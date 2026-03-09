@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -615,6 +616,8 @@
         <input type="password" id="authPassword" placeholder="••••••••">
       </div>
       <button class="btn btn-primary" id="authLoginBtn">ログイン</button>
+      <button class="btn btn-secondary" id="googleLoginBtn" style="margin-top:10px;background:#fff;color:#333;border:1px solid #d0d7de;">Googleでログイン（管理者）</button>
+      <p style="font-size:.85rem;color:#666;margin-top:10px;line-height:1.5;">一般ユーザーはメールアドレス/パスワードでログイン、管理者は Google ログインを利用してください。</p>
       <p id="authMsg" style="color:#c62828;margin-top:10px;"></p>
     </div>
   </div>
@@ -1271,7 +1274,7 @@ document.getElementById('shareOpenRepair')?.addEventListener('click', ()=>{
 
  
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
   import {
     getFirestore,
     collection, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, updateDoc,
@@ -1310,6 +1313,8 @@ onAuthStateChanged(auth, (user) => {
   const gate = document.getElementById('authGate');
   const appRoot = document.getElementById('appRoot');
   const signOutBtn = document.getElementById('signOutBtn');
+  const googleProvider = new GoogleAuthProvider();
+  googleProvider.setCustomParameters({ prompt:'select_account' });
 // --- 再発時の対策状況 切替UI ---
 const recurrenceSelect = document.getElementById('recurrenceType');
 const measureStatusGroup = document.getElementById('measureStatusGroup');
@@ -1372,14 +1377,14 @@ document.getElementById('btnAutoFillChangePointTech')?.addEventListener('click',
   document.getElementById('tech_changePointContent').value = rootCauseAction;
 });
 
-  // ===== v17 追加：端末ID / ロール / 監査ログ / 初回管理者端末登録 =====
+  // ===== v17.1 追加：端末ID / ロール / 監査ログ / 初回管理者端末登録 + Google管理者ログイン =====
 const ADMIN_EMAILS = [
   'ysugimoto@miyama-unitec.co.jp' // ←必要に応じて追加
 ];
 
 // 端末ID（ブラウザに固定保存）
 function getDeviceId(){
-  const KEY = 'abn_device_id_v17';
+  const KEY = 'abn_device_id_v17_1';
   let id = null;
   try{ id = localStorage.getItem(KEY); }catch(e){}
   if (!id){
@@ -1498,6 +1503,27 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
     // onAuthStateChanged 側で後処理
   }catch(e){
     msg.textContent = 'ログイン失敗: ' + (e.code||e.message);
+  }
+});
+
+// 管理者向け Google ログイン
+document.getElementById('googleLoginBtn')?.addEventListener('click', async ()=>{
+  const msg = document.getElementById('authMsg');
+  msg.textContent = '';
+  try{
+    await setPersistence(auth, browserLocalPersistence);
+    const result = await signInWithPopup(auth, googleProvider);
+    const email = (result?.user?.email || '').toLowerCase();
+    const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
+    if (!isAllowedAdmin){
+      await logAudit('blocked_google_non_admin', { email });
+      await signOut(auth);
+      msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
+      return;
+    }
+    // onAuthStateChanged 側で後処理
+  }catch(e){
+    msg.textContent = 'Googleログイン失敗: ' + (e.code||e.message);
   }
 });
 
