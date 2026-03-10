@@ -1,0 +1,652 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>品質呼び出し</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1:wght@400;600;700;900&display=swap');
+
+  :root{
+    --bg:#0d1117;
+    --surface:#161b22;
+    --surface2:#21262d;
+    --border:#30363d;
+    --urgent:#ff3b3b;
+    --urgent-glow:rgba(255,59,59,0.35);
+    --normal:#1e90ff;
+    --normal-glow:rgba(30,144,255,0.35);
+    --text:#e6edf3;
+    --text-muted:#8b949e;
+    --success:#3fb950;
+    --accent:#f0a030;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box}
+
+  body{
+    font-family:'M PLUS 1',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* ===== BACKGROUND GRID ===== */
+  body::before{
+    content:'';
+    position:fixed;inset:0;
+    background-image:
+      linear-gradient(rgba(30,144,255,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,144,255,.04) 1px, transparent 1px);
+    background-size:40px 40px;
+    pointer-events:none;z-index:0;
+  }
+
+  /* ===== AUTH GATE ===== */
+  #authGate{
+    position:fixed;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    z-index:1000;
+    background:var(--bg);
+  }
+  .auth-card{
+    position:relative;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:40px 36px;
+    width:100%;max-width:400px;
+    box-shadow:0 0 60px rgba(30,144,255,.08);
+  }
+  .auth-logo{
+    font-size:2.8rem;
+    text-align:center;
+    margin-bottom:6px;
+    filter:drop-shadow(0 0 12px var(--normal-glow));
+  }
+  .auth-title{
+    text-align:center;
+    font-size:1.25rem;
+    font-weight:700;
+    letter-spacing:.05em;
+    margin-bottom:28px;
+    color:var(--text);
+  }
+  .auth-field{
+    margin-bottom:16px;
+  }
+  .auth-field label{
+    display:block;font-size:.78rem;font-weight:700;
+    color:var(--text-muted);letter-spacing:.08em;
+    text-transform:uppercase;margin-bottom:6px;
+  }
+  .auth-field input{
+    width:100%;background:var(--surface2);
+    border:1px solid var(--border);
+    border-radius:8px;padding:12px 14px;
+    color:var(--text);font-size:.95rem;
+    font-family:inherit;
+    transition:border-color .2s;
+  }
+  .auth-field input:focus{
+    outline:none;border-color:var(--normal);
+    box-shadow:0 0 0 3px rgba(30,144,255,.15);
+  }
+  .btn-login{
+    width:100%;padding:14px;
+    background:var(--normal);
+    border:none;border-radius:8px;
+    color:#fff;font-size:1rem;font-weight:700;
+    font-family:inherit;cursor:pointer;
+    transition:.2s;margin-top:6px;
+    box-shadow:0 4px 18px rgba(30,144,255,.3);
+  }
+  .btn-login:hover{filter:brightness(1.1);transform:translateY(-1px);}
+  .btn-google{
+    width:100%;padding:12px;
+    background:var(--surface2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text-muted);font-size:.9rem;font-weight:600;
+    font-family:inherit;cursor:pointer;
+    transition:.2s;margin-top:10px;
+  }
+  .btn-google:hover{border-color:var(--normal);color:var(--text);}
+  #authMsg{color:#ff6b6b;font-size:.85rem;margin-top:10px;min-height:20px;}
+
+  /* ===== MAIN APP ===== */
+  #app{display:none;position:relative;z-index:1;}
+
+  /* ===== HEADER ===== */
+  .header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 24px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:blur(12px);
+  }
+  .header-title{
+    font-size:1.05rem;font-weight:900;
+    letter-spacing:.04em;
+    display:flex;align-items:center;gap:10px;
+  }
+  .header-title .badge{
+    font-size:.65rem;font-weight:700;
+    background:var(--normal);
+    color:#fff;padding:2px 8px;border-radius:999px;
+    letter-spacing:.06em;
+  }
+  #signOutBtn{
+    background:transparent;border:1px solid var(--border);
+    color:var(--text-muted);border-radius:6px;padding:6px 14px;
+    font-size:.82rem;font-family:inherit;cursor:pointer;
+    transition:.2s;
+  }
+  #signOutBtn:hover{border-color:#ff6b6b;color:#ff6b6b;}
+
+  /* ===== MAIN LAYOUT ===== */
+  .main{
+    max-width:600px;margin:0 auto;
+    padding:28px 20px;
+  }
+
+  /* ===== PANEL ===== */
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:24px;
+    position:relative;overflow:hidden;
+  }
+  .panel-title{
+    font-size:.8rem;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text-muted);margin-bottom:18px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .panel-title::before{
+    content:'';display:inline-block;
+    width:3px;height:14px;border-radius:2px;
+    background:var(--normal);
+  }
+
+  /* ===== FORM ===== */
+  .form-group{margin-bottom:14px;}
+  .form-label{
+    display:block;font-size:.76rem;font-weight:700;
+    color:var(--text-muted);letter-spacing:.07em;
+    text-transform:uppercase;margin-bottom:6px;
+  }
+  .form-input,.form-select,.form-textarea{
+    width:100%;
+    background:var(--surface2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:11px 14px;
+    color:var(--text);font-size:.93rem;
+    font-family:inherit;
+    transition:border-color .2s,box-shadow .2s;
+    appearance:none;
+  }
+  .form-input:focus,.form-select:focus,.form-textarea:focus{
+    outline:none;border-color:var(--normal);
+    box-shadow:0 0 0 3px rgba(30,144,255,.12);
+  }
+  .form-textarea{min-height:80px;resize:vertical;}
+  .form-select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 14px center;
+    padding-right:36px;
+  }
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+  /* ===== CALL BUTTONS ===== */
+  .call-buttons{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:14px;margin-top:20px;
+  }
+  .btn-call{
+    position:relative;
+    padding:20px 10px;
+    border:none;border-radius:12px;
+    font-family:inherit;cursor:pointer;
+    font-weight:900;font-size:1.05rem;
+    letter-spacing:.04em;
+    transition:.2s;
+    overflow:hidden;
+  }
+  .btn-call::after{
+    content:'';
+    position:absolute;inset:0;
+    background:rgba(255,255,255,0);
+    transition:.2s;
+  }
+  .btn-call:hover::after{background:rgba(255,255,255,.07);}
+  .btn-call:active{transform:scale(.97);}
+
+  .btn-urgent{
+    background:linear-gradient(135deg,#b91c1c,#dc2626);
+    color:#fff;
+    box-shadow:0 4px 20px var(--urgent-glow);
+  }
+  .btn-urgent:hover{
+    box-shadow:0 6px 28px rgba(220,38,38,.5);
+    transform:translateY(-2px);
+  }
+  .btn-normal{
+    background:linear-gradient(135deg,#1565c0,#1e90ff);
+    color:#fff;
+    box-shadow:0 4px 20px var(--normal-glow);
+  }
+  .btn-normal:hover{
+    box-shadow:0 6px 28px rgba(30,144,255,.5);
+    transform:translateY(-2px);
+  }
+  .btn-call .btn-icon{font-size:1.6rem;display:block;margin-bottom:4px;}
+  .btn-call .btn-sub{font-size:.72rem;font-weight:600;opacity:.8;display:block;}
+
+  /* ===== TOAST ===== */
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:14px 24px;
+    font-size:.9rem;font-weight:600;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);
+    z-index:9999;
+    transition:transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
+    opacity:0;
+    display:flex;align-items:center;gap:10px;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+  .toast.urgent-toast{border-color:var(--urgent);box-shadow:0 8px 32px var(--urgent-glow);}
+  .toast.normal-toast{border-color:var(--normal);box-shadow:0 8px 32px var(--normal-glow);}
+
+  /* ===== PENDING COUNT BADGE ===== */
+  .pending-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:20px;height:20px;
+    background:var(--urgent);color:#fff;
+    border-radius:50%;font-size:.72rem;font-weight:700;
+    margin-left:6px;
+    animation:pulse 2s infinite;
+  }
+
+  /* ===== LOADING ===== */
+  .loading{
+    text-align:center;padding:20px;
+    color:var(--text-muted);font-size:.85rem;
+  }
+
+  /* ===== WAITING STATUS ===== */
+  .wait-status{
+    margin-top:18px;
+    border-radius:12px;
+    padding:18px 20px;
+    display:flex;align-items:center;gap:16px;
+    border:1px solid var(--border);
+    background:var(--surface2);
+    transition:all .4s;
+  }
+  .wait-status.has-pending{
+    border-color:rgba(240,160,48,.5);
+    background:rgba(240,160,48,.06);
+    box-shadow:0 0 20px rgba(240,160,48,.1);
+  }
+  .wait-icon{font-size:2rem;flex-shrink:0;}
+  .wait-status.has-pending .wait-icon{animation:wobble 2s infinite;}
+  @keyframes wobble{
+    0%,100%{transform:rotate(0);}
+    20%{transform:rotate(-12deg);}
+    40%{transform:rotate(10deg);}
+    60%{transform:rotate(-6deg);}
+    80%{transform:rotate(4deg);}
+  }
+  .wait-body{flex:1;}
+  .wait-count{font-size:1.4rem;font-weight:900;color:var(--text-muted);transition:color .3s;}
+  .wait-status.has-pending .wait-count{color:var(--accent);}
+  .wait-count em{font-size:2rem;font-style:normal;margin-right:4px;}
+  .wait-msg{font-size:.82rem;color:var(--text-muted);margin-top:3px;transition:color .3s;}
+  .wait-status.has-pending .wait-msg{color:rgba(240,160,48,.8);}
+  .wait-dot{
+    display:inline-block;width:8px;height:8px;border-radius:50%;
+    background:var(--text-muted);margin-right:6px;vertical-align:middle;transition:background .3s;
+  }
+  .wait-status.has-pending .wait-dot{background:var(--accent);animation:pulse 1.5s infinite;}
+</style>
+</head>
+<body>
+
+<!-- 認証ゲート -->
+<div id="authGate">
+  <div class="auth-card">
+    <div class="auth-logo">📞</div>
+    <div class="auth-title">品質呼び出し</div>
+    <div class="auth-field">
+      <label>メールアドレス</label>
+      <input type="email" id="authEmail" placeholder="user@example.com" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label>パスワード</label>
+      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btnLogin">ログイン</button>
+    <button class="btn-google" id="btnGoogleLogin">Googleでログイン</button>
+    <div id="authMsg"></div>
+  </div>
+</div>
+
+<!-- メインアプリ -->
+<div id="app">
+  <div class="header">
+    <div class="header-title">
+      📞 品質呼び出し
+      
+    </div>
+    <button id="signOutBtn">ログアウト</button>
+  </div>
+
+  <div class="main">
+    <!-- 左：呼び出しフォーム -->
+    <div>
+      <div class="panel">
+        <div class="panel-title">呼び出し内容</div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">発信部署 *</label>
+            <select class="form-select" id="fDept">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ライン名 *</label>
+            <select class="form-select" id="fLine">
+              <option value="">部署を選択後</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">整理No</label>
+            <input type="text" class="form-input" id="fSerialNo" placeholder="例：6769">
+          </div>
+          <div class="form-group">
+            <label class="form-label">発信者名 *</label>
+            <select class="form-select" id="fHandler">
+              <option value="">部署を選択後</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">メッセージ（任意）</label>
+          <textarea class="form-textarea" id="fMessage" placeholder="異常内容・状況など（任意）"></textarea>
+        </div>
+
+        <div class="call-buttons">
+          <button class="btn-call btn-urgent" id="btnUrgent">
+            <span class="btn-icon">🚨</span>
+            緊急呼び出し
+            <span class="btn-sub">至急対応が必要</span>
+          </button>
+          <button class="btn-call btn-normal" id="btnNormal">
+            <span class="btn-icon">🔔</span>
+            通常呼び出し
+            <span class="btn-sub">通常の問い合わせ</span>
+          </button>
+        </div>
+
+        <!-- 待ち件数表示 -->
+        <div class="wait-status" id="waitStatus">
+          <div class="wait-icon">🕐</div>
+          <div class="wait-body">
+            <div class="wait-count"><em id="waitCount">0</em>件待ち</div>
+            <div class="wait-msg"><span class="wait-dot"></span><span id="waitMsg">現在の待ち呼び出しはありません</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+  </div>
+</div>
+
+<!-- トースト -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+import {
+  getFirestore, collection, addDoc, getDocs,
+  query, where, onSnapshot, orderBy, limit, updateDoc, doc, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0YUIpIDh4WB4p1ewiNB0XfwHve0ByljU",
+  authDomain: "abnreport-fd733.firebaseapp.com",
+  projectId: "abnreport-fd733",
+  storageBucket: "abnreport-fd733.firebasestorage.app",
+  messagingSenderId: "349748947315",
+  appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
+};
+
+const app    = initializeApp(firebaseConfig);
+const auth   = getAuth(app);
+const db     = getFirestore(app);
+const gp     = new GoogleAuthProvider();
+gp.setCustomParameters({ prompt: 'select_account' });
+
+// ===== 認証 =====
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const email = document.getElementById('authEmail').value.trim();
+  const pw    = document.getElementById('authPassword').value;
+  const msg   = document.getElementById('authMsg');
+  msg.textContent = '';
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    await signInWithEmailAndPassword(auth, email, pw);
+  } catch(e) {
+    msg.textContent = 'ログイン失敗: ' + (e.code || e.message);
+  }
+});
+
+document.getElementById('btnGoogleLogin').addEventListener('click', async () => {
+  const msg = document.getElementById('authMsg');
+  msg.textContent = '';
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    await signInWithPopup(auth, gp);
+  } catch(e) {
+    msg.textContent = 'Googleログイン失敗: ' + (e.code || e.message);
+  }
+});
+
+document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
+
+// Enterキーでログイン
+document.getElementById('authPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnLogin').click();
+});
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    document.getElementById('authGate').style.display = 'none';
+    document.getElementById('app').style.display    = 'block';
+    bootApp();
+  } else {
+    document.getElementById('authGate').style.display = 'flex';
+    document.getElementById('app').style.display    = 'none';
+  }
+});
+
+// ===== マスタ読み込み =====
+let mastersCache = null;
+
+async function fetchMasters() {
+  if (mastersCache) return mastersCache;
+  const [depSnap, lineSnap, hSnap] = await Promise.all([
+    getDocs(collection(db,'masters','department','items')),
+    getDocs(collection(db,'masters','line','items')),
+    getDocs(collection(db,'masters','handler','items'))
+  ]);
+  const departments = depSnap.docs.map(d => d.data().name).sort();
+  const lines = {};
+  lineSnap.docs.forEach(d => {
+    const data = d.data();
+    if (!lines[data.department]) lines[data.department] = [];
+    lines[data.department].push(data.name);
+  });
+  const handlers = {};
+  hSnap.docs.forEach(d => {
+    const data = d.data();
+    if (!handlers[data.department]) handlers[data.department] = [];
+    handlers[data.department].push(data.name);
+  });
+  mastersCache = { departments, lines, handlers };
+  return mastersCache;
+}
+
+function populateSelect(sel, opts, placeholder) {
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  opts.forEach(v => {
+    const o = document.createElement('option');
+    o.value = o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+async function bootApp() {
+  const m = await fetchMasters();
+  populateSelect(document.getElementById('fDept'), m.departments, '選択してください');
+
+  document.getElementById('fDept').addEventListener('change', () => {
+    const dept = document.getElementById('fDept').value;
+    populateSelect(document.getElementById('fLine'), m.lines[dept] || [], 'ライン選択');
+    populateSelect(document.getElementById('fHandler'), m.handlers[dept] || [], '処置者選択');
+  });
+
+  startWaitingListener();
+}
+
+// ===== 待ち件数リアルタイム監視 =====
+function startWaitingListener() {
+  // pending（未対応）と inprogress（対応中）を両方カウント
+  const q = query(
+    collection(db, 'quality_cases'),
+    orderBy('createdAt', 'desc')
+  );
+  onSnapshot(q, snap => {
+    const cases = snap.docs.map(d => d.data());
+    const pendingCount   = cases.filter(c => (c.status || 'pending') === 'pending').length;
+    const inprogressCount= cases.filter(c => c.status === 'inprogress').length;
+    const total = pendingCount + inprogressCount;
+
+    const box     = document.getElementById('waitStatus');
+    const countEl = document.getElementById('waitCount');
+    const msgEl   = document.getElementById('waitMsg');
+
+    countEl.textContent = total;
+
+    if (total > 0) {
+      box.classList.add('has-pending');
+      const parts = [];
+      if (pendingCount   > 0) parts.push(`未対応 ${pendingCount}件`);
+      if (inprogressCount > 0) parts.push(`対応中 ${inprogressCount}件`);
+      msgEl.textContent = parts.join('　') + '　少々お待ちください';
+    } else {
+      box.classList.remove('has-pending');
+      msgEl.textContent = '現在の待ち呼び出しはありません';
+    }
+  }, err => console.error('waiting listener error', err));
+}
+
+// ===== 呼び出し送信 =====
+async function sendCall(priority) {
+  const dept     = document.getElementById('fDept').value.trim();
+  const lineName = document.getElementById('fLine').value.trim();
+  const serialNo = document.getElementById('fSerialNo').value.trim();
+  const handler  = document.getElementById('fHandler').value.trim();
+  const message  = document.getElementById('fMessage').value.trim();
+
+  if (!dept)    { showToast('発信部署を選択してください', 'error'); document.getElementById('fDept').focus(); return; }
+  if (!lineName){ showToast('ライン名を選択してください', 'error'); document.getElementById('fLine').focus(); return; }
+  if (!handler) { showToast('発信者名を選択してください', 'error'); document.getElementById('fHandler').focus(); return; }
+
+  const label = priority === 'urgent' ? '緊急' : '通常';
+  if (!confirm(`${label}呼び出しを送信しますか？\n\n部署：${dept}\nライン：${lineName}\n発信者：${handler}`)) return;
+
+  const btn = priority === 'urgent'
+    ? document.getElementById('btnUrgent')
+    : document.getElementById('btnNormal');
+  btn.disabled = true;
+
+  try {
+    const caseData = {
+      priority,
+      department: dept,
+      lineName,
+      serialNo: serialNo || '',
+      callerName: handler,
+      message: message || '',
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser?.email || ''
+    };
+    await addDoc(collection(db, 'quality_cases'), caseData);
+
+    showToast(`${label}呼び出しを送信しました 📤`, priority);
+    document.getElementById('fMessage').value = '';
+    document.getElementById('fSerialNo').value = '';
+
+  } catch(err) {
+    console.error(err);
+    showToast('送信失敗: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btnUrgent').addEventListener('click', () => sendCall('urgent'));
+document.getElementById('btnNormal').addEventListener('click', () => sendCall('normal'));
+
+// ===== ユーティリティ =====
+function escHtml(v) {
+  return String(v ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+let toastTimer = null;
+function showToast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.className = 'toast';
+  if (type === 'urgent') {
+    el.className += ' urgent-toast';
+    el.innerHTML = '🚨 ' + msg;
+  } else if (type === 'normal') {
+    el.className += ' normal-toast';
+    el.innerHTML = '🔔 ' + msg;
+  } else if (type === 'error') {
+    el.innerHTML = '❌ ' + msg;
+  } else {
+    el.innerHTML = '✅ ' + msg;
+  }
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
