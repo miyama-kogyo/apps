@@ -356,7 +356,6 @@ main{flex:1;padding:28px 32px;overflow-y:auto;}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 import {
   getFirestore, collection, doc,
   onSnapshot, addDoc, updateDoc, deleteDoc,
@@ -376,10 +375,9 @@ const firebaseConfig = {
   appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
 };
 
-const fireApp = initializeApp(firebaseConfig);
-const auth    = getAuth(fireApp);
-const db      = getFirestore(fireApp);
-const rtdb    = getDatabase(fireApp);
+const fireApp   = initializeApp(firebaseConfig);
+const db        = getFirestore(fireApp);
+const rtdb      = getDatabase(fireApp);
 const appsCol   = collection(db, 'platform_apps');
 const configDoc = doc(db, 'platform_config', 'settings');
 
@@ -402,23 +400,19 @@ let selectedIcon = '📊', editSelectedIcon = '📊';
 let pendingLockUrl = '', pendingLockPw = '';
 let colorIdx = 0;
 
-// ===== AUTH =====
-onAuthStateChanged(auth, async user => {
-  if (!user) { await signInAnonymously(auth); return; }
-
+// ===== INIT =====
+async function initApp() {
   // ===== PRESENCE (リアルタイム閲覧者数) =====
-  const connRef    = ref(rtdb, '.info/connected');
-  const presRef    = ref(rtdb, 'platform_presence');
-  const countEl    = document.getElementById('viewerCount');
+  const connRef  = ref(rtdb, '.info/connected');
+  const presRef  = ref(rtdb, 'platform_presence');
+  const countEl  = document.getElementById('viewerCount');
 
   onValue(connRef, snap => {
     if (!snap.val()) return;
-    // この接続を presence ノードに追加し、切断時に自動削除
     const myRef = push(presRef, { t: serverTimestamp() });
     onDisconnect(myRef).remove();
   });
 
-  // 閲覧者数をリアルタイム監視
   onValue(presRef, snap => {
     const n = snap.exists() ? Object.keys(snap.val()).length : 0;
     countEl.textContent = n;
@@ -439,7 +433,9 @@ onAuthStateChanged(auth, async user => {
     apps = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
     renderSidebar(); renderApps(); hideLoading();
   }, err => { console.error(err); hideLoading(); });
-});
+}
+
+initApp();
 
 function hideLoading(){
   const s = document.getElementById('loadingScreen');
@@ -474,6 +470,7 @@ function renderSidebar(){
   el.innerHTML = h;
 }
 window.setFilter = function(id){ activeFilter=id; renderSidebar(); renderApps(); };
+window.renderApps = renderApps;
 
 // ===== RENDER APPS =====
 function renderApps(){
