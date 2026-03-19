@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>QR照合 ログビューア</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --bg:       #07080a;
+      --surface:  #0e1117;
+      --surface2: #161b22;
+      --border:   #21262d;
+      --border2:  #30363d;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --faint:    #3d444d;
+      --ok:       #3fb950;
+      --ok-bg:    #0d2e1a;
+      --ok-glow:  rgba(63,185,80,.18);
+      --ng:       #f85149;
+      --ng-bg:    #2e0d0d;
+      --ng-glow:  rgba(248,81,73,.18);
+      --accent:   #58a6ff;
+      --accent2:  #79c0ff;
+      --warn:     #d29922;
+      --mono:     'JetBrains Mono', monospace;
+      --sans:     'Noto Sans JP', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo {
+      font-family: var(--mono);
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .header-sub {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 3px 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+    }
+    .conn-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 5px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      transition: all .3s;
+    }
+    .conn-badge.connected { color: var(--ok); border-color: var(--ok); background: var(--ok-bg); }
+    .conn-badge.error     { color: var(--ng); border-color: var(--ng); background: var(--ng-bg); }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .conn-badge.connected .conn-dot { animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ─── STATS BAR ─── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-cell {
+      background: var(--surface);
+      padding: 14px 20px;
+      text-align: center;
+    }
+    .stat-val {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+    .stat-cell.total .stat-val  { color: var(--accent2); }
+    .stat-cell.ok-s .stat-val   { color: var(--ok); }
+    .stat-cell.ng-s .stat-val   { color: var(--ng); }
+    .stat-cell.rate .stat-val   { color: var(--warn); }
+
+    /* ─── TOOLBAR ─── */
+    .toolbar {
+      padding: 12px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 14px;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      padding: 9px 12px 9px 32px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--faint); }
+
+    .filter-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-btn.active-all  { background: rgba(88,166,255,.12); color: var(--accent2); border-color: var(--accent); }
+    .filter-btn.active-ok   { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+    .filter-btn.active-ng   { background: var(--ng-bg); color: var(--ng); border-color: var(--ng); }
+
+    .date-input {
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: var(--sans);
+      outline: none;
+      cursor: pointer;
+    }
+    .date-input:focus { border-color: var(--accent); }
+
+    .export-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--ok);
+      background: var(--ok-bg);
+      color: var(--ok);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 700;
+      transition: all .15s;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .export-btn:hover { background: rgba(63,185,80,.25); }
+
+    /* ─── TABLE AREA ─── */
+    .table-wrap {
+      overflow-x: auto;
+      padding: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td {
+      padding: 10px 14px;
+      vertical-align: middle;
+    }
+    td.mono { font-family: var(--mono); font-size: 12px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+    .badge-ng { background: var(--ng-bg); color: var(--ng); border: 1px solid var(--ng); }
+
+    .part-code {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent2);
+      background: rgba(88,166,255,.08);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(88,166,255,.2);
+    }
+
+    .qr-cell {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: color .15s;
+    }
+    .qr-cell:hover { color: var(--text); }
+
+    .rule-chip {
+      display: inline-block;
+      padding: 2px 7px;
+      background: rgba(210,153,34,.1);
+      border: 1px solid rgba(210,153,34,.3);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--warn);
+      white-space: nowrap;
+    }
+
+    .note-chip {
+      display: inline-block;
+      padding: 1px 6px;
+      background: rgba(248,81,73,.08);
+      border: 1px solid rgba(248,81,73,.2);
+      border-radius: 4px;
+      font-size: 10px;
+      color: #f8a;
+    }
+
+    .time-col { color: var(--muted); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+
+    /* ─── EMPTY / LOADING ─── */
+    .empty {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--faint);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; }
+
+    .loading-row td {
+      padding: 60px;
+      text-align: center;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── DETAIL MODAL ─── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.show { display: flex; animation: fadeIn .15s; }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 14px;
+      max-width: 580px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 80px rgba(0,0,0,.7);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title { font-weight: 700; font-size: 15px; }
+    .modal-close {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 20px; }
+    .detail-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .detail-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 4px;
+    }
+    .detail-block {
+      flex: 1;
+      min-width: 200px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .detail-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+
+    /* ─── FOOTER ─── */
+    .footer-bar {
+      padding: 10px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 600px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .header-sub { display: none; }
+      thead th:nth-child(n+5) { display: none; }
+      tbody td:nth-child(n+5) { display: none; }
+    }
+    @media (max-width: 380px) {
+      .stat-val { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo">📟 QR LOG</div>
+    <div class="header-sub">照合ログビューア</div>
+  </div>
+  <div class="conn-badge" id="connBadge">
+    <div class="conn-dot"></div>
+    <span id="connText">接続中...</span>
+  </div>
+</header>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-cell total">
+    <div class="stat-val" id="statTotal">—</div>
+    <div class="stat-label">TOTAL</div>
+  </div>
+  <div class="stat-cell ok-s">
+    <div class="stat-val" id="statOK">—</div>
+    <div class="stat-label">OK</div>
+  </div>
+  <div class="stat-cell ng-s">
+    <div class="stat-val" id="statNG">—</div>
+    <div class="stat-label">NG</div>
+  </div>
+  <div class="stat-cell rate">
+    <div class="stat-val" id="statRate">—</div>
+    <div class="stat-label">OK率</div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" id="searchInput" placeholder="品番・QRで絞り込み" oninput="applyFilters()">
+  </div>
+  <button class="filter-btn active-all" id="fAll"  onclick="setResultFilter('all')">すべて</button>
+  <button class="filter-btn"            id="fOK"   onclick="setResultFilter('ok')">✅ OK</button>
+  <button class="filter-btn"            id="fNG"   onclick="setResultFilter('ng')">❌ NG</button>
+  <input type="date" class="date-input" id="dateFrom" title="開始日" onchange="applyFilters()">
+  <span style="color:var(--muted);font-size:12px;">〜</span>
+  <input type="date" class="date-input" id="dateTo"   title="終了日" onchange="applyFilters()">
+  <button class="export-btn" onclick="exportCSV()">📥 CSV出力</button>
+</div>
+
+<!-- TABLE -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>日時</th>
+        <th>結果</th>
+        <th>品番</th>
+        <th>1回目 QR</th>
+        <th>2回目 QR</th>
+        <th>文字数</th>
+        <th>抽出ルール</th>
+        <th>note</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr class="loading-row">
+        <td colspan="8"><span class="spinner"></span>Firebase からデータを読み込み中...</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- FOOTER -->
+<div class="footer-bar">
+  <span id="footerCount">0件</span>
+  <span id="footerLast">最終更新: —</span>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-backdrop" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">詳細</div>
+      <button class="modal-close" onclick="document.getElementById('modal').classList.remove('show')">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+  // ─── Firebase設定 ───────────────────────────────────────────
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAOMRoojKv9Hnh3OjVGwYV_k1LBTGOKepY",
+    authDomain: "miyamaunitec-fb87a.firebaseapp.com",
+    databaseURL: "https://miyamaunitec-fb87a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "miyamaunitec-fb87a"
+  };
+
+  // ─── 状態 ───────────────────────────────────────────────────
+  let allLogs = [];
+  let filtered = [];
+  let resultFilter = 'all';
+
+  // ─── Firebase 初期化 ────────────────────────────────────────
+  const app = firebase.initializeApp(FIREBASE_CONFIG);
+  const db  = firebase.database();
+
+  db.ref('.info/connected').on('value', snap => {
+    const ok = snap.val() === true;
+    const badge = document.getElementById('connBadge');
+    const text  = document.getElementById('connText');
+    badge.className = 'conn-badge ' + (ok ? 'connected' : '');
+    text.textContent = ok ? 'リアルタイム接続中' : '未接続';
+  });
+
+  db.ref('qr_match_logs').orderByChild('timestamp').on('value', snap => {
+    const data = snap.val();
+    if (data) {
+      allLogs = Object.entries(data)
+        .map(([key, val]) => ({ ...val, _key: key }))
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    } else {
+      allLogs = [];
+    }
+    updateStats();
+    applyFilters();
+    document.getElementById('footerLast').textContent =
+      '最終更新: ' + new Date().toLocaleTimeString('ja-JP');
+  }, err => {
+    const badge = document.getElementById('connBadge');
+    badge.className = 'conn-badge error';
+    document.getElementById('connText').textContent = '接続エラー';
+    document.getElementById('tableBody').innerHTML =
+      `<tr class="loading-row"><td colspan="8">❌ ${escHtml(err.message)}</td></tr>`;
+  });
+
+  // ─── フィルター ─────────────────────────────────────────────
+  function setResultFilter(f) {
+    resultFilter = f;
+    document.getElementById('fAll').className = 'filter-btn' + (f==='all'?' active-all':'');
+    document.getElementById('fOK') .className = 'filter-btn' + (f==='ok' ?' active-ok' :'');
+    document.getElementById('fNG') .className = 'filter-btn' + (f==='ng' ?' active-ng' :'');
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q    = document.getElementById('searchInput').value.trim().toLowerCase();
+    const from = document.getElementById('dateFrom').value;
+    const to   = document.getElementById('dateTo').value;
+
+    filtered = allLogs.filter(l => {
+      if (resultFilter === 'ok' && l.result !== 'OK') return false;
+      if (resultFilter === 'ng' && l.result !== 'NG') return false;
+
+      if (from && l.timestamp < from) return false;
+      if (to   && l.timestamp > to + 'T23:59:59') return false;
+
+      if (q) {
+        const hay = [l.partNumber, l.qr1, l.qr2, l.qr1_raw, l.qr2_raw]
+          .join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    renderTable();
+    document.getElementById('footerCount').textContent = filtered.length + '件表示';
+  }
+
+  // ─── 統計 ───────────────────────────────────────────────────
+  function updateStats() {
+    const total = allLogs.length;
+    const okCnt = allLogs.filter(l => l.result === 'OK').length;
+    const ngCnt = allLogs.filter(l => l.result === 'NG').length;
+    const rate  = total ? Math.round(okCnt / total * 100) : 0;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statOK')   .textContent = okCnt;
+    document.getElementById('statNG')   .textContent = ngCnt;
+    document.getElementById('statRate') .textContent = rate + '%';
+  }
+
+  // ─── テーブル描画 ────────────────────────────────────────────
+  function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr><td colspan="8">
+          <div class="empty">
+            <div class="empty-icon">🗂</div>
+            <div class="empty-text">表示するログがありません</div>
+          </div>
+        </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((l, i) => {
+      const dt  = new Date(l.timestamp).toLocaleString('ja-JP', { month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit' });
+      const isOK = l.result === 'OK';
+      const badge = isOK
+        ? `<span class="badge badge-ok">✓ OK</span>`
+        : `<span class="badge badge-ng">✕ NG</span>`;
+
+      const rule = l.matchedRule
+        ? `<span class="rule-chip">s${l.matchedRule.startPos} c${l.matchedRule.charCount}${l.matchedRule.prefix ? ' p:'+escHtml(l.matchedRule.prefix) : ''}</span>`
+        : `<span class="rule-chip" style="opacity:.4">—</span>`;
+
+      const note = l.extractNote
+        ? `<span class="note-chip">${escHtml(l.extractNote)}</span>`
+        : '';
+
+      return `
+        <tr onclick="showDetail(${i})" style="cursor:pointer;">
+          <td class="time-col">${dt}</td>
+          <td>${badge}</td>
+          <td><span class="part-code">${escHtml(l.partNumber || '—')}</span></td>
+          <td><div class="qr-cell" title="${escHtml(l.qr1_raw || '')}">${escHtml(truncate(l.qr1_raw||l.qr1||'', 28))}</div></td>
+          <td><div class="qr-cell" title="${escHtml(l.qr2_raw || '')}">${escHtml(truncate(l.qr2_raw||l.qr2||'', 28))}</div></td>
+          <td class="mono" style="color:var(--muted);text-align:right;">${l.qr2Length ?? '—'}</td>
+          <td>${rule}</td>
+          <td>${note}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ─── 詳細モーダル ────────────────────────────────────────────
+  function showDetail(idx) {
+    const l = filtered[idx];
+    if (!l) return;
+    const isOK = l.result === 'OK';
+
+    document.getElementById('modalTitle').innerHTML =
+      `詳細 &nbsp;<span class="badge ${isOK?'badge-ok':'badge-ng'}">${isOK?'✓ OK':'✕ NG'}</span>`;
+
+    const rule = l.matchedRule
+      ? `minLen=${l.matchedRule.minLen}  maxLen=${l.matchedRule.maxLen}\nstartPos=${l.matchedRule.startPos}  charCount=${l.matchedRule.charCount}\nprefix="${l.matchedRule.prefix||''}"`
+      : '(なし)';
+
+    document.getElementById('modalBody').innerHTML = `
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">日時</div>
+          <div class="detail-val">${new Date(l.timestamp).toLocaleString('ja-JP')}</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-block">
+          <div class="detail-label">抽出品番</div>
+          <div class="detail-val" style="color:var(--accent2);font-size:15px;font-weight:700;">${escHtml(l.partNumber||'—')}</div>
+        </div>
+        <div class="detail-block">
+          <div class="detail-label">2回目 文字数</div>
+          <div class="detail-val">${l.qr2Length ?? '—'} 文字</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">1回目 QR（raw）</div>
+          <div class="detail-val">${escHtml(l.qr1_raw||l.qr1||'—')}</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">1回目 QR（正規化）</div>
+          <div class="detail-val" style="color:var(--muted)">${escHtml(l.qr1||'—')}</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">2回目 QR（raw）</div>
+          <div class="detail-val">${escHtml(l.qr2_raw||l.qr2||'—')}</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">2回目 QR（正規化）</div>
+          <div class="detail-val" style="color:var(--muted)">${escHtml(l.qr2||'—')}</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">適用ルール</div>
+          <div class="detail-val" style="white-space:pre; color:var(--warn)">${escHtml(rule)}</div>
+        </div>
+      </div>
+      ${l.extractNote ? `
+      <div class="detail-row">
+        <div class="detail-block" style="flex:0 0 100%">
+          <div class="detail-label">note</div>
+          <div class="detail-val" style="color:#f8a">${escHtml(l.extractNote)}</div>
+        </div>
+      </div>` : ''}
+    `;
+    document.getElementById('modal').classList.add('show');
+  }
+
+  function closeModal(e) {
+    if (e.target === document.getElementById('modal'))
+      document.getElementById('modal').classList.remove('show');
+  }
+
+  // ─── CSV出力 ─────────────────────────────────────────────────
+  function exportCSV() {
+    const target = filtered.length ? filtered : allLogs;
+    if (!target.length) return alert('データがありません');
+
+    const headers = ['日時','結果','品番','1回目QR(raw)','2回目QR(raw)',
+                     '1回目QR(norm)','2回目QR(norm)','文字数','ルール','note'];
+    const rows = target.map(l => [
+      new Date(l.timestamp).toLocaleString('ja-JP'),
+      l.result,
+      l.partNumber ?? '',
+      l.qr1_raw ?? '',
+      l.qr2_raw ?? '',
+      l.qr1 ?? '',
+      l.qr2 ?? '',
+      l.qr2Length ?? '',
+      l.matchedRule ? JSON.stringify(l.matchedRule) : '',
+      l.extractNote ?? ''
+    ]);
+
+    const csv = [headers, ...rows]
+      .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
+      .join('\n');
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv' }));
+    a.download = `QR照合ログ_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  // ─── ユーティリティ ──────────────────────────────────────────
+  function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, m =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function truncate(s, n) {
+    return s.length > n ? s.slice(0, n) + '…' : s;
+  }
+</script>
+</body>
+</html>
