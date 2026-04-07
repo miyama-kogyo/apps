@@ -724,7 +724,7 @@
           <p style="font-size:.78rem;color:#999;margin-bottom:6px;">📷 QRコードで端末IDを共有</p>
           <div id="deviceQrCode" style="display:inline-block;padding:10px;background:#fff;border-radius:8px;border:1.5px solid #a0aef0;box-shadow:0 2px 8px rgba(102,126,234,.15);"></div>
         </div>
-
+        <button class="btn" id="btnDeviceApply" style="margin-top:0;padding:10px;border:none;border-radius:6px;background:#667eea;color:#fff;cursor:pointer;font-weight:bold;width:100%;">📩 申請する</button>
       </div>
       <!-- ===== /端末ID発行・申請セクション ===== -->
     </div>
@@ -1693,25 +1693,32 @@ function initDeviceApplyUI() {
   const el = document.getElementById('displayDeviceId');
   if (el) el.textContent = DEVICE_ID;
 
-  // QRコード生成
-  const qrEl = document.getElementById('deviceQrCode');
-  if (qrEl) {
-    const tryQr = () => {
-      if (typeof QRCode !== 'undefined') {
-        try { new QRCode(qrEl, { text: DEVICE_ID, width: 150, height: 150,
-          colorDark: '#3730a3', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
-        catch(e) { document.getElementById('deviceQrWrap').style.display='none'; }
-      } else {
-        setTimeout(() => {
-          if (typeof QRCode !== 'undefined') {
-            try { new QRCode(qrEl, { text: DEVICE_ID, width: 150, height: 150,
-              colorDark: '#3730a3', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
-            catch(e) { document.getElementById('deviceQrWrap').style.display='none'; }
-          } else { document.getElementById('deviceQrWrap').style.display='none'; }
-        }, 2000);
-      }
+  // QRコード生成（qrcode@1.5.3 / toCanvas方式 - 文字化けなし）
+  const qrWrap = document.getElementById('deviceQrWrap');
+  const qrEl   = document.getElementById('deviceQrCode');
+  if (qrEl && qrWrap) {
+    const genQr = () => {
+      const canvas = document.createElement('canvas');
+      QRCode.toCanvas(canvas, DEVICE_ID, {
+        width: 150, margin: 1,
+        color: { dark: '#3730a3', light: '#ffffff' }
+      }, (err) => {
+        if (err) { console.warn('QR生成失敗:', err); qrWrap.style.display = 'none'; return; }
+        qrEl.innerHTML = '';
+        qrEl.appendChild(canvas);
+      });
     };
-    tryQr();
+    if (typeof QRCode !== 'undefined') {
+      genQr();
+    } else {
+      // ライブラリ読み込み待ち（最大3秒）
+      let waited = 0;
+      const tid = setInterval(() => {
+        waited += 200;
+        if (typeof QRCode !== 'undefined') { clearInterval(tid); genQr(); }
+        else if (waited >= 3000) { clearInterval(tid); qrWrap.style.display = 'none'; }
+      }, 200);
+    }
   }
 
   const copyBtn = document.getElementById('btnCopyDeviceId');
@@ -1729,6 +1736,35 @@ function initDeviceApplyUI() {
     });
   }
 
+
+  // 申請ボタン（Firestoreに送信）
+  const applyBtn = document.getElementById('btnDeviceApply');
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      const userEmail = (document.getElementById('authEmail')?.value || '').trim();
+      applyBtn.disabled = true;
+      applyBtn.textContent = '送信中…';
+      try {
+        await addDoc(collection(db, 'deviceRequests'), {
+          deviceId: DEVICE_ID,
+          userEmail: userEmail || '（未入力）',
+          ua: navigator.userAgent.slice(0, 200),
+          requestedAt: serverTimestamp(),
+          status: 'pending'
+        });
+        applyBtn.textContent = '✅ 申請しました。管理者の承認をお待ちください';
+        applyBtn.style.background = '#10b981';
+        const msg = document.getElementById('authMsg');
+        if (msg) { msg.style.color = '#059669'; msg.textContent = '申請が送信されました。管理者が承認後にログインできます。'; }
+      } catch(e) {
+        console.error('申請送信失敗:', e);
+        applyBtn.disabled = false;
+        applyBtn.textContent = '📩 申請する';
+        const msg = document.getElementById('authMsg');
+        if (msg) { msg.style.color = '#c62828'; msg.textContent = '送信失敗。ネットワークを確認して再試行してください。'; }
+      }
+    });
+  }
 }
 
 // ===== /端末申請UI =====
