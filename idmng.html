@@ -1,0 +1,829 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>端末認証 管理コンソール</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#0f1729;
+  --navy2:#1a2640;
+  --navy3:#1e2e4a;
+  --blue:#3b82f6;
+  --blue-light:#60a5fa;
+  --green:#10b981;
+  --red:#ef4444;
+  --amber:#f59e0b;
+  --slate:#64748b;
+  --border:#2a3a56;
+  --text:#e2e8f0;
+  --text2:#94a3b8;
+  --card:#1a2640;
+  --card2:#1e2e4a;
+}
+body{
+  font-family:'Hiragino Sans','Yu Gothic UI','Noto Sans JP',sans-serif;
+  background:var(--navy);
+  color:var(--text);
+  min-height:100vh;
+}
+
+/* ===== LOGIN ===== */
+#loginGate{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--navy);
+  z-index:999;
+}
+.login-card{
+  background:var(--navy2);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:40px 36px;
+  width:100%;max-width:380px;
+  box-shadow:0 24px 64px rgba(0,0,0,.5);
+  text-align:center;
+}
+.login-logo{font-size:2.4rem;margin-bottom:12px;}
+.login-title{font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:4px;}
+.login-sub{font-size:.85rem;color:var(--text2);margin-bottom:28px;}
+.btn-google{
+  width:100%;padding:13px 16px;
+  background:#fff;color:#1f2937;
+  border:none;border-radius:8px;
+  font-size:.95rem;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:.2s;
+}
+.btn-google:hover{background:#f1f5f9;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.btn-google svg{width:20px;height:20px;flex-shrink:0;}
+#loginMsg{font-size:.85rem;color:var(--red);margin-top:14px;min-height:1.2em;}
+
+/* ===== LAYOUT ===== */
+#appRoot{display:none;}
+.topbar{
+  background:var(--navy2);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  display:flex;align-items:center;gap:16px;
+  height:56px;
+  position:sticky;top:0;z-index:100;
+}
+.topbar-logo{font-size:1rem;font-weight:700;color:#fff;letter-spacing:.5px;display:flex;align-items:center;gap:8px;}
+.topbar-logo span{color:var(--blue-light);}
+.topbar-spacer{flex:1;}
+.admin-badge{
+  font-size:.78rem;background:rgba(59,130,246,.15);color:var(--blue-light);
+  border:1px solid rgba(59,130,246,.3);padding:3px 10px;border-radius:999px;
+}
+.topbar-email{font-size:.82rem;color:var(--text2);}
+.btn-signout{
+  padding:6px 14px;background:transparent;border:1px solid var(--border);
+  color:var(--text2);border-radius:6px;cursor:pointer;font-size:.82rem;
+  transition:.2s;
+}
+.btn-signout:hover{border-color:var(--red);color:var(--red);}
+
+/* ===== TABS ===== */
+.tabs-bar{
+  background:var(--navy2);
+  border-bottom:1px solid var(--border);
+  display:flex;gap:0;padding:0 24px;
+}
+.tab-btn{
+  padding:14px 20px;
+  background:transparent;border:none;
+  color:var(--text2);cursor:pointer;
+  font-size:.9rem;font-weight:600;
+  border-bottom:2px solid transparent;
+  transition:.2s;
+  position:relative;
+  display:flex;align-items:center;gap:7px;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--blue-light);border-bottom-color:var(--blue);}
+.badge{
+  background:var(--amber);color:#000;
+  font-size:.72rem;font-weight:800;
+  padding:2px 7px;border-radius:999px;
+  min-width:20px;text-align:center;
+  display:none;
+}
+.badge.show{display:inline-block;animation:pulse-badge .6s ease;}
+@keyframes pulse-badge{0%{transform:scale(1.4);}100%{transform:scale(1);}}
+
+.tab-content{display:none;padding:24px;}
+.tab-content.active{display:block;}
+
+/* ===== CARDS ===== */
+.page-header{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:20px;
+}
+.page-title{font-size:1.1rem;font-weight:700;color:#fff;}
+.page-count{font-size:.82rem;color:var(--text2);background:var(--navy3);
+  padding:3px 10px;border-radius:999px;}
+
+/* 申請カード */
+.request-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:18px 20px;
+  margin-bottom:12px;
+  border-left:4px solid var(--amber);
+  animation:slide-in .3s ease;
+}
+@keyframes slide-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+.request-card.approved{border-left-color:var(--green);}
+.request-card.rejected{border-left-color:var(--red);opacity:.7;}
+
+.req-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.req-device-id{
+  font-family:'Courier New',monospace;
+  font-size:.82rem;color:var(--blue-light);
+  word-break:break-all;flex:1;
+}
+.req-status{
+  padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:700;
+  flex-shrink:0;
+}
+.req-status.pending{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.3);}
+.req-status.approved{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3);}
+.req-status.rejected{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+
+.req-meta{display:flex;flex-wrap:wrap;gap:12px;font-size:.82rem;color:var(--text2);margin-bottom:12px;}
+.req-meta-item{display:flex;align-items:center;gap:5px;}
+.req-meta-label{color:var(--slate);}
+
+.req-ua{
+  font-size:.75rem;color:var(--slate);
+  background:rgba(255,255,255,.03);
+  padding:6px 10px;border-radius:6px;
+  margin-bottom:12px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  cursor:default;
+}
+.req-note-input{
+  width:100%;padding:8px 12px;
+  background:var(--navy);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;font-size:.85rem;
+  margin-bottom:10px;
+}
+.req-note-input:focus{outline:none;border-color:var(--blue);}
+.req-actions{display:flex;gap:8px;}
+.btn-approve{
+  flex:1;padding:9px 14px;border:none;border-radius:7px;
+  background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:.88rem;
+  transition:.2s;
+}
+.btn-approve:hover{filter:brightness(1.1);}
+.btn-reject{
+  flex:1;padding:9px 14px;border:none;border-radius:7px;
+  background:rgba(239,68,68,.2);color:var(--red);
+  border:1px solid rgba(239,68,68,.3);
+  font-weight:700;cursor:pointer;font-size:.88rem;transition:.2s;
+}
+.btn-reject:hover{background:var(--red);color:#fff;}
+.btn-processed{
+  padding:9px 14px;border:none;border-radius:7px;
+  background:rgba(255,255,255,.06);color:var(--text2);
+  font-size:.82rem;cursor:pointer;
+}
+
+/* filter bar */
+.filter-bar{
+  display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;
+}
+.filter-btn{
+  padding:6px 14px;border:1px solid var(--border);background:transparent;
+  color:var(--text2);border-radius:999px;cursor:pointer;font-size:.82rem;transition:.2s;
+}
+.filter-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.search-input{
+  padding:7px 14px;background:var(--navy2);border:1px solid var(--border);
+  color:var(--text);border-radius:8px;font-size:.85rem;flex:1;min-width:200px;
+}
+.search-input:focus{outline:none;border-color:var(--blue);}
+
+/* ===== 端末一覧 ===== */
+.device-grid{display:flex;flex-direction:column;gap:10px;}
+.device-row{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px 18px;
+  display:grid;grid-template-columns:1fr auto;
+  gap:12px;align-items:center;
+}
+.device-row:hover{border-color:#3a4a66;}
+.dev-id{font-family:'Courier New',monospace;font-size:.8rem;color:var(--blue-light);word-break:break-all;}
+.dev-name{font-size:.88rem;color:var(--text);margin-top:3px;font-weight:500;}
+.dev-meta{font-size:.75rem;color:var(--text2);margin-top:2px;}
+.dev-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+.status-pill{
+  padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:700;
+  white-space:nowrap;
+}
+.status-pill.allowed{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3);}
+.status-pill.denied{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+.btn-sm{
+  padding:5px 12px;border-radius:6px;font-size:.78rem;font-weight:600;cursor:pointer;border:none;
+  transition:.2s;white-space:nowrap;
+}
+.btn-sm.toggle-allow{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25);}
+.btn-sm.toggle-allow:hover{background:var(--green);color:#fff;}
+.btn-sm.toggle-deny{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25);}
+.btn-sm.toggle-deny:hover{background:var(--red);color:#fff;}
+.btn-sm.rename{background:rgba(59,130,246,.12);color:var(--blue-light);border:1px solid rgba(59,130,246,.2);}
+.btn-sm.rename:hover{background:var(--blue);color:#fff;}
+.btn-sm.del{background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.15);}
+.btn-sm.del:hover{background:var(--red);color:#fff;}
+
+/* ===== ユーザー管理 ===== */
+.user-row{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px 18px;
+  display:grid;grid-template-columns:1fr auto;
+  gap:12px;align-items:center;
+  margin-bottom:10px;
+}
+.user-row:hover{border-color:#3a4a66;}
+.user-email{font-size:.9rem;font-weight:600;color:var(--text);}
+.user-meta{font-size:.78rem;color:var(--text2);margin-top:3px;}
+.role-pill{
+  padding:2px 9px;border-radius:999px;font-size:.73rem;font-weight:700;
+}
+.role-pill.admin{background:rgba(59,130,246,.2);color:var(--blue-light);border:1px solid rgba(59,130,246,.3);}
+.role-pill.user{background:rgba(100,116,139,.15);color:var(--slate);border:1px solid rgba(100,116,139,.25);}
+.user-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+
+/* ===== EMPTY STATE ===== */
+.empty{
+  text-align:center;padding:48px 20px;color:var(--text2);
+}
+.empty-icon{font-size:2.5rem;margin-bottom:12px;opacity:.5;}
+
+/* ===== LOADING ===== */
+.loading{text-align:center;padding:32px;color:var(--text2);font-size:.9rem;}
+
+/* ===== TOAST ===== */
+#toast{
+  position:fixed;bottom:24px;right:24px;
+  background:#1e3a5f;border:1px solid var(--blue);
+  color:#fff;padding:12px 20px;border-radius:10px;
+  font-size:.88rem;font-weight:600;
+  opacity:0;transform:translateY(10px);
+  transition:.25s;pointer-events:none;z-index:9999;
+  max-width:320px;
+}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.error{background:#3b1f1f;border-color:var(--red);}
+
+/* ===== ADD DEVICE MANUAL ===== */
+.add-bar{
+  background:var(--navy2);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;margin-bottom:16px;
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+}
+.add-input{
+  flex:1;min-width:200px;padding:8px 12px;
+  background:var(--navy);border:1px solid var(--border);
+  color:var(--text);border-radius:7px;font-size:.85rem;
+}
+.add-input:focus{outline:none;border-color:var(--blue);}
+.btn-add{
+  padding:8px 18px;border:none;border-radius:7px;
+  background:var(--blue);color:#fff;font-weight:700;font-size:.85rem;cursor:pointer;
+  transition:.2s;white-space:nowrap;
+}
+.btn-add:hover{filter:brightness(1.1);}
+
+/* ===== PULSE NEW REQUEST ===== */
+@keyframes new-req-glow{
+  0%{box-shadow:0 0 0 0 rgba(245,158,11,.5);}
+  70%{box-shadow:0 0 0 12px rgba(245,158,11,0);}
+  100%{box-shadow:0 0 0 0 rgba(245,158,11,0);}
+}
+.request-card.new-arrival{animation:slide-in .3s ease, new-req-glow .8s ease 0s 3;}
+
+@media(max-width:640px){
+  .tabs-bar{padding:0 12px;overflow-x:auto;}
+  .tab-btn{padding:12px 14px;font-size:.82rem;}
+  .tab-content{padding:16px 12px;}
+  .device-row,.user-row{grid-template-columns:1fr;}
+  .dev-actions,.user-actions{justify-content:flex-start;}
+  .topbar{padding:0 12px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginGate">
+  <div class="login-card">
+    <div class="login-logo">🛡️</div>
+    <div class="login-title">端末認証 管理コンソール</div>
+    <div class="login-sub">ミヤマ工業 / 品質管理システム</div>
+    <button class="btn-google" id="btnGoogleLogin">
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Google でログイン（管理者専用）
+    </button>
+    <p id="loginMsg"></p>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="appRoot">
+  <div class="topbar">
+    <div class="topbar-logo">🛡️ <span>端末認証</span> 管理コンソール</div>
+    <div class="topbar-spacer"></div>
+    <span class="admin-badge">ADMIN</span>
+    <span class="topbar-email" id="adminEmail"></span>
+    <button class="btn-signout" id="btnSignOut">サインアウト</button>
+  </div>
+
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="requests">
+      🔔 申請管理
+      <span class="badge" id="pendingBadge">0</span>
+    </button>
+    <button class="tab-btn" data-tab="devices">
+      🖥️ 端末一覧
+    </button>
+    <button class="tab-btn" data-tab="users">
+      👤 ユーザー管理
+    </button>
+  </div>
+
+  <!-- ===== 申請管理タブ ===== -->
+  <div class="tab-content active" id="tab-requests">
+    <div class="page-header">
+      <div class="page-title">端末アクセス申請</div>
+      <div class="page-count" id="reqCount">— 件</div>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-req-filter="pending">⏳ 未処理</button>
+      <button class="filter-btn" data-req-filter="approved">✅ 承認済</button>
+      <button class="filter-btn" data-req-filter="rejected">🚫 拒否済</button>
+      <button class="filter-btn" data-req-filter="all">📋 すべて</button>
+      <input class="search-input" id="reqSearch" placeholder="メール・端末IDで絞り込み…">
+    </div>
+    <div id="requestList"><div class="loading">リアルタイム受信中…</div></div>
+  </div>
+
+  <!-- ===== 端末一覧タブ ===== -->
+  <div class="tab-content" id="tab-devices">
+    <div class="page-header">
+      <div class="page-title">登録端末一覧</div>
+      <div class="page-count" id="devCount">— 件</div>
+    </div>
+    <div class="add-bar">
+      <input class="add-input" id="addDeviceId" placeholder="端末IDを入力して手動登録…">
+      <input class="add-input" id="addDeviceName" placeholder="名称・設置場所（任意）">
+      <button class="btn-add" id="btnAddDevice">➕ 許可登録</button>
+    </div>
+    <div class="filter-bar">
+      <input class="search-input" id="devSearch" placeholder="端末ID・名称で絞り込み…">
+      <button class="filter-btn active" data-dev-filter="all">すべて</button>
+      <button class="filter-btn" data-dev-filter="allowed">✅ 許可のみ</button>
+      <button class="filter-btn" data-dev-filter="denied">🚫 拒否のみ</button>
+    </div>
+    <div class="device-grid" id="deviceGrid"><div class="loading">読み込み中…</div></div>
+  </div>
+
+  <!-- ===== ユーザー管理タブ ===== -->
+  <div class="tab-content" id="tab-users">
+    <div class="page-header">
+      <div class="page-title">ユーザーアカウント</div>
+      <div class="page-count" id="userCount">— 件</div>
+    </div>
+    <div class="filter-bar">
+      <input class="search-input" id="userSearch" placeholder="メールアドレスで絞り込み…">
+    </div>
+    <div id="userList"><div class="loading">読み込み中…</div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, signOut,
+  GoogleAuthProvider, signInWithPopup
+} from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+import {
+  getFirestore,
+  collection, doc, addDoc, setDoc, getDoc, getDocs,
+  updateDoc, deleteDoc,
+  query, orderBy, where, onSnapshot,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+
+// ─── Firebase 設定 ───────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyA0YUIpIDh4WB4p1ewiNB0XfwHve0ByljU",
+  authDomain: "abnreport-fd733.firebaseapp.com",
+  projectId: "abnreport-fd733",
+  storageBucket: "abnreport-fd733.firebasestorage.app",
+  messagingSenderId: "349748947315",
+  appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
+};
+const ADMIN_EMAILS = ['ysugimoto@miyama-unitec.co.jp'];
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const gProvider = new GoogleAuthProvider();
+gProvider.setCustomParameters({ prompt:'select_account' });
+
+// ─── Toast ───────────────────────────────────────────
+function toast(msg, type='ok'){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type==='error'?' error':'');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.className=''; }, 3000);
+}
+
+// ─── Tab 切り替え ─────────────────────────────────────
+let currentTab = 'requests';
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const tab = btn.getAttribute('data-tab');
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+tab).classList.add('active');
+    currentTab = tab;
+    if(tab==='devices') loadDevices();
+    if(tab==='users') loadUsers();
+  });
+});
+
+// ─── Filter helpers ──────────────────────────────────
+let reqFilter='pending', devFilter='all';
+
+document.querySelectorAll('[data-req-filter]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('[data-req-filter]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    reqFilter = b.getAttribute('data-req-filter');
+    renderRequests();
+  });
+});
+document.querySelectorAll('[data-dev-filter]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('[data-dev-filter]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    devFilter = b.getAttribute('data-dev-filter');
+    renderDevices();
+  });
+});
+document.getElementById('reqSearch')?.addEventListener('input',()=>renderRequests());
+document.getElementById('devSearch')?.addEventListener('input',()=>renderDevices());
+document.getElementById('userSearch')?.addEventListener('input',()=>renderUsers());
+
+// ─── escape ──────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── 申請管理 (onSnapshot) ───────────────────────────
+let allRequests = [];
+let unsubRequests = null;
+
+function subscribeRequests(){
+  if(unsubRequests) unsubRequests();
+  const q = query(collection(db,'deviceRequests'), orderBy('requestedAt','desc'));
+  unsubRequests = onSnapshot(q, snap=>{
+    const prev = allRequests.length;
+    allRequests = snap.docs.map(d=>({_id:d.id,...d.data()}));
+    const pending = allRequests.filter(r=>r.status==='pending').length;
+    // バッジ
+    const badge = document.getElementById('pendingBadge');
+    badge.textContent = pending;
+    badge.classList.toggle('show', pending>0);
+    document.getElementById('reqCount').textContent = `${pending} 件未処理`;
+    // 新着通知
+    if(prev>0 && allRequests.length>prev){
+      toast('🔔 新しい端末申請が届きました！');
+    }
+    renderRequests();
+  });
+}
+
+function renderRequests(){
+  const list = document.getElementById('requestList');
+  const search = (document.getElementById('reqSearch')?.value||'').toLowerCase();
+  let items = allRequests;
+
+  if(reqFilter!=='all') items = items.filter(r=>r.status===reqFilter);
+  if(search) items = items.filter(r=>
+    (r.userEmail||'').toLowerCase().includes(search) ||
+    (r.deviceId||'').toLowerCase().includes(search)
+  );
+
+  if(!items.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">📭</div>
+      ${reqFilter==='pending'?'未処理の申請はありません':'該当する申請がありません'}</div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(r=>{
+    const dt = r.requestedAt?.toDate?.()?.toLocaleString('ja-JP')||'—';
+    const processed = r.processedAt?.toDate?.()?.toLocaleString('ja-JP')||'';
+    const isPending = r.status==='pending';
+    return `
+    <div class="request-card ${r.status}" id="req-${r._id}">
+      <div class="req-header">
+        <div class="req-device-id">🖥️ ${esc(r.deviceId||'—')}</div>
+        <span class="req-status ${r.status}">${
+          r.status==='pending'?'⏳ 未処理':
+          r.status==='approved'?'✅ 承認済':'🚫 拒否済'
+        }</span>
+      </div>
+      <div class="req-meta">
+        <div class="req-meta-item"><span class="req-meta-label">申請者：</span>${esc(r.userEmail||'—')}</div>
+        <div class="req-meta-item"><span class="req-meta-label">申請日時：</span>${dt}</div>
+        ${processed?`<div class="req-meta-item"><span class="req-meta-label">処理：</span>${processed} (${esc(r.processedBy||'—')})</div>`:''}
+        ${r.note?`<div class="req-meta-item"><span class="req-meta-label">メモ：</span>${esc(r.note)}</div>`:''}
+      </div>
+      ${r.ua?`<div class="req-ua" title="${esc(r.ua)}">UA: ${esc(r.ua)}</div>`:''}
+      ${isPending?`
+        <input class="req-note-input" id="note-${r._id}" placeholder="承認メモ（端末名・設置場所など。省略可）">
+        <div class="req-actions">
+          <button class="btn-approve" onclick="approveRequest('${r._id}','${esc(r.deviceId)}')">✅ 承認して許可登録</button>
+          <button class="btn-reject" onclick="rejectRequest('${r._id}')">🚫 拒否</button>
+        </div>
+      `:isPending?'':
+      `<div class="req-actions">
+        <button class="btn-processed" onclick="resetRequest('${r._id}')">↩️ 未処理に戻す</button>
+      </div>`}
+    </div>`;
+  }).join('');
+}
+
+window.approveRequest = async (reqId, deviceId)=>{
+  const note = (document.getElementById('note-'+reqId)?.value||'').trim();
+  try{
+    // devices コレクションに許可登録
+    await setDoc(doc(db,'devices',deviceId),{
+      allowed: true,
+      name: note || `申請承認: ${deviceId.slice(0,8)}`,
+      approvedAt: serverTimestamp(),
+      approvedBy: auth.currentUser?.email||'',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    },{merge:true});
+    // 申請ステータス更新
+    await updateDoc(doc(db,'deviceRequests',reqId),{
+      status:'approved',
+      note,
+      processedAt: serverTimestamp(),
+      processedBy: auth.currentUser?.email||''
+    });
+    toast('✅ 承認しました。端末が利用可能になりました。');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+window.rejectRequest = async (reqId)=>{
+  if(!confirm('この申請を拒否しますか？')) return;
+  try{
+    await updateDoc(doc(db,'deviceRequests',reqId),{
+      status:'rejected',
+      processedAt: serverTimestamp(),
+      processedBy: auth.currentUser?.email||''
+    });
+    toast('🚫 拒否しました。');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+window.resetRequest = async (reqId)=>{
+  try{
+    await updateDoc(doc(db,'deviceRequests',reqId),{ status:'pending' });
+    toast('↩️ 未処理に戻しました。');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+// ─── 端末一覧 ─────────────────────────────────────────
+let allDevices = [];
+
+async function loadDevices(){
+  document.getElementById('deviceGrid').innerHTML='<div class="loading">読み込み中…</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'devices'),orderBy('createdAt','desc')));
+    allDevices = snap.docs.map(d=>({_id:d.id,...d.data()}));
+    renderDevices();
+  }catch(e){
+    document.getElementById('deviceGrid').innerHTML=`<div class="empty">読み込みエラー: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderDevices(){
+  const grid = document.getElementById('deviceGrid');
+  const search = (document.getElementById('devSearch')?.value||'').toLowerCase();
+  let items = allDevices;
+  if(devFilter==='allowed') items=items.filter(d=>d.allowed===true);
+  if(devFilter==='denied') items=items.filter(d=>d.allowed!==true);
+  if(search) items=items.filter(d=>
+    d._id.toLowerCase().includes(search)||(d.name||'').toLowerCase().includes(search));
+  document.getElementById('devCount').textContent = `${items.length} 件`;
+
+  if(!items.length){
+    grid.innerHTML=`<div class="empty"><div class="empty-icon">🖥️</div>端末が見つかりません</div>`;
+    return;
+  }
+  grid.innerHTML = items.map(d=>{
+    const allowed = d.allowed===true;
+    const createdAt = d.createdAt?.toDate?.()?.toLocaleString('ja-JP')||'—';
+    const approvedBy = d.approvedBy ? ` / 承認: ${esc(d.approvedBy)}` : '';
+    return `
+    <div class="device-row">
+      <div>
+        <div class="dev-id">${esc(d._id)}</div>
+        <div class="dev-name">${d.name?'📝 '+esc(d.name):'<span style="color:var(--slate);font-size:.8rem;">（名称未設定）</span>'}</div>
+        <div class="dev-meta">登録: ${createdAt}${approvedBy}</div>
+      </div>
+      <div class="dev-actions">
+        <span class="status-pill ${allowed?'allowed':'denied'}">${allowed?'✅ 許可':'🚫 拒否'}</span>
+        <button class="btn-sm ${allowed?'toggle-deny':'toggle-allow'}"
+          onclick="toggleDevice('${d._id}',${allowed})">
+          ${allowed?'🚫 拒否に変更':'✅ 許可に変更'}
+        </button>
+        <button class="btn-sm rename" onclick="renameDevice('${d._id}')">✏️ 名称変更</button>
+        <button class="btn-sm del" onclick="deleteDevice('${d._id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.toggleDevice = async (deviceId, currentAllowed)=>{
+  const newAllowed = !currentAllowed;
+  if(!confirm(`「${deviceId.slice(0,16)}…」を${newAllowed?'許可':'拒否'}に変更しますか？`)) return;
+  try{
+    await setDoc(doc(db,'devices',deviceId),{allowed:newAllowed,updatedAt:serverTimestamp()},{merge:true});
+    allDevices = allDevices.map(d=>d._id===deviceId?{...d,allowed:newAllowed}:d);
+    renderDevices();
+    toast(newAllowed?'✅ 許可に変更しました':'🚫 拒否に変更しました');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+window.renameDevice = async (deviceId)=>{
+  const cur = allDevices.find(d=>d._id===deviceId);
+  const name = window.prompt('端末の名称・設置場所を入力してください:',cur?.name||'');
+  if(name===null) return;
+  try{
+    await setDoc(doc(db,'devices',deviceId),{name:name.trim(),updatedAt:serverTimestamp()},{merge:true});
+    allDevices = allDevices.map(d=>d._id===deviceId?{...d,name:name.trim()}:d);
+    renderDevices();
+    toast('✏️ 名称を更新しました');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+window.deleteDevice = async (deviceId)=>{
+  if(!confirm(`端末「${deviceId.slice(0,20)}」を削除しますか？\nこの端末は次回ログイン時にアクセス拒否されます。`)) return;
+  try{
+    await deleteDoc(doc(db,'devices',deviceId));
+    allDevices = allDevices.filter(d=>d._id!==deviceId);
+    renderDevices();
+    toast('🗑️ 端末を削除しました');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+document.getElementById('btnAddDevice')?.addEventListener('click', async ()=>{
+  const deviceId = (document.getElementById('addDeviceId')?.value||'').trim();
+  const name = (document.getElementById('addDeviceName')?.value||'').trim();
+  if(!deviceId){ toast('端末IDを入力してください','error'); return; }
+  try{
+    await setDoc(doc(db,'devices',deviceId),{
+      allowed:true, name, createdAt:serverTimestamp(), updatedAt:serverTimestamp(),
+      addedBy: auth.currentUser?.email||''
+    },{merge:true});
+    document.getElementById('addDeviceId').value='';
+    document.getElementById('addDeviceName').value='';
+    toast('✅ 端末を手動登録しました');
+    loadDevices();
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+});
+
+// ─── ユーザー管理 ─────────────────────────────────────
+let allUsers = [];
+
+async function loadUsers(){
+  document.getElementById('userList').innerHTML='<div class="loading">読み込み中…</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'users'),orderBy('createdAt','desc')));
+    allUsers = snap.docs.map(d=>({_uid:d.id,...d.data()}));
+    renderUsers();
+  }catch(e){
+    document.getElementById('userList').innerHTML=`<div class="empty">読み込みエラー: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderUsers(){
+  const list = document.getElementById('userList');
+  const search = (document.getElementById('userSearch')?.value||'').toLowerCase();
+  let items = allUsers;
+  if(search) items=items.filter(u=>(u.email||'').toLowerCase().includes(search));
+  document.getElementById('userCount').textContent=`${items.length} 件`;
+
+  if(!items.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">👤</div>ユーザーが見つかりません</div>`;
+    return;
+  }
+  list.innerHTML = items.map(u=>{
+    const createdAt = u.createdAt?.toDate?.()?.toLocaleString('ja-JP')||'—';
+    const isAdmin = u.role==='admin';
+    const disabled = u.isDisabled===true;
+    return `
+    <div class="user-row" style="${disabled?'opacity:.55':''}">
+      <div>
+        <div class="user-email">
+          ${esc(u.email||'—')}
+          <span class="role-pill ${isAdmin?'admin':'user'}" style="margin-left:6px;">${isAdmin?'ADMIN':'USER'}</span>
+          ${disabled?'<span style="margin-left:6px;font-size:.75rem;color:var(--red);font-weight:700;">DISABLED</span>':''}
+        </div>
+        <div class="user-meta">UID: ${esc(u._uid)} ／ 登録: ${createdAt}</div>
+      </div>
+      <div class="user-actions">
+        <button class="btn-sm ${isAdmin?'toggle-deny':'toggle-allow'}"
+          onclick="toggleRole('${u._uid}','${u.role||'user'}')">
+          ${isAdmin?'👤 USER に降格':'⭐ ADMIN に昇格'}
+        </button>
+        <button class="btn-sm ${disabled?'toggle-allow':'toggle-deny'}"
+          onclick="toggleDisabled('${u._uid}',${disabled})">
+          ${disabled?'✅ 有効化':'🚫 無効化'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.toggleRole = async (uid, currentRole)=>{
+  const newRole = currentRole==='admin'?'user':'admin';
+  if(!confirm(`ロールを「${newRole}」に変更しますか？`)) return;
+  try{
+    await updateDoc(doc(db,'users',uid),{role:newRole,updatedAt:serverTimestamp()});
+    allUsers=allUsers.map(u=>u._uid===uid?{...u,role:newRole}:u);
+    renderUsers();
+    toast(`ロールを ${newRole} に変更しました`);
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+window.toggleDisabled = async (uid, currentDisabled)=>{
+  const newVal = !currentDisabled;
+  if(!confirm(`このアカウントを${newVal?'無効化':'有効化'}しますか？`)) return;
+  try{
+    await updateDoc(doc(db,'users',uid),{isDisabled:newVal,updatedAt:serverTimestamp()});
+    allUsers=allUsers.map(u=>u._uid===uid?{...u,isDisabled:newVal}:u);
+    renderUsers();
+    toast(newVal?'🚫 アカウントを無効化しました':'✅ アカウントを有効化しました');
+  }catch(e){ toast('エラー: '+e.message,'error'); }
+};
+
+// ─── Auth ────────────────────────────────────────────
+document.getElementById('btnGoogleLogin')?.addEventListener('click', async ()=>{
+  const msg = document.getElementById('loginMsg');
+  msg.textContent='';
+  try{
+    const result = await signInWithPopup(auth, gProvider);
+    const email = (result?.user?.email||'').toLowerCase();
+    if(!ADMIN_EMAILS.map(x=>x.toLowerCase()).includes(email)){
+      await signOut(auth);
+      msg.textContent='❌ このアカウントは管理者権限がありません。';
+      return;
+    }
+  }catch(e){
+    msg.textContent='ログイン失敗: '+(e.code||e.message);
+  }
+});
+
+document.getElementById('btnSignOut')?.addEventListener('click', async ()=>{
+  if(unsubRequests) unsubRequests();
+  await signOut(auth);
+});
+
+onAuthStateChanged(auth, user=>{
+  const gate = document.getElementById('loginGate');
+  const app  = document.getElementById('appRoot');
+  if(user){
+    const email = (user.email||'').toLowerCase();
+    if(!ADMIN_EMAILS.map(x=>x.toLowerCase()).includes(email)){
+      signOut(auth);
+      document.getElementById('loginMsg').textContent='管理者アカウントでログインしてください。';
+      gate.style.display='flex'; app.style.display='none';
+      return;
+    }
+    gate.style.display='none';
+    app.style.display='block';
+    document.getElementById('adminEmail').textContent = user.email;
+    subscribeRequests();
+  } else {
+    if(unsubRequests){ unsubRequests(); unsubRequests=null; }
+    gate.style.display='flex';
+    app.style.display='none';
+  }
+});
+</script>
+</body>
+</html>
