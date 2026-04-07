@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -638,6 +639,55 @@
   justify-content:flex-end;
 }
 
+/* ===== 待ち状況インライン表示（呼び出しボタン横） ===== */
+.wait-inline{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#fff8ee;
+  border:1.5px solid #f59e0b;
+  border-radius:8px;
+  padding:6px 12px;
+  min-width:90px;
+  transition:all .35s;
+  vertical-align:middle;
+}
+.wait-inline.no-pending{
+  background:#f1f3f5;
+  border-color:#ced4da;
+}
+.wait-inline-icon{
+  font-size:1.15rem;
+  flex-shrink:0;
+  line-height:1;
+}
+.wait-inline:not(.no-pending) .wait-inline-icon{
+  animation:wobble-inline 2s infinite;
+}
+@keyframes wobble-inline{
+  0%,100%{transform:rotate(0);}
+  20%{transform:rotate(-14deg);}
+  40%{transform:rotate(11deg);}
+  60%{transform:rotate(-7deg);}
+  80%{transform:rotate(4deg);}
+}
+.wait-inline-body{
+  display:flex;flex-direction:column;gap:1px;line-height:1.2;
+}
+.wait-inline-count{
+  font-size:.78rem;font-weight:700;color:#6c757d;white-space:nowrap;
+}
+.wait-inline:not(.no-pending) .wait-inline-count{color:#b45309;}
+.wait-inline-count em{
+  font-size:1.05rem;font-style:normal;margin-right:2px;
+}
+.wait-inline-msg{
+  font-size:.68rem;color:#adb5bd;white-space:nowrap;
+}
+.wait-inline:not(.no-pending) .wait-inline-msg{
+  color:#d97706;
+  animation:blink-msg .8s step-start infinite;
+}
+@keyframes blink-msg{0%,100%{opacity:1;}50%{opacity:.5;}}
+
 </style>
 </head>
 <body>
@@ -657,6 +707,19 @@
       <button class="btn btn-secondary" id="googleLoginBtn" style="margin-top:10px;background:#fff;color:#333;border:1px solid #d0d7de;">Googleでログイン（管理者）</button>
       <p style="font-size:.85rem;color:#666;margin-top:10px;line-height:1.5;">一般ユーザーはメールアドレス/パスワードでログイン、管理者は Google ログインを利用してください。</p>
       <p id="authMsg" style="color:#c62828;margin-top:10px;"></p>
+
+      <!-- ===== 端末ID発行・申請セクション ===== -->
+      <div id="deviceApplySection" style="margin-top:16px;padding-top:16px;border-top:1px solid #e8e8e8;">
+        <p style="font-size:.85rem;color:#888;margin-bottom:8px;font-weight:bold;">🖥️ この端末でのアクセス申請</p>
+        <p style="font-size:.82rem;color:#999;margin-bottom:8px;">初めてご利用の端末は管理者への申請が必要です。</p>
+        <div style="background:#f4f6ff;border:1.5px solid #a0aef0;border-radius:6px;padding:10px 12px;font-size:.82rem;word-break:break-all;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+          <span style="color:#667eea;font-weight:bold;flex-shrink:0;">端末ID</span>
+          <span id="displayDeviceId" style="color:#333;flex:1;"></span>
+          <button id="btnCopyDeviceId" style="padding:4px 10px;border:1.5px solid #667eea;background:#fff;color:#667eea;border-radius:5px;cursor:pointer;font-size:.8rem;white-space:nowrap;" title="コピー">📋 コピー</button>
+        </div>
+        <button class="btn" id="btnDeviceApply" style="margin-top:0;padding:10px;border:none;border-radius:6px;background:#667eea;color:#fff;cursor:pointer;font-weight:bold;width:100%;">📧 申請メールを作成する</button>
+      </div>
+      <!-- ===== /端末ID発行・申請セクション ===== -->
     </div>
   </div>
 
@@ -701,6 +764,7 @@
     <!-- 発信部署入力 -->
     <div id="manufacturing" class="tab-content active">
       <h2 style="margin-bottom:16px;color:#667eea;">異常報告</h2>
+
       <form id="manufacturingForm">
         <div style="background:#f0f7ff;padding:15px;border-radius:6px;margin-bottom:14px;">
           <h3 style="color:#667eea;margin-bottom:12px;font-size:1.05rem;">📅 いつ</h3>
@@ -818,6 +882,13 @@
     <div class="andon-btns">
       <button type="button" class="andon-btn urgent" id="btnCallUrgentFromAnomaly">🚨 緊急呼び出し</button>
       <button type="button" class="andon-btn normal" id="btnCallNormalFromAnomaly">🔔 通常呼び出し</button>
+      <div class="wait-inline no-pending" id="waitStatusBar">
+        <span class="wait-inline-icon">🕐</span>
+        <span class="wait-inline-body">
+          <span class="wait-inline-count"><em id="waitBarCount">0</em>件待ち</span>
+          <span class="wait-inline-msg" id="waitBarMsg">待ちなし</span>
+        </span>
+      </div>
     </div>
   </div>
 
@@ -1145,6 +1216,20 @@
     <!-- 管理 -->
     <div id="master" class="tab-content">
       <h2 style="margin-bottom:16px;color:#667eea;">⚙️ マスタ管理</h2>
+
+      <!-- ===== 端末管理セクション（管理者のみ表示） ===== -->
+      <div id="deviceManageSection" style="display:none;background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-bottom:16px;border-left:4px solid #667eea;">
+        <h3 style="color:#667eea;margin-bottom:12px;font-size:1.05rem;">🖥️ 端末管理（許可リスト）</h3>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary" style="width:auto;padding:10px 18px;margin:0;" id="btnLoadDevices">🔄 端末リスト読み込み</button>
+          <button class="btn" id="btnAddDeviceManual" style="width:auto;padding:10px 18px;margin:0;background:#28a745;color:#fff;">➕ 端末IDを手動登録</button>
+        </div>
+        <div id="deviceList">
+          <p style="color:#999;font-size:.9rem;text-align:center;">「端末リスト読み込み」を押すと一覧が表示されます</p>
+        </div>
+      </div>
+      <!-- ===== /端末管理セクション ===== -->
+
       <div style="background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-bottom:16px;">
         <h3 style="color:#667eea;margin-bottom:10px;">部署管理</h3>
         <div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -1540,8 +1625,13 @@ async function getUserRole(){
 }
 
 async function isDeviceAllowed(){
-  // 一時的に端末認証を無効化（Firebase側準備完了まで）
-  return true;
+  try {
+    const snap = await getDoc(doc(db, 'devices', DEVICE_ID));
+    return snap.exists() && snap.data()?.allowed === true;
+  } catch(e) {
+    console.warn('isDeviceAllowed error', e);
+    return false;
+  }
 }
 
 async function registerThisDevice(){
@@ -1560,7 +1650,110 @@ function applyRoleUi(role){
   // v17: 一般ユーザーもマスター管理を利用可
   const masterTabBtn = document.querySelector('.tab[data-tab="master"]');
   if (masterTabBtn) masterTabBtn.style.display = '';
+  // 管理者のみ端末管理セクションを表示
+  const deviceMgr = document.getElementById('deviceManageSection');
+  if (deviceMgr) {
+    deviceMgr.style.display = (role === 'admin') ? 'block' : 'none';
+  }
 }
+
+// ===== 端末申請UI / 申請メール生成 =====
+const DEVICE_APPLY_TO = 'ysugimoto@miyama-unitec.co.jp'; // 申請先管理者メール
+
+function showDeviceApplyUI(userEmail) {
+  const msg = document.getElementById('authMsg');
+  if (msg) {
+    msg.style.color = '#b45309';
+    msg.innerHTML =
+      '⚠️ この端末は未登録です。<br>下の「申請メールを作成する」ボタンから管理者へ申請してください。';
+  }
+  const section = document.getElementById('deviceApplySection');
+  if (section) {
+    section.style.background = '#fffbe6';
+    section.style.border = '2px solid #f59e0b';
+    section.style.borderRadius = '8px';
+    section.style.padding = '12px';
+    section.style.transition = 'all .3s';
+    setTimeout(() => {
+      section.style.background = '';
+      section.style.border = '';
+      section.style.padding = '';
+    }, 3000);
+  }
+}
+
+function buildApplyMailUrl(userEmail) {
+  const ua = navigator.userAgent.slice(0, 120);
+  const subject = `【端末アクセス申請】異常履歴入力ツール`;
+  const body =
+`申請日時: ${new Date().toLocaleString('ja-JP')}
+申請者メール: ${userEmail || '（ログイン前）'}
+端末ID: ${DEVICE_ID}
+ブラウザ情報: ${ua}
+
+上記の端末を異常履歴入力ツールの利用許可リストに追加してください。
+管理者は Firestore > devices コレクションへ以下を登録してください:
+  ドキュメントID: ${DEVICE_ID}
+  allowed: true
+  name: 【所有者名や設置場所を記入】
+`;
+  return `mailto:${DEVICE_APPLY_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function initDeviceApplyUI() {
+  const el = document.getElementById('displayDeviceId');
+  if (el) el.textContent = DEVICE_ID;
+
+  const copyBtn = document.getElementById('btnCopyDeviceId');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(DEVICE_ID);
+        copyBtn.textContent = '✅ コピー済';
+        setTimeout(() => { copyBtn.textContent = '📋 コピー'; }, 2000);
+      } catch(e) {
+        const range = document.createRange();
+        const el = document.getElementById('displayDeviceId');
+        if (el) { range.selectNode(el); window.getSelection().removeAllRanges(); window.getSelection().addRange(range); }
+      }
+    });
+  }
+
+  const applyBtn = document.getElementById('btnDeviceApply');
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      const userEmail = (document.getElementById('authEmail')?.value || '').trim();
+      // Firestoreに申請データを書き込む
+      try {
+        await addDoc(collection(db, 'deviceRequests'), {
+          deviceId: DEVICE_ID,
+          userEmail: userEmail || '（未入力）',
+          ua: navigator.userAgent.slice(0, 200),
+          requestedAt: serverTimestamp(),
+          status: 'pending'
+        });
+        // 申請セクションにメッセージ表示
+        const applyBtn = document.getElementById('btnDeviceApply');
+        if (applyBtn) {
+          applyBtn.textContent = '✅ 申請を送信しました！管理者の承認をお待ちください';
+          applyBtn.style.background = '#10b981';
+          applyBtn.disabled = true;
+        }
+        const msg = document.getElementById('authMsg');
+        if (msg) {
+          msg.style.color = '#059669';
+          msg.textContent = '申請が送信されました。管理者が承認後、ログインできるようになります。';
+        }
+      } catch(e) {
+        // Firestore書き込み失敗時はメール申請にフォールバック
+        console.warn('Firestore申請書き込み失敗、メール申請へ:', e);
+        window.location.href = buildApplyMailUrl(userEmail);
+      }
+    });
+  }
+}
+
+// ===== /端末申請UI =====
 
 // 無操作ログアウト（30分）
 const IDLE_MS = 30 * 60 * 1000;
@@ -1749,6 +1942,7 @@ function initBoot(){
 
 document.addEventListener("DOMContentLoaded", () => {
   initBoot();
+  initDeviceApplyUI(); // 端末申請UI初期化（ログイン画面に端末IDを表示）
 
   // ===== モニター/他アプリから「特定案件を開く」要求（focusAnomalyId） =====
   (function(){
@@ -1819,8 +2013,9 @@ onAuthStateChanged(auth, async (user)=>{
             return;
           }
         } else {
-          alert('この端末は未登録のため利用できません。\n\n端末ID: ' + DEVICE_ID + '\n管理者に登録を依頼してください。');
+          // 未登録端末の場合はサインアウトして申請UIへ誘導
           await signOut(auth);
+          showDeviceApplyUI(user.email || '');
           return;
         }
       }
@@ -2506,6 +2701,12 @@ async function applyFilter(){
               <div class="card-content-label">🔧 現場対応</div>
               <div class="card-content-text">${item.actionTaken||'-'}</div>
             </div>
+${item.traceback ? `
+              <div class="card-content-section">
+                <div class="card-content-label">↩️ 遡り</div>
+                <div class="card-content-text">${item.traceback}</div>
+              </div>
+            ` : ''}
             ${item.qualityResponse ? `
               <div class="card-content-section">
                 <div class="card-content-label">✅ 品質対応</div>
@@ -2714,18 +2915,44 @@ async function applyFilter(){
     }
   }
 
-  function renderTechTargetSelect(){
+  async function renderTechTargetSelect(){
     const sel = document.getElementById('selectSerialNo');
-    sel.innerHTML = '<option value="">整理Noを選択してください</option>';
-    anomalyCache
-      .filter(x=>x.status==='pending' && x.techRequest==='要請')
-      .sort((a,b)=> (b.occurrenceDate||'').localeCompare(a.occurrenceDate||''))
-      .forEach(x=>{
-        const o=document.createElement('option');
+    sel.innerHTML = '<option value="">読み込み中...</option>';
+    try {
+      const q = query(
+        collection(db, 'anomalies'),
+        where('status', '==', 'pending')
+      );
+      const snap = await getDocs(q);
+      const items = [];
+      snap.forEach(d => {
+        const x = { _id: d.id, ...d.data() };
+        if (!anomalyCache.some(c => c._id === x._id)) {
+          anomalyCache.push(x);
+        }
+        items.push(x);
+      });
+      items.sort((a,b) => (b.occurrenceDate||'').localeCompare(a.occurrenceDate||''));
+      sel.innerHTML = '<option value="">整理Noを選択してください</option>';
+      items.forEach(x => {
+        const o = document.createElement('option');
         o.value = x._id;
         o.textContent = `[${x.serialNo}] ${x.occurrenceDate} - ${x.anomalyContent?.slice(0,30)||''}...`;
         sel.appendChild(o);
       });
+    } catch(e) {
+      console.error('renderTechTargetSelect error:', e);
+      sel.innerHTML = '<option value="">整理Noを選択してください</option>';
+      anomalyCache
+        .filter(x=>x.status==='pending')
+        .sort((a,b)=> (b.occurrenceDate||'').localeCompare(a.occurrenceDate||''))
+        .forEach(x=>{
+          const o=document.createElement('option');
+          o.value = x._id;
+          o.textContent = `[${x.serialNo}] ${x.occurrenceDate} - ${x.anomalyContent?.slice(0,30)||''}...`;
+          sel.appendChild(o);
+        });
+    }
   }
 
   document.querySelectorAll('.tab').forEach(tab => {
@@ -2767,8 +2994,40 @@ async function applyFilter(){
     initAndonLaunchButton();
     initAndonCompletionBridge();
     checkAndonPrefillData();
+    startWaitingListener();
 
   }
+
+// ===== 待ち件数リアルタイム監視（quality_cases） =====
+function startWaitingListener(){
+  const q = query(
+    collection(db, 'quality_cases'),
+    orderBy('createdAt', 'desc')
+  );
+  onSnapshot(q, snap => {
+    const cases = snap.docs.map(d => d.data());
+    const pendingCount    = cases.filter(c => (c.status || 'pending') === 'pending').length;
+    const inprogressCount = cases.filter(c => c.status === 'inprogress').length;
+    const total = pendingCount + inprogressCount;
+
+    const bar     = document.getElementById('waitStatusBar');
+    const countEl = document.getElementById('waitBarCount');
+    const msgEl   = document.getElementById('waitBarMsg');
+    if (!bar) return;
+
+    countEl.textContent = total;
+    if (total > 0) {
+      bar.classList.remove('no-pending');
+      const parts = [];
+      if (pendingCount    > 0) parts.push(`未対応 ${pendingCount}件`);
+      if (inprogressCount > 0) parts.push(`対応中 ${inprogressCount}件`);
+      msgEl.textContent = parts.join('　') + '　少々お待ちください';
+    } else {
+      bar.classList.add('no-pending');
+      msgEl.textContent = '現在の待ち呼び出しはありません';
+    }
+  }, err => console.error('waitingListener error', err));
+}
 
 function checkAndonPrefillData() {
   const prefillDataStr = localStorage.getItem('anomaly_prefill_data');
@@ -4067,8 +4326,18 @@ const base = {
   changePointContent: changePointContent
 };
 
-    const docRef = await addDoc(collection(db, 'anomalies'), base);
-       // 変化点がある場合、changepointsコレクションにも記録
+    // アンドン呼び出し時に draft が作られていればそれを上書き、なければ新規作成
+    const draftId = state.anomalyId;
+    let docRef;
+    if (draftId) {
+      await setDoc(doc(db, 'anomalies', draftId), base);
+      docRef = { id: draftId };
+      state.anomalyId = null; // 使い終わったらリセット
+    } else {
+      docRef = await addDoc(collection(db, 'anomalies'), base);
+    }
+
+    // 変化点がある場合、changepointsコレクションにも記録（upsert）
     if (hasChangePoint && changePointCategory) {
       const changepointData = {
         type: 'sudden',
@@ -4082,21 +4351,32 @@ const base = {
         relatedAnomalyId: docRef.id,
         createdAt: serverTimestamp()
       };
-      await addDoc(collection(db, 'changepoints'), changepointData);
+      const existingCPSnap = await getDocs(query(
+        collection(db, 'changepoints'),
+        where('relatedAnomalyId', '==', docRef.id)
+      ));
+      if (existingCPSnap.docs.length > 0) {
+        await updateDoc(doc(db, 'changepoints', existingCPSnap.docs[0].id), changepointData);
+      } else {
+        await addDoc(collection(db, 'changepoints'), changepointData);
+      }
     }
     if (mfgPhotos.length > 0) {
       submitBtn.textContent = `画像アップロード中... (${mfgPhotos.length}枚)`;
       const photoUrls = await uploadPhotos(docRef.id, 'mfg', mfgPhotos);
       await updateDoc(doc(db, 'anomalies', docRef.id), { mfgPhotoUrls: photoUrls });
       
+      // draft を上書きした場合はキャッシュ内の既存エントリを更新、新規の場合は先頭追加
       const newDoc = { _id: docRef.id, ...base, mfgPhotoUrls: photoUrls };
-      anomalyCache.unshift(newDoc);
-      filteredCache = [newDoc, ...filteredCache];
+      const existIdx = anomalyCache.findIndex(x => x._id === docRef.id);
+      if (existIdx !== -1) { anomalyCache[existIdx] = newDoc; } else { anomalyCache.unshift(newDoc); }
+      filteredCache = [...anomalyCache];
       renderHistory();
     } else {
       const newDoc = { _id: docRef.id, ...base };
-      anomalyCache.unshift(newDoc);
-      filteredCache = [newDoc, ...filteredCache];
+      const existIdx = anomalyCache.findIndex(x => x._id === docRef.id);
+      if (existIdx !== -1) { anomalyCache[existIdx] = newDoc; } else { anomalyCache.unshift(newDoc); }
+      filteredCache = [...anomalyCache];
       renderHistory();
     }
     
@@ -4201,7 +4481,7 @@ if (rootText.trim()) {
     }
     
     await updateDoc(doc(db, 'anomalies', id), updates);
-      // 変化点がある場合、changepointsコレクションにも記録
+      // 変化点がある場合、changepointsコレクションにも記録（upsert）
     if (hasChangePoint && changePointCategory) {
       const existingItem = anomalyCache.find(x => x._id === id);
       const changepointData = {
@@ -4216,7 +4496,16 @@ if (rootText.trim()) {
         relatedAnomalyId: id,
         createdAt: serverTimestamp()
       };
-      await addDoc(collection(db, 'changepoints'), changepointData);
+      // 同一案件の変化点が既にあれば更新、なければ新規作成
+      const existingCPSnap = await getDocs(query(
+        collection(db, 'changepoints'),
+        where('relatedAnomalyId', '==', id)
+      ));
+      if (existingCPSnap.docs.length > 0) {
+        await updateDoc(doc(db, 'changepoints', existingCPSnap.docs[0].id), changepointData);
+      } else {
+        await addDoc(collection(db, 'changepoints'), changepointData);
+      }
     }
     const cacheIndex = anomalyCache.findIndex(x => x._id === id);
     if (cacheIndex !== -1) {
@@ -4594,6 +4883,84 @@ document.getElementById('actionTaken').addEventListener('blur', () => {
     const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download=`異常履歴_${new Date().toISOString().split('T')[0]}.csv`; a.click();
   });
+
+  // ===== 端末管理（管理者用） =====
+  async function loadDeviceList(){
+    const list = document.getElementById('deviceList');
+    if (!list) return;
+    list.innerHTML = '<p style="color:#667eea;text-align:center;padding:10px;">読み込み中...</p>';
+    try {
+      const snap = await getDocs(collection(db,'devices'));
+      if (snap.empty) {
+        list.innerHTML = '<p style="color:#999;text-align:center;">登録された端末はありません</p>';
+        return;
+      }
+      list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + snap.docs.map(d => {
+        const data = d.data();
+        const allowed = data.allowed === true;
+        const createdAt = data.createdAt?.toDate?.()?.toLocaleString('ja-JP') || '不明';
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;background:#f8f9fa;border-radius:6px;border-left:4px solid ${allowed ? '#28a745' : '#dc3545'};">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:.78rem;color:#888;margin-bottom:2px;">端末ID</div>
+              <div style="font-weight:700;color:#333;word-break:break-all;font-size:.82rem;">${d.id}</div>
+              ${data.name ? `<div style="font-size:.82rem;color:#555;margin-top:3px;">📝 ${data.name}</div>` : ''}
+              <div style="font-size:.75rem;color:#aaa;margin-top:2px;">登録：${createdAt}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+              <span style="padding:3px 10px;border-radius:12px;font-size:.8rem;font-weight:700;text-align:center;background:${allowed ? '#d4edda' : '#f8d7da'};color:${allowed ? '#155724' : '#721c24'};">${allowed ? '✅ 許可' : '🚫 拒否'}</span>
+              <button data-device-toggle="${d.id}" data-device-allowed="${allowed}" class="btn-small ${allowed ? 'btn-delete' : 'btn-edit'}" style="font-size:.78rem;padding:5px 8px;">${allowed ? '🚫 拒否に変更' : '✅ 許可に変更'}</button>
+              <button data-device-rename="${d.id}" class="btn-small" style="font-size:.78rem;padding:5px 8px;background:#17a2b8;color:#fff;">✏️ 名称変更</button>
+            </div>
+          </div>
+        `;
+      }).join('') + '</div>';
+    } catch(e) {
+      list.innerHTML = `<p style="color:#c62828;">読み込みエラー: ${e.message}</p>`;
+    }
+  }
+
+  document.getElementById('btnLoadDevices')?.addEventListener('click', loadDeviceList);
+
+  document.addEventListener('click', async (e) => {
+    const toggleBtn = e.target.closest('button[data-device-toggle]');
+    if (toggleBtn) {
+      const deviceId = toggleBtn.getAttribute('data-device-toggle');
+      const currentAllowed = toggleBtn.getAttribute('data-device-allowed') === 'true';
+      const newAllowed = !currentAllowed;
+      if (!confirm(`この端末を「${newAllowed ? '許可' : '拒否'}」に変更しますか？\n端末ID: ${deviceId}`)) return;
+      await setDoc(doc(db,'devices', deviceId), { allowed: newAllowed, updatedAt: serverTimestamp() }, { merge:true });
+      await logAudit('device_toggle', { deviceId, allowed: newAllowed });
+      loadDeviceList();
+      return;
+    }
+
+    const renameBtn = e.target.closest('button[data-device-rename]');
+    if (renameBtn) {
+      const deviceId = renameBtn.getAttribute('data-device-rename');
+      const name = window.prompt('端末の名称（設置場所・使用者）を入力してください:', '');
+      if (name === null) return;
+      await setDoc(doc(db,'devices', deviceId), { name: name.trim(), updatedAt: serverTimestamp() }, { merge:true });
+      loadDeviceList();
+      return;
+    }
+  });
+
+  document.getElementById('btnAddDeviceManual')?.addEventListener('click', async () => {
+    const deviceId = window.prompt('登録する端末IDを入力してください:');
+    if (!deviceId || !deviceId.trim()) return;
+    const name = window.prompt('端末の名称・設置場所を入力してください（省略可）:', '') || '';
+    await setDoc(doc(db,'devices', deviceId.trim()), {
+      allowed: true,
+      name: name.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge:true });
+    await logAudit('device_registered_manual', { deviceId: deviceId.trim() });
+    alert('端末を登録しました。');
+    loadDeviceList();
+  });
+  // ===== /端末管理 =====
 
   // マスタ管理
   async function updateDepartmentList(){
@@ -5238,16 +5605,14 @@ if (editCurrentTab === 'tech' && finalRecurrence === '再発' && !finalMeasureSt
   return; // ← ここで保存中断
 }
 
-// 2) 編集モーダルで「処置内容」または「変化点」が入ったら status を完了に切替（ダウングレードはしない）
-const finalRootCauseAction =
-  ('rootCauseAction' in updates) ? (updates.rootCauseAction || '') : (item.rootCauseAction || '');
-
-const finalChangePointCategory =
-  ('changePointCategory' in updates) ? (updates.changePointCategory || '') : (item.changePointCategory || '');
-
-// どちらかが入っていれば完了化
-if (finalRootCauseAction.trim() || finalChangePointCategory.trim()) {
-  updates.status = 'complete';
+// 2) 技術タブ保存時のみ: 処置内容または変化点が入ったら status を完了化（ダウングレードはしない）
+//    ※ mfgタブ保存では status を変更しない（発信部署側の変化点で誤完了になるバグを防止）
+if (editCurrentTab === 'tech') {
+  const finalRootCauseAction = (updates.rootCauseAction || '').trim();
+  const finalTechChangePoint  = (updates.changePointCategory || '').trim();
+  if (finalRootCauseAction || finalTechChangePoint) {
+    updates.status = 'complete';
+  }
 }
 
 
