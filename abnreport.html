@@ -1,4 +1,6 @@
 
+
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -717,7 +719,12 @@
           <span id="displayDeviceId" style="color:#333;flex:1;"></span>
           <button id="btnCopyDeviceId" style="padding:4px 10px;border:1.5px solid #667eea;background:#fff;color:#667eea;border-radius:5px;cursor:pointer;font-size:.8rem;white-space:nowrap;" title="コピー">📋 コピー</button>
         </div>
-        <button class="btn" id="btnDeviceApply" style="margin-top:0;padding:10px;border:none;border-radius:6px;background:#667eea;color:#fff;cursor:pointer;font-weight:bold;width:100%;">📧 申請メールを作成する</button>
+        <!-- QRコード表示エリア -->
+        <div id="deviceQrWrap" style="margin-bottom:10px;text-align:center;">
+          <p style="font-size:.78rem;color:#999;margin-bottom:6px;">📷 QRコードで端末IDを共有</p>
+          <div id="deviceQrCode" style="display:inline-block;padding:10px;background:#fff;border-radius:8px;border:1.5px solid #a0aef0;box-shadow:0 2px 8px rgba(102,126,234,.15);"></div>
+        </div>
+
       </div>
       <!-- ===== /端末ID発行・申請セクション ===== -->
     </div>
@@ -1353,6 +1360,7 @@
     </div>
   </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 
 /* =====================================================
@@ -1554,7 +1562,8 @@ document.getElementById('btnAutoFillChangePointTech')?.addEventListener('click',
 
   // ===== v17.1 追加：端末ID / ロール / 監査ログ / 初回管理者端末登録 + Google管理者ログイン =====
 const ADMIN_EMAILS = [
-  'motsu922@icloud.com'// ←必要に応じて追加
+  'motsu922@icloud.com',
+  'miyama.firebase@gmail.com'
 ];
 
 // 端末ID（ブラウザに固定保存）
@@ -1657,15 +1666,14 @@ function applyRoleUi(role){
   }
 }
 
-// ===== 端末申請UI / 申請メール生成 =====
-const DEVICE_APPLY_TO = 'ysugimoto@miyama-unitec.co.jp'; // 申請先管理者メール
+// ===== 端末申請UI =====
 
 function showDeviceApplyUI(userEmail) {
   const msg = document.getElementById('authMsg');
   if (msg) {
     msg.style.color = '#b45309';
     msg.innerHTML =
-      '⚠️ この端末は未登録です。<br>下の「申請メールを作成する」ボタンから管理者へ申請してください。';
+      '⚠️ この端末は未登録です。<br>下の「申請する」ボタンから管理者へ申請してください。';
   }
   const section = document.getElementById('deviceApplySection');
   if (section) {
@@ -1681,28 +1689,30 @@ function showDeviceApplyUI(userEmail) {
     }, 3000);
   }
 }
-
-function buildApplyMailUrl(userEmail) {
-  const ua = navigator.userAgent.slice(0, 120);
-  const subject = `【端末アクセス申請】異常履歴入力ツール`;
-  const body =
-`申請日時: ${new Date().toLocaleString('ja-JP')}
-申請者メール: ${userEmail || '（ログイン前）'}
-端末ID: ${DEVICE_ID}
-ブラウザ情報: ${ua}
-
-上記の端末を異常履歴入力ツールの利用許可リストに追加してください。
-管理者は Firestore > devices コレクションへ以下を登録してください:
-  ドキュメントID: ${DEVICE_ID}
-  allowed: true
-  name: 【所有者名や設置場所を記入】
-`;
-  return `mailto:${DEVICE_APPLY_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
 function initDeviceApplyUI() {
   const el = document.getElementById('displayDeviceId');
   if (el) el.textContent = DEVICE_ID;
+
+  // QRコード生成
+  const qrEl = document.getElementById('deviceQrCode');
+  if (qrEl) {
+    const tryQr = () => {
+      if (typeof QRCode !== 'undefined') {
+        try { new QRCode(qrEl, { text: DEVICE_ID, width: 150, height: 150,
+          colorDark: '#3730a3', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
+        catch(e) { document.getElementById('deviceQrWrap').style.display='none'; }
+      } else {
+        setTimeout(() => {
+          if (typeof QRCode !== 'undefined') {
+            try { new QRCode(qrEl, { text: DEVICE_ID, width: 150, height: 150,
+              colorDark: '#3730a3', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
+            catch(e) { document.getElementById('deviceQrWrap').style.display='none'; }
+          } else { document.getElementById('deviceQrWrap').style.display='none'; }
+        }, 2000);
+      }
+    };
+    tryQr();
+  }
 
   const copyBtn = document.getElementById('btnCopyDeviceId');
   if (copyBtn) {
@@ -1719,38 +1729,6 @@ function initDeviceApplyUI() {
     });
   }
 
-  const applyBtn = document.getElementById('btnDeviceApply');
-  if (applyBtn) {
-    applyBtn.addEventListener('click', async () => {
-      const userEmail = (document.getElementById('authEmail')?.value || '').trim();
-      // Firestoreに申請データを書き込む
-      try {
-        await addDoc(collection(db, 'deviceRequests'), {
-          deviceId: DEVICE_ID,
-          userEmail: userEmail || '（未入力）',
-          ua: navigator.userAgent.slice(0, 200),
-          requestedAt: serverTimestamp(),
-          status: 'pending'
-        });
-        // 申請セクションにメッセージ表示
-        const applyBtn = document.getElementById('btnDeviceApply');
-        if (applyBtn) {
-          applyBtn.textContent = '✅ 申請を送信しました！管理者の承認をお待ちください';
-          applyBtn.style.background = '#10b981';
-          applyBtn.disabled = true;
-        }
-        const msg = document.getElementById('authMsg');
-        if (msg) {
-          msg.style.color = '#059669';
-          msg.textContent = '申請が送信されました。管理者が承認後、ログインできるようになります。';
-        }
-      } catch(e) {
-        // Firestore書き込み失敗時はメール申請にフォールバック
-        console.warn('Firestore申請書き込み失敗、メール申請へ:', e);
-        window.location.href = buildApplyMailUrl(userEmail);
-      }
-    });
-  }
 }
 
 // ===== /端末申請UI =====
