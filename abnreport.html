@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -1461,7 +1463,7 @@ document.getElementById('shareOpenRepair')?.addEventListener('click', ()=>{
 
  
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
   import {
     getFirestore,
     collection, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, updateDoc,
@@ -1794,30 +1796,24 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
 });
 
 // 管理者向け Google ログイン
-// Googleリダイレクト結果をページロード時に処理
-getRedirectResult(auth).then(async (result) => {
-  if (!result) return;
-  const email = (result.user?.email || '').toLowerCase();
-  const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
-  if (!isAllowedAdmin) {
-    await logAudit('blocked_google_non_admin', { email });
-    await signOut(auth);
-    const msg = document.getElementById('authMsg');
-    if (msg) msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
-  }
-  // 管理者の場合は onAuthStateChanged 側で後処理
-}).catch((e) => {
-  const msg = document.getElementById('authMsg');
-  if (msg) msg.textContent = 'Googleログイン失敗: ' + (e.code || e.message);
-});
-
 document.getElementById('googleLoginBtn')?.addEventListener('click', async ()=>{
   const msg = document.getElementById('authMsg');
-  msg.textContent = 'Googleログイン画面に移動します...';
+  msg.textContent = '';
   try{
     await setPersistence(auth, browserLocalPersistence);
-    await signInWithRedirect(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    const email = (result?.user?.email || '').toLowerCase();
+    const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
+    if (!isAllowedAdmin){
+      await logAudit('blocked_google_non_admin', { email });
+      await signOut(auth);
+      msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
+      return;
+    }
+    // onAuthStateChanged 側で後処理
   }catch(e){
+    // COOP警告はEdgeの仕様で無害。popup-closed-by-user は無視
+    if(e.code === 'auth/popup-closed-by-user') return;
     msg.textContent = 'Googleログイン失敗: ' + (e.code||e.message);
   }
 });
