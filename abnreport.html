@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -720,6 +722,12 @@
         <div style="margin-bottom:10px;">
           <label style="display:block;font-size:.82rem;color:#888;font-weight:bold;margin-bottom:4px;">👤 申請者名 <span style="color:#c62828;">*</span></label>
           <input type="text" id="applyUserName" placeholder="氏名を入力してください" style="width:100%;padding:9px 12px;border:1.5px solid #a0aef0;border-radius:6px;font-size:.9rem;background:#f4f6ff;">
+        </div>
+        <!-- デバイス名入力 -->
+        <div style="margin-bottom:10px;">
+          <label style="display:block;font-size:.82rem;color:#888;font-weight:bold;margin-bottom:4px;">💻 PC・スマホ名 <span style="color:#c62828;">*</span></label>
+          <input type="text" id="applyDeviceName" placeholder="例）PC2026408　または　miyama000" style="width:100%;padding:9px 12px;border:1.5px solid #a0aef0;border-radius:6px;font-size:.9rem;background:#f4f6ff;">
+          <p style="font-size:.75rem;color:#aaa;margin-top:4px;line-height:1.5;">PC：「PC・・・・」シールの端末情報<br>スマホ：設定→一般→情報→「名前」</p>
         </div>
 
         <button class="btn" id="btnDeviceApply" style="margin-top:0;padding:10px;border:none;border-radius:6px;background:#667eea;color:#fff;cursor:pointer;font-weight:bold;width:100%;">📩 申請する</button>
@@ -1714,10 +1722,16 @@ function initDeviceApplyUI() {
   if (applyBtn) {
     applyBtn.addEventListener('click', async () => {
       const userEmail = (document.getElementById('authEmail')?.value || '').trim();
-      const userName  = (document.getElementById('applyUserName')?.value || '').trim();
+      const userName   = (document.getElementById('applyUserName')?.value || '').trim();
+      const deviceName = (document.getElementById('applyDeviceName')?.value || '').trim();
       if (!userName) {
         const msg = document.getElementById('authMsg');
         if (msg) { msg.style.color = '#c62828'; msg.textContent = '申請者名を入力してください。'; }
+        return;
+      }
+      if (!deviceName) {
+        const msg = document.getElementById('authMsg');
+        if (msg) { msg.style.color = '#c62828'; msg.textContent = 'PC・スマホ名を入力してください。'; }
         return;
       }
       applyBtn.disabled = true;
@@ -1727,6 +1741,7 @@ function initDeviceApplyUI() {
           deviceId: DEVICE_ID,
           userEmail: userEmail || '（未入力）',
           applicantName: userName,
+          deviceName: deviceName,
           ua: navigator.userAgent.slice(0, 200),
           requestedAt: serverTimestamp(),
           status: 'pending'
