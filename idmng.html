@@ -430,7 +430,7 @@ const firebaseConfig = {
   messagingSenderId: "349748947315",
   appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
 };
-const ADMIN_EMAILS = ['ysugimoto@miyama-unitec.co.jp'];
+const ADMIN_EMAILS = ['motsu922@icloud.com', 'miyama.firebase@gmail.com'];
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -784,16 +784,8 @@ window.toggleDisabled = async (uid, currentDisabled)=>{
 };
 
 // ─── Auth ────────────────────────────────────────────
-// リダイレクト結果をページロード時に処理
-getRedirectResult(auth).then(async (result) => {
-  if (!result) return;
-  const email = (result.user?.email || '').toLowerCase();
-  if (!ADMIN_EMAILS.map(x => x.toLowerCase()).includes(email)) {
-    await signOut(auth);
-    const msg = document.getElementById('loginMsg');
-    if (msg) msg.textContent = '❌ このアカウントは管理者権限がありません。';
-  }
-}).catch((e) => {
+// リダイレクト結果をページロード時に処理（onAuthStateChangedより先に実行）
+getRedirectResult(auth).catch((e) => {
   const msg = document.getElementById('loginMsg');
   if (msg) msg.textContent = 'ログイン失敗: ' + (e.code || e.message);
 });
@@ -820,7 +812,8 @@ onAuthStateChanged(auth, user=>{
     const email = (user.email||'').toLowerCase();
     if(!ADMIN_EMAILS.map(x=>x.toLowerCase()).includes(email)){
       signOut(auth);
-      document.getElementById('loginMsg').textContent='管理者アカウントでログインしてください。';
+      const msg = document.getElementById('loginMsg');
+      if(msg) msg.textContent='❌ このアカウントは管理者権限がありません。（許可: miyama.firebase@gmail.com）';
       gate.style.display='flex'; app.style.display='none';
       return;
     }
