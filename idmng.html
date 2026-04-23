@@ -430,7 +430,7 @@ const firebaseConfig = {
   messagingSenderId: "349748947315",
   appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
 };
-const ADMIN_EMAILS = ['motsu922@icloud.com','miyama.firebase@gmail.com'];
+const ADMIN_EMAILS = ['ysugimoto@miyama-unitec.co.jp'];
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -544,6 +544,7 @@ function renderRequests(){
       </div>
       <div class="req-meta">
         <div class="req-meta-item"><span class="req-meta-label">申請者名：</span><strong>${esc(r.applicantName||'（未入力）')}</strong></div>
+        <div class="req-meta-item"><span class="req-meta-label">端末名：</span>${esc(r.deviceName||'（未入力）')}</div>
         <div class="req-meta-item"><span class="req-meta-label">メール：</span>${esc(r.userEmail||'—')}</div>
         <div class="req-meta-item"><span class="req-meta-label">申請日時：</span>${dt}</div>
         ${processed?`<div class="req-meta-item"><span class="req-meta-label">処理：</span>${processed} (${esc(r.processedBy||'—')})</div>`:''}
