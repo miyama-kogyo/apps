@@ -411,7 +411,7 @@ body{
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, signOut,
-  GoogleAuthProvider, signInWithPopup
+  GoogleAuthProvider, signInWithRedirect, getRedirectResult
 } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
 import {
   getFirestore,
@@ -784,17 +784,25 @@ window.toggleDisabled = async (uid, currentDisabled)=>{
 };
 
 // ─── Auth ────────────────────────────────────────────
+// リダイレクト結果をページロード時に処理
+getRedirectResult(auth).then(async (result) => {
+  if (!result) return;
+  const email = (result.user?.email || '').toLowerCase();
+  if (!ADMIN_EMAILS.map(x => x.toLowerCase()).includes(email)) {
+    await signOut(auth);
+    const msg = document.getElementById('loginMsg');
+    if (msg) msg.textContent = '❌ このアカウントは管理者権限がありません。';
+  }
+}).catch((e) => {
+  const msg = document.getElementById('loginMsg');
+  if (msg) msg.textContent = 'ログイン失敗: ' + (e.code || e.message);
+});
+
 document.getElementById('btnGoogleLogin')?.addEventListener('click', async ()=>{
   const msg = document.getElementById('loginMsg');
-  msg.textContent='';
+  msg.textContent='Googleログイン画面に移動します...';
   try{
-    const result = await signInWithPopup(auth, gProvider);
-    const email = (result?.user?.email||'').toLowerCase();
-    if(!ADMIN_EMAILS.map(x=>x.toLowerCase()).includes(email)){
-      await signOut(auth);
-      msg.textContent='❌ このアカウントは管理者権限がありません。';
-      return;
-    }
+    await signInWithRedirect(auth, gProvider);
   }catch(e){
     msg.textContent='ログイン失敗: '+(e.code||e.message);
   }
