@@ -5839,6 +5839,14 @@ function closePtDetail(e)    { if(e.target===document.getElementById('ptDetailOv
 function closePtDetailForce(){ document.getElementById('ptDetailOverlay').classList.remove('active'); }
 function _ptEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ===== 過去トラ関数をグローバル公開（type="module"対策） =====
+window._ptBuildSearchText      = _ptBuildSearchText;
+window.checkPastTroubles       = checkPastTroubles;
+window.showPastTroubleWarning  = showPastTroubleWarning;
+window.openPtDetail            = openPtDetail;
+window.closePtDetail           = closePtDetail;
+window.closePtDetailForce      = closePtDetailForce;
+
 
 </script>
  <!-- 編集モーダル -->
