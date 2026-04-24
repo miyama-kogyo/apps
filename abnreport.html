@@ -859,7 +859,7 @@
           <h3 style="color:#2e7d32;margin-bottom:12px;font-size:1.05rem;">📝 何があった</h3>
           <div class="form-group word-suggestions">
             <label>異常内容 *</label>
-            <textarea id="anomalyContent" required oninput="showPastTroubleWarning(checkPastTroubles(this.value))"></textarea>
+            <textarea id="anomalyContent" required oninput="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))"></textarea>
             <div id="anomalyWordSuggestions" class="word-suggestion-box">
               <div class="word-suggestion-header">💡 よく使われる表現（クリックで追加）</div>
               <div id="anomalyWords"></div>
@@ -4286,7 +4286,7 @@ document.getElementById('manufacturingForm').addEventListener('submit', async (e
   e.preventDefault();
 
   // ===== 過去トラ確認チェック =====
-  const _ptHits = checkPastTroubles(document.getElementById('anomalyContent').value || '');
+  const _ptHits = checkPastTroubles(_ptBuildSearchText());
   if (_ptHits.length > 0) {
     const _ptOk = confirm(
       '⚠️ 過去トラブルと類似しています（' + _ptHits.length + '件）\n\n' +
@@ -5753,13 +5753,33 @@ function _ptNorm(str) {
     .toLowerCase();
 }
 
+// 検索対象フィールドを結合したテキストを生成
+// 対象: 整理No / 異常内容 / ライン名 / 処置内容
+function _ptBuildSearchText() {
+  const get = id => (document.getElementById(id)?.value || '').trim();
+  return [
+    get('serialNo'),
+    get('anomalyContent'),
+    get('lineName'),
+    get('rootCauseAction'),
+  ].join(' ');
+}
+
 function checkPastTroubles(inputText) {
   if (!_ptLoaded || !inputText.trim()) return [];
   const norm = _ptNorm(inputText);
   const hits = [];
   _ptTroubles.forEach(t => {
-    const hitKws = (t.keywords || []).filter(k => norm.includes(_ptNorm(k)));
-    if (hitKws.length) hits.push({ trouble: t, hitKeywords: hitKws });
+    const groups = t.keywordGroups || [];
+    if (!groups.length) return; // 旧データ(keywords)は無視
+    // グループ間OR: いずれか1グループが全キーワードにマッチ(AND)すればヒット
+    const matchedGroup = groups.find(g =>
+      (g.keywords || []).length > 0 &&
+      (g.keywords || []).every(k => k && norm.includes(_ptNorm(k)))
+    );
+    if (matchedGroup) {
+      hits.push({ trouble: t, hitKeywords: matchedGroup.keywords || [] });
+    }
   });
   return hits;
 }
