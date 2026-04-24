@@ -51,7 +51,34 @@
   .btn-filter-clear{background:#e0e0e0;color:#333;}
   .filter-result-count{margin-top:12px;padding:10px;background:#fff;border-radius:6px;text-align:center;color:#666;font-size:.9rem;}
   .filter-result-count strong{color:#667eea;}
-  
+
+  /* ===== 過去トラ警告 ===== */
+  #pastTroubleWarning{display:none;background:#fff8e1;border:2px solid #f39c12;border-radius:8px;margin:8px 0 4px;overflow:hidden}
+  #pastTroubleWarning.active{display:block}
+  .pt-warn-header{background:#f39c12;color:#fff;padding:8px 12px;font-size:13px;font-weight:bold;display:flex;align-items:center;gap:6px}
+  .pt-warn-body{padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+  .pt-card{background:#fff;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .pt-card-info{flex:1}
+  .pt-card-title{font-size:13px;font-weight:bold;color:#c0392b;margin-bottom:4px}
+  .pt-card-kws{display:flex;flex-wrap:wrap;gap:3px}
+  .pt-kw-hit{background:#fde68a;color:#7d5a00;border:1px solid #f39c12;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:bold}
+  .pt-kw-normal{background:#f5f5f5;color:#888;padding:1px 7px;border-radius:10px;font-size:11px}
+  .btn-pt-detail{background:#f39c12;color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+  #ptDetailOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:flex-end}
+  #ptDetailOverlay.active{display:flex}
+  #ptDetailModal{background:#fff;border-radius:16px 16px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:20px}
+  .pt-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .pt-modal-title{font-size:16px;font-weight:bold;color:#c0392b}
+  .pt-modal-close{background:none;border:none;font-size:22px;color:#888;cursor:pointer}
+  .pt-detail-sec{margin-bottom:14px}
+  .pt-detail-lbl{font-size:12px;color:#888;margin-bottom:3px}
+  .pt-detail-val{font-size:14px;color:#333;white-space:pre-wrap;word-break:break-all}
+  .pt-photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .pt-photos img{width:90px;height:90px;object-fit:cover;border-radius:6px;cursor:pointer}
+  .pt-kw-chips{display:flex;flex-wrap:wrap;gap:4px}
+  .pt-chip{background:#ffeaea;color:#c0392b;border:1px solid #f5c6c6;padding:2px 9px;border-radius:12px;font-size:12px}
+  /* ======================== */
+
   .history-controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
   .view-toggle{display:flex;gap:5px}
   .view-toggle button{padding:8px 12px;border:2px solid #667eea;background:#fff;color:#667eea;border-radius:6px;cursor:pointer;font-weight:bold}
@@ -832,10 +859,15 @@
           <h3 style="color:#2e7d32;margin-bottom:12px;font-size:1.05rem;">📝 何があった</h3>
           <div class="form-group word-suggestions">
             <label>異常内容 *</label>
-            <textarea id="anomalyContent" required></textarea>
+            <textarea id="anomalyContent" required oninput="showPastTroubleWarning(checkPastTroubles(this.value))"></textarea>
             <div id="anomalyWordSuggestions" class="word-suggestion-box">
               <div class="word-suggestion-header">💡 よく使われる表現（クリックで追加）</div>
               <div id="anomalyWords"></div>
+            </div>
+            <!-- 過去トラ警告バナー -->
+            <div id="pastTroubleWarning">
+              <div class="pt-warn-header">⚠️ 過去トラブルと類似しています（<span id="ptHitCount">0</span>件）</div>
+              <div class="pt-warn-body" id="ptWarnBody"></div>
             </div>
           </div>
             <div class="form-group">
@@ -1463,7 +1495,7 @@ document.getElementById('shareOpenRepair')?.addEventListener('click', ()=>{
 
  
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
   import {
     getFirestore,
     collection, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, updateDoc,
@@ -1796,24 +1828,30 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
 });
 
 // 管理者向け Google ログイン
+// Googleリダイレクト結果をページロード時に処理
+getRedirectResult(auth).then(async (result) => {
+  if (!result) return;
+  const email = (result.user?.email || '').toLowerCase();
+  const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
+  if (!isAllowedAdmin) {
+    await logAudit('blocked_google_non_admin', { email });
+    await signOut(auth);
+    const msg = document.getElementById('authMsg');
+    if (msg) msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
+  }
+  // 管理者の場合は onAuthStateChanged 側で後処理
+}).catch((e) => {
+  const msg = document.getElementById('authMsg');
+  if (msg) msg.textContent = 'Googleログイン失敗: ' + (e.code || e.message);
+});
+
 document.getElementById('googleLoginBtn')?.addEventListener('click', async ()=>{
   const msg = document.getElementById('authMsg');
-  msg.textContent = '';
+  msg.textContent = 'Googleログイン画面に移動します...';
   try{
     await setPersistence(auth, browserLocalPersistence);
-    const result = await signInWithPopup(auth, googleProvider);
-    const email = (result?.user?.email || '').toLowerCase();
-    const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
-    if (!isAllowedAdmin){
-      await logAudit('blocked_google_non_admin', { email });
-      await signOut(auth);
-      msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
-      return;
-    }
-    // onAuthStateChanged 側で後処理
+    await signInWithRedirect(auth, googleProvider);
   }catch(e){
-    // COOP警告はEdgeの仕様で無害。popup-closed-by-user は無視
-    if(e.code === 'auth/popup-closed-by-user') return;
     msg.textContent = 'Googleログイン失敗: ' + (e.code||e.message);
   }
 });
@@ -2958,6 +2996,7 @@ ${item.traceback ? `
  async function bootAfterLogin(){
     mastersCache = null;
     mastersCache = await fetchMasters();
+    loadPastTroubles(); // 過去トラ読み込み
     updateDepartmentSelect('department', mastersCache.departments);
     updateDepartmentSelect('lineManageDept', mastersCache.departments);
     updateDepartmentSelect('handlerManageDept', mastersCache.departments);
@@ -4245,7 +4284,19 @@ let isSubmittingMfg = false;
 
 document.getElementById('manufacturingForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
+  // ===== 過去トラ確認チェック =====
+  const _ptHits = checkPastTroubles(document.getElementById('anomalyContent').value || '');
+  if (_ptHits.length > 0) {
+    const _ptOk = confirm(
+      '⚠️ 過去トラブルと類似しています（' + _ptHits.length + '件）\n\n' +
+      _ptHits.map(h => '・' + h.trouble.title).join('\n') +
+      '\n\n対策内容を確認しましたか？\n「OK」で登録、「キャンセル」で戻ります'
+    );
+    if (!_ptOk) return;
+  }
+  // =================================
+
   if (isSubmittingMfg) return;
   
   isSubmittingMfg = true;
@@ -5679,6 +5730,90 @@ if (editCurrentTab === 'tech') {
    editPendingData = { mfg: {}, tech: {} }; // ← 追加
   });
 
+// ============================================================
+//  過去トラ警告機能
+// ============================================================
+let _ptTroubles = [];
+let _ptLoaded   = false;
+
+async function loadPastTroubles() {
+  try {
+    const snap = await getDocs(collection(db, 'pastTroubles'));
+    _ptTroubles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _ptLoaded   = true;
+    console.log('[過去トラ] ロード完了:', _ptTroubles.length, '件');
+  } catch(e) {
+    console.warn('[過去トラ] ロードエラー:', e);
+  }
+}
+
+function _ptNorm(str) {
+  return (str || '')
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .toLowerCase();
+}
+
+function checkPastTroubles(inputText) {
+  if (!_ptLoaded || !inputText.trim()) return [];
+  const norm = _ptNorm(inputText);
+  const hits = [];
+  _ptTroubles.forEach(t => {
+    const hitKws = (t.keywords || []).filter(k => norm.includes(_ptNorm(k)));
+    if (hitKws.length) hits.push({ trouble: t, hitKeywords: hitKws });
+  });
+  return hits;
+}
+
+function showPastTroubleWarning(hits) {
+  const banner = document.getElementById('pastTroubleWarning');
+  const body   = document.getElementById('ptWarnBody');
+  const cnt    = document.getElementById('ptHitCount');
+  if (!banner) return;
+  if (!hits.length) { banner.classList.remove('active'); return; }
+  cnt.textContent = hits.length;
+  body.innerHTML = hits.map(({ trouble: t, hitKeywords }) => {
+    const allKws = (t.keywords || []).map(k => {
+      const isHit = hitKeywords.some(hk => _ptNorm(hk) === _ptNorm(k));
+      return `<span class="${isHit ? 'pt-kw-hit' : 'pt-kw-normal'}">${_ptEsc(k)}</span>`;
+    }).join('');
+    return `<div class="pt-card">
+      <div class="pt-card-info">
+        <div class="pt-card-title">${_ptEsc(t.title)}</div>
+        <div class="pt-card-kws">${allKws}</div>
+      </div>
+      <button class="btn-pt-detail" onclick="openPtDetail('${t.id}')">詳細を見る</button>
+    </div>`;
+  }).join('');
+  banner.classList.add('active');
+}
+
+function openPtDetail(id) {
+  const t = _ptTroubles.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('ptDetailBody').innerHTML = `
+    <div class="pt-detail-sec">
+      <div class="pt-detail-lbl">タイトル</div>
+      <div class="pt-detail-val" style="font-size:15px;font-weight:bold;color:#c0392b">${_ptEsc(t.title)}</div>
+    </div>
+    <div class="pt-detail-sec">
+      <div class="pt-detail-lbl">キーワード</div>
+      <div class="pt-kw-chips">${(t.keywords||[]).map(k=>`<span class="pt-chip">${_ptEsc(k)}</span>`).join('')}</div>
+    </div>
+    ${t.date ? `<div class="pt-detail-sec"><div class="pt-detail-lbl">発生日</div><div class="pt-detail-val">${t.date}</div></div>` : ''}
+    ${t.department ? `<div class="pt-detail-sec"><div class="pt-detail-lbl">担当部署・工程</div><div class="pt-detail-val">${_ptEsc(t.department)}</div></div>` : ''}
+    <div class="pt-detail-sec">
+      <div class="pt-detail-lbl">詳細内容</div>
+      <div class="pt-detail-val">${_ptEsc(t.content)}</div>
+    </div>
+    ${t.countermeasure ? `<div class="pt-detail-sec"><div class="pt-detail-lbl">対策内容</div><div class="pt-detail-val">${_ptEsc(t.countermeasure)}</div></div>` : ''}
+    ${(t.photoURLs||[]).length ? `<div class="pt-detail-sec"><div class="pt-detail-lbl">添付写真</div><div class="pt-photos">${t.photoURLs.map(u=>`<img src="${u}" onclick="window.open('${u}','_blank')">`).join('')}</div></div>` : ''}
+  `;
+  document.getElementById('ptDetailOverlay').classList.add('active');
+}
+function closePtDetail(e)    { if(e.target===document.getElementById('ptDetailOverlay')) closePtDetailForce(); }
+function closePtDetailForce(){ document.getElementById('ptDetailOverlay').classList.remove('active'); }
+function _ptEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 
 </script>
  <!-- 編集モーダル -->
@@ -5748,5 +5883,15 @@ if (editCurrentTab === 'tech') {
 </div>
 <!-- ========== /画像編集 ========= -->
 
+<!-- ===== 過去トラ詳細モーダル ===== -->
+<div id="ptDetailOverlay" onclick="closePtDetail(event)">
+  <div id="ptDetailModal">
+    <div class="pt-modal-header">
+      <span class="pt-modal-title">⚠️ 過去トラブル詳細</span>
+      <button class="pt-modal-close" onclick="closePtDetailForce()">✕</button>
+    </div>
+    <div id="ptDetailBody"></div>
+  </div>
+</div>
 </body>
 </html>
