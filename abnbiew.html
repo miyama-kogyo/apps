@@ -422,76 +422,33 @@
   .tag-col-exist-chip:hover{background:rgba(16,185,129,.1);border-color:#10b981;color:#059669;}
   .tag-col-exist-chip.already{opacity:.38;cursor:default;}
 
+  /* ===== 過去トラマッチ 行ハイライト ===== */
+  tbody tr.pt-match td:first-child{border-left:4px solid #ef4444;}
+  tbody tr.pt-match{background:rgba(239,68,68,.05) !important;}
+  tbody tr.pt-match:hover{background:rgba(239,68,68,.11) !important;}
+  .pt-match-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:999px;font-size:.72rem;font-weight:800;background:rgba(239,68,68,.12);color:#dc2626;border:1px solid rgba(239,68,68,.3);margin-right:4px;white-space:nowrap;vertical-align:middle;}
+  body.theme-dark tbody tr.pt-match{background:rgba(239,68,68,.08) !important;}
+  body.theme-dark tbody tr.pt-match:hover{background:rgba(239,68,68,.16) !important;}
+  /* 過去トラ詳細モーダル */
+  #ptDetailOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;}
+  #ptDetailOverlay.active{display:flex;}
+  #ptDetailModal{background:#fff;border-radius:16px;width:92%;max-width:560px;max-height:88vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .pt-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .pt-modal-title{font-size:16px;font-weight:bold;color:#c0392b;}
+  .pt-modal-close{background:none;border:none;font-size:22px;color:#888;cursor:pointer;}
+  .pt-detail-sec{margin-bottom:14px;}
+  .pt-detail-lbl{font-size:12px;color:#888;margin-bottom:3px;}
+  .pt-detail-val{font-size:14px;color:#333;white-space:pre-wrap;word-break:break-all;}
+  .pt-photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .pt-photos img{width:180px;height:180px;object-fit:cover;border-radius:8px;cursor:pointer;transition:transform .2s;}
+  .pt-photos img:hover{transform:scale(1.04);}
+  .pt-kw-chips{display:flex;flex-wrap:wrap;gap:4px;}
+  .pt-chip{background:#ffeaea;color:#c0392b;border:1px solid #f5c6c6;padding:2px 9px;border-radius:12px;font-size:12px;}
+  /* ===== /過去トラ ===== */
 
-  /* ===== 端末認証ゲート ===== */
-  #authGate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;}
-  #authCard{background:var(--card);max-width:380px;width:92%;padding:28px 24px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.15);border:1px solid var(--border);}
-  #authCard h2{font-size:1.3rem;font-weight:700;margin-bottom:4px;text-align:center;color:var(--ink);}
-  #authCard .auth-sub{font-size:.85rem;color:var(--muted);text-align:center;margin-bottom:20px;}
-  .auth-field{margin-bottom:12px;}
-  .auth-field label{display:block;font-size:.85rem;font-weight:600;color:var(--ink-2);margin-bottom:4px;}
-  .auth-field input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;background:var(--bg);color:var(--ink);}
-  .auth-field input:focus{outline:none;border-color:var(--brand);}
-  .btn-auth-primary{width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:8px;}
-  .btn-auth-google{width:100%;padding:11px;background:#fff;color:#333;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;}
-  .btn-auth-google:hover{background:#f1f5f9;}
-  #authMsg{font-size:.83rem;color:#c62828;margin-top:10px;min-height:1.2em;text-align:center;}
-  .auth-divider{display:flex;align-items:center;gap:8px;margin:12px 0;color:var(--muted);font-size:.8rem;}
-  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
-  /* 申請セクション */
-  #deviceApplySection{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
-  #deviceApplySection p{font-size:.82rem;color:var(--muted);margin-bottom:6px;}
-  .device-id-box{background:var(--bg);border:1.5px solid #a0aef0;border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:.8rem;}
-  .device-id-label{color:var(--brand);font-weight:700;flex-shrink:0;}
-  #displayDeviceId{color:var(--ink);flex:1;word-break:break-all;}
-  #btnCopyDeviceId{padding:3px 9px;border:1.5px solid var(--brand);background:#fff;color:var(--brand);border-radius:5px;cursor:pointer;font-size:.78rem;white-space:nowrap;}
-  .auth-field-sm{margin-bottom:8px;}
-  .auth-field-sm label{display:block;font-size:.8rem;font-weight:600;color:var(--ink-2);margin-bottom:3px;}
-  .auth-field-sm input{width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:.88rem;background:var(--bg);color:var(--ink);}
-  .auth-field-sm input:focus{outline:none;border-color:var(--brand);}
-  .btn-auth-apply{width:100%;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer;margin-top:4px;}
-  #signOutBtn{position:fixed;right:12px;top:12px;background:#ef5350;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;z-index:1500;font-size:.85rem;display:none;}
-  /* ===== /端末認証ゲート ===== */
 </style>
 </head>
 <body>
-<button id="signOutBtn">サインアウト</button>
-<div id="authGate">
-  <div id="authCard">
-    <h2>🔐 ログイン</h2>
-    <p class="auth-sub">異常履歴データシート</p>
-    <div class="auth-field">
-      <label>メールアドレス</label>
-      <input type="email" id="authEmail" placeholder="user@example.com">
-    </div>
-    <div class="auth-field">
-      <label>パスワード</label>
-      <input type="password" id="authPassword" placeholder="••••••••">
-    </div>
-    <button class="btn-auth-primary" id="authLoginBtn">ログイン</button>
-    <div class="auth-divider">または</div>
-    <button class="btn-auth-google" id="googleLoginBtn">
-      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-      Googleでログイン（管理者）
-    </button>
-    <p id="authMsg"></p>
-    <!-- 端末申請セクション -->
-    <div id="deviceApplySection">
-      <p><strong>🖥️ この端末でのアクセス申請</strong></p>
-      <p>初めてのご利用は管理者への申請が必要です。</p>
-      <div class="device-id-box">
-        <span class="device-id-label">端末ID</span>
-        <span id="displayDeviceId"></span>
-        <button id="btnCopyDeviceId">📋 コピー</button>
-      </div>
-      <div class="auth-field-sm">
-        <label>申請者名 <span style="color:#c62828;">*</span></label>
-        <input type="text" id="applyUserName" placeholder="氏名を入力してください">
-      </div>
-      <button class="btn-auth-apply" id="btnDeviceApply">📩 申請する</button>
-    </div>
-  </div>
-</div>
 
 <!-- ===== 写真ホバープレビュー用フローティング要素 ===== -->
 <div id="photoHoverPreview">
@@ -715,8 +672,8 @@ function productToFileURLFromUNC(unc){ const noLead=unc.replace(/^\\\\/, ""); co
 function getProductPhotoUrl(serialNoRaw){ const normalized=normalizeSerial(serialNoRaw??''); if(!normalized) return null; const fname=productEnsureExt(normalized); const unc=PRODUCT_BASE_UNC+"\\"+fname; return productToFileURLFromUNC(unc); }
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
-import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+import { getFirestore, collection, query, orderBy, onSnapshot, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 
 let headerDragActive = false;
 
@@ -824,132 +781,14 @@ function renderCauseTag(cause){
 function getCurrentFilterWindow(){ if(dateFromStr||dateToStr){const from=dateFromStr?new Date(`${dateFromStr}T00:00:00`).getTime():-Infinity;const to=dateToStr?new Date(`${dateToStr}T23:59:59.999`).getTime():Infinity;return [from,to];}const binsInfo=buildBins();const bins=binsInfo?.bins||[];if(!bins.length){const t=new Date();t.setHours(0,0,0,0);return[t.getTime(),t.getTime()+24*60*60*1000-1];}return[bins[0].start,bins[bins.length-1].end]; }
 function getDeptSparkColor(){ return 'rgba(66,133,244,0.85)'; }
 
-// ===== 端末認証システム =====
-const ADMIN_EMAILS = ['motsu922@icloud.com', 'miyama.firebase@gmail.com'];
-const gProvider = new GoogleAuthProvider();
-gProvider.setCustomParameters({ prompt: 'select_account' });
-
-function getDeviceId() {
-  const KEY = 'abn_device_id_v17_1';
-  let id = null;
-  try { id = localStorage.getItem(KEY); } catch(e) {}
-  if (!id) {
-    id = crypto?.randomUUID?.() || ('dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36));
-    try { localStorage.setItem(KEY, id); } catch(e) {}
-  }
-  return id;
-}
-const DEVICE_ID = getDeviceId();
-
-async function isDeviceAllowed() {
-  try {
-    const snap = await getDoc(doc(db, 'devices', DEVICE_ID));
-    return snap.exists() && snap.data()?.allowed === true;
-  } catch(e) { console.warn('isDeviceAllowed error', e); return false; }
-}
-
-async function registerThisDevice(name = '') {
-  const user = auth.currentUser;
-  await setDoc(doc(db, 'devices', DEVICE_ID), {
-    allowed: true,
-    name: name || (user?.email || '') + ' / ' + new Date().toLocaleString('ja-JP'),
-    createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-  }, { merge: true });
-}
-
-function initDeviceApplyUI() {
-  const el = document.getElementById('displayDeviceId');
-  if (el) el.textContent = DEVICE_ID;
-  document.getElementById('btnCopyDeviceId')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btnCopyDeviceId');
-    try {
-      await navigator.clipboard.writeText(DEVICE_ID);
-      btn.textContent = '✅ コピー済'; setTimeout(() => { btn.textContent = '📋 コピー'; }, 2000);
-    } catch(e) {}
-  });
-  document.getElementById('btnDeviceApply')?.addEventListener('click', async () => {
-    const userName = (document.getElementById('applyUserName')?.value || '').trim();
-    const userEmail = (document.getElementById('authEmail')?.value || '').trim();
-    const msg = document.getElementById('authMsg');
-    if (!userName) { if(msg){msg.style.color='#c62828';msg.textContent='申請者名を入力してください。';} return; }
-    const btn = document.getElementById('btnDeviceApply');
-    btn.disabled = true; btn.textContent = '送信中…';
-    try {
-      await addDoc(collection(db, 'deviceRequests'), {
-        deviceId: DEVICE_ID, userEmail: userEmail || '（未入力）',
-        applicantName: userName, ua: navigator.userAgent.slice(0, 200),
-        requestedAt: serverTimestamp(), status: 'pending'
-      });
-      btn.textContent = '✅ 申請しました。管理者の承認をお待ちください';
-      btn.style.background = '#10b981';
-      if(msg){msg.style.color='#059669';msg.textContent='申請が送信されました。管理者承認後にログインできます。';}
-    } catch(e) {
-      btn.disabled = false; btn.textContent = '📩 申請する';
-      if(msg){msg.style.color='#c62828';msg.textContent='送信失敗。ネットワークを確認して再試行してください。';}
-    }
+async function checkAuth(){
+  return new Promise(resolve=>{
+    onAuthStateChanged(auth,(user)=>{
+      if(user) resolve(true);
+      else{ const email=prompt('メールアドレスを入力してください'); const password=prompt('パスワードを入力してください'); if(email&&password){ setPersistence(auth,browserLocalPersistence).then(()=>signInWithEmailAndPassword(auth,email,password)).then(()=>resolve(true)).catch(e=>{alert('ログインに失敗しました: '+e.message);resolve(false);}); }else resolve(false); }
+    });
   });
 }
-
-// ログインボタン
-document.getElementById('authLoginBtn')?.addEventListener('click', async () => {
-  const email = (document.getElementById('authEmail')?.value || '').trim();
-  const pw = document.getElementById('authPassword')?.value || '';
-  const msg = document.getElementById('authMsg');
-  msg.textContent = '';
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    await signInWithEmailAndPassword(auth, email, pw);
-  } catch(e) { msg.style.color='#c62828'; msg.textContent = 'ログイン失敗: ' + (e.code || e.message); }
-});
-
-// Google ログイン
-document.getElementById('googleLoginBtn')?.addEventListener('click', async () => {
-  const msg = document.getElementById('authMsg');
-  msg.textContent = '';
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    const result = await signInWithPopup(auth, gProvider);
-    const email = (result?.user?.email || '').toLowerCase();
-    if (!ADMIN_EMAILS.map(x => x.toLowerCase()).includes(email)) {
-      await signOut(auth);
-      msg.style.color='#c62828'; msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
-    }
-  } catch(e) { msg.style.color='#c62828'; msg.textContent = 'Googleログイン失敗: ' + (e.code || e.message); }
-});
-
-// サインアウト
-document.getElementById('signOutBtn')?.addEventListener('click', async () => { await signOut(auth); });
-
-// 認証状態変化
-onAuthStateChanged(auth, async (user) => {
-  const gate = document.getElementById('authGate');
-  const signOutBtn = document.getElementById('signOutBtn');
-  if (user) {
-    const allowed = await isDeviceAllowed();
-    const role = ADMIN_EMAILS.map(x=>x.toLowerCase()).includes((user.email||'').toLowerCase()) ? 'admin' : 'user';
-    if (!allowed) {
-      if (role === 'admin') {
-        const ok = confirm('この端末は未登録です。\n端末ID: ' + DEVICE_ID + '\n\n許可リストに登録しますか？');
-        if (ok) { await registerThisDevice(); }
-        else { await signOut(auth); return; }
-      } else {
-        await signOut(auth);
-        const msg = document.getElementById('authMsg');
-        if(msg){msg.style.color='#b45309';msg.innerHTML='⚠️ この端末は未登録です。<br>下の「申請する」ボタンから管理者へ申請してください。';}
-        return;
-      }
-    }
-    gate.style.display = 'none';
-    signOutBtn.style.display = 'inline-block';
-    bootApp();
-  } else {
-    gate.style.display = 'flex';
-    signOutBtn.style.display = 'none';
-  }
-});
-
-initDeviceApplyUI();
-// ===== /端末認証システム =====
 
 function convertAnomalyDoc(doc){
   const raw={_id:doc.id,...doc.data()};
@@ -972,7 +811,7 @@ function startAnomaliesListener(){
   if(unsubscribeAnomalies){unsubscribeAnomalies();unsubscribeAnomalies=null;}
   const ro=new ResizeObserver(()=>{ requestAnimationFrame(()=>drawAllSparklines()); });
   ['deptBar','linesGrid','serialsGrid'].forEach(id=>{const el=document.getElementById(id);if(el) ro.observe(el);});
-  unsubscribeAnomalies=onSnapshot(q,(snap)=>{ allData=snap.docs.map(convertAnomalyDoc); renderDeptBar(); refreshTagFilterPanel(); applyFilters(); drawAllSparklines(); },(err)=>{ console.error('onSnapshot error:',err); alert('データの取得中にエラーが発生しました: '+err.message); });
+  unsubscribeAnomalies=onSnapshot(q,(snap)=>{ allData=snap.docs.map(convertAnomalyDoc); markPtMatches(); renderDeptBar(); refreshTagFilterPanel(); applyFilters(); drawAllSparklines(); },(err)=>{ console.error('onSnapshot error:',err); alert('データの取得中にエラーが発生しました: '+err.message); });
 }
 
 function renderDeptBar(){
@@ -1152,7 +991,7 @@ function renderTable(){
   const display=(displayLimit&&displayLimit>0)?filteredData.slice(0,displayLimit):filteredData;
   if(display.length===0){tbody.innerHTML=`<tr><td colspan="${columns.length}"><div class="empty-state"><div class="empty-icon">📭</div><p>データがありません</p></div></td></tr>`;}
   else{
-    tbody.innerHTML=display.map(item=>`<tr data-id="${item._id}">${columns.map(col=>{
+    tbody.innerHTML=display.map(item=>`<tr data-id="${item._id}"${item._ptMatch?' class="pt-match" title="⚠️ 過去トラ該当: '+(item._ptMatchTitles||[]).join(' / ')+'"':''} >${columns.map(col=>{
       let v=item[col.id]??'-';
       if(col.id==='occurrenceDate'){v=item.occurrenceDateISO||item.createdAtISO||'-';}
       else if(col.id==='occurrenceTime'){v=item.occurrenceTimeNorm||'-';}
@@ -1167,7 +1006,8 @@ function renderTable(){
       else if(col.id==='changePointCategory'){const cpCat=item.changePointCategory||'';if(cpCat){v=`<span class="badge badge-compact badge-cp-${cpCat}"><span class="dot"></span>${cpCat}</span>`;}else{v='-';}}
       else if(col.id==='anomalyCategory'){v=renderAnomalyClassTag(item.anomalyCategory,false);}
       else if(col.id==='causeCategory'){v=renderCauseTag(item.causeCategory);}
-      else if(col.id==='anomalyContent'||col.id==='actionTaken'||col.id==='rootCauseAction'){const s=v||'';v=(s.length>30?s.slice(0,30)+'...':s);}
+      else if(col.id==='anomalyContent'){const s=v||'';const trunc=(s.length>30?s.slice(0,30)+'...':s);v=item._ptMatch?`<span class="pt-match-badge">⚠️ 過去トラ</span>${trunc}`:trunc;}
+      else if(col.id==='actionTaken'||col.id==='rootCauseAction'){const s=v||'';v=(s.length>30?s.slice(0,30)+'...':s);}
       else if(col.id==='tags'){const tgs=item.tags||[];v=tgs.length?'<div class="tags-cell">'+tgs.map(t=>'<span class="tag-chip-table">'+escapeHtml(t)+'</span>').join('')+'</div>':'-';}
       return `<td>${v}</td>`;
     }).join('')}${visTags.map(tag=>{const has=(item.tags||[]).includes(tag);const _id=item._id;return '<td class="tag-col-td" onclick="event.stopPropagation()"><label class="tag-toggle" onclick="event.stopPropagation();window._toggleTagCol(this,this.dataset.docid,this.dataset.tag)" data-docid="'+escapeHtml(_id)+'" data-tag="'+escapeHtml(tag)+'"><input type="checkbox"'+(has?' checked':'')+'><span class="tag-toggle-slider"></span></label></td>';}).join('')}</tr>`).join('');
@@ -1764,7 +1604,8 @@ if(fsDateFrom) fsDateFrom.addEventListener('change',onFsDateChange);
 if(fsDateTo) fsDateTo.addEventListener('change',onFsDateChange);
 document.getElementById('fsBtnClearDate')?.addEventListener('click',()=>{dateFromStr=null;dateToStr=null;syncDateFilters('','',null);autoRangeActive=false;sparkMode=lastManualSparkMode;drawAllSparklines();refreshPillsForDate();applyFilters();});
 
-function bootApp() {
+(async()=>{
+  const ok=await checkAuth();if(!ok){alert('認証が必要です');return;}
   loadSettings();
   const t=getOperationalToday();
   const df=document.getElementById('dateFrom');const dt=document.getElementById('dateTo');
@@ -1772,9 +1613,109 @@ function bootApp() {
   const fsFrom=document.getElementById('fsDateFrom');const fsTo=document.getElementById('fsDateTo');const fsBtnT=document.getElementById('fsBtnToday');
   if(fsFrom&&!fsFrom.value) fsFrom.value=t;if(fsTo&&!fsTo.value) fsTo.value=t;
   if(!dateFromStr&&!dateToStr){dateFromStr=t;dateToStr=t;autoRangeActive=false;document.getElementById('btnToday')?.classList.add('active');document.getElementById('btnYesterday')?.classList.remove('active');if(fsBtnT) fsBtnT.classList.add('active');}
+  loadPastTroubles();
   startAnomaliesListener();
+})();
+
+// ============================================================
+//  過去トラ警告機能（ビュアー）
+// ============================================================
+let _ptTroubles = [];
+let _ptLoaded   = false;
+
+function loadPastTroubles() {
+  onSnapshot(
+    collection(db, 'pastTroubles'),
+    snap => {
+      _ptTroubles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _ptLoaded   = true;
+      console.log('[過去トラ] 同期:', _ptTroubles.length, '件');
+      markPtMatches();
+      renderTable();
+    },
+    e => console.warn('[過去トラ] エラー:', e)
+  );
 }
 
+function _ptNorm(str) {
+  return (str || '')
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .toLowerCase();
+}
+
+function markPtMatches() {
+  if (!_ptLoaded) return;
+  allData.forEach(item => {
+    const norm = _ptNorm([
+      item.serialNo        || '',
+      item.anomalyContent  || '',
+      item.lineName        || '',
+      item.rootCauseAction || '',
+    ].join(' '));
+    const matched = _ptTroubles.filter(t => {
+      const groups = t.keywordGroups || [];
+      if (!groups.length) return false;
+      return groups.some(g =>
+        (g.keywords || []).length > 0 &&
+        (g.keywords || []).every(k => k && norm.includes(_ptNorm(k)))
+      );
+    });
+    item._ptMatch = matched.length > 0;
+    item._ptMatchTitles = matched.map(t => t.title);
+  });
+}
+
+function _ptEsc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openPtDetail(id) {
+  const t = _ptTroubles.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('ptDetailBody').innerHTML = `
+    <div class="pt-detail-sec">
+      <div class="pt-detail-lbl">タイトル</div>
+      <div class="pt-detail-val" style="font-size:15px;font-weight:bold;color:#c0392b">${_ptEsc(t.title)}</div>
+    </div>
+    <div class="pt-detail-sec">
+      <div class="pt-detail-lbl">検索条件（AND/OR）</div>
+      <div class="pt-kw-chips">${(t.keywordGroups||[]).map((g,i)=>{
+        const sep = i>0?'<span style="font-size:11px;font-weight:800;color:#b45309;background:#fff8e1;border:1px solid #f39c12;padding:2px 8px;border-radius:8px;margin:0 6px;">OR</span>':'';
+        const chips=(g.keywords||[]).map(k=>`<span class="pt-chip">${_ptEsc(k)}</span>`).join('<span style="font-size:11px;color:#f39c12;font-weight:800;margin:0 3px;">AND</span>');
+        return sep+chips;
+      }).join('')}</div>
+    </div>
+    ${t.date?`<div class="pt-detail-sec"><div class="pt-detail-lbl">発生日</div><div class="pt-detail-val">${t.date}</div></div>`:''}
+    ${t.department?`<div class="pt-detail-sec"><div class="pt-detail-lbl">担当部署・工程</div><div class="pt-detail-val">${_ptEsc(t.department)}</div></div>`:''}
+    <div class="pt-detail-sec">
+      <div class="pt-detail-lbl">詳細内容</div>
+      <div class="pt-detail-val">${_ptEsc(t.content)}</div>
+    </div>
+    ${t.countermeasure?`<div class="pt-detail-sec"><div class="pt-detail-lbl">対策内容</div><div class="pt-detail-val">${_ptEsc(t.countermeasure)}</div></div>`:''}
+    ${(t.photoURLs||[]).length?`<div class="pt-detail-sec"><div class="pt-detail-lbl">添付写真</div><div class="pt-photos">${t.photoURLs.map(u=>`<img src="${u}" onclick="window.open('${u}','_blank')">`).join('')}</div></div>`:''}
+  `;
+  document.getElementById('ptDetailOverlay').classList.add('active');
+}
+
+document.getElementById('btnClosePtDetail').addEventListener('click', () => {
+  document.getElementById('ptDetailOverlay').classList.remove('active');
+});
+document.getElementById('ptDetailOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('ptDetailOverlay'))
+    document.getElementById('ptDetailOverlay').classList.remove('active');
+});
+
 </script>
+
+<!-- ===== 過去トラ詳細モーダル ===== -->
+<div id="ptDetailOverlay">
+  <div id="ptDetailModal">
+    <div class="pt-modal-header">
+      <span class="pt-modal-title">⚠️ 過去トラブル詳細</span>
+      <button class="pt-modal-close" id="btnClosePtDetail">✕</button>
+    </div>
+    <div id="ptDetailBody"></div>
+  </div>
+</div>
 </body>
 </html>
