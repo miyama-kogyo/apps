@@ -839,7 +839,7 @@
         <div style="background:#fff4e6;padding:15px;border-radius:6px;margin-bottom:14px;">
           <h3 style="color:#f57c00;margin-bottom:12px;font-size:1.05rem;">📍 どこで</h3>
           <div class="form-group"><label>発信部署 *</label><select id="department" required></select></div>
-          <div class="form-group"><label>ライン名 *</label><select id="lineName" required onchange="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))"><option value="">部署を先に選択してください</option></select></div>
+          <div class="form-group"><label>ライン名 *</label><select id="lineName" required><option value="">部署を先に選択してください</option></select></div>
           <div class="form-group"><label>処置者 *</label><select id="handler" required><option value="">部署を先に選択してください</option></select></div>
         </div>
 
@@ -847,7 +847,7 @@
           <h3 style="color:#8e24aa;margin-bottom:12px;font-size:1.05rem;">🔢 整理No</h3>
           <div class="form-group word-suggestions">
             <label>整理No *</label>
-            <input type="text" id="serialNo" required oninput="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))" placeholder="例:6769" list="serialNoList">
+            <input type="text" id="serialNo" required placeholder="例:6769" list="serialNoList">
             <datalist id="serialNoList"></datalist>
             <div id="serialNoInfo" style="margin-top:8px;padding:8px;background:#f3e5f5;border-radius:4px;font-size:.85rem;color:#8e24aa;display:none;">
               <strong>💡 ヒント:</strong> この整理Noの過去データ: <span id="serialNoCount">0</span>件
@@ -859,7 +859,7 @@
           <h3 style="color:#2e7d32;margin-bottom:12px;font-size:1.05rem;">📝 何があった</h3>
           <div class="form-group word-suggestions">
             <label>異常内容 *</label>
-            <textarea id="anomalyContent" required oninput="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))"></textarea>
+            <textarea id="anomalyContent" required></textarea>
             <div id="anomalyWordSuggestions" class="word-suggestion-box">
               <div class="word-suggestion-header">💡 よく使われる表現（クリックで追加）</div>
               <div id="anomalyWords"></div>
@@ -1087,7 +1087,7 @@
           </select>
         </div>
         <div class="form-group"><label>保全単位</label><input type="text" id="maintenanceUnit"></div>
-        <div class="form-group"><label>何が悪くどうした</label><textarea id="rootCauseAction" oninput="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))"></textarea></div>
+        <div class="form-group"><label>何が悪くどうした</label><textarea id="rootCauseAction"></textarea></div>
         <div class="form-group">
           <label>原因分類</label>
           <select id="causeCategory">
@@ -3056,6 +3056,22 @@ function startWaitingListener(){
       msgEl.textContent = '現在の待ち呼び出しはありません';
     }
   }, err => console.error('waitingListener error', err));
+
+  // ===== 過去トラ警告：イベントリスナー登録 =====
+  const _ptTriggerCheck = () => {
+    showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()));
+  };
+  [
+    { id: 'anomalyContent', ev: 'input'  },
+    { id: 'serialNo',       ev: 'input'  },
+    { id: 'rootCauseAction',ev: 'input'  },
+    { id: 'lineName',       ev: 'change' },
+    { id: 'department',     ev: 'change' },
+  ].forEach(({ id, ev }) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(ev, _ptTriggerCheck);
+  });
+  // =============================================
 }
 
 function checkAndonPrefillData() {
