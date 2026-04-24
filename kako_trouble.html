@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -52,12 +53,25 @@ body{font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#f0f2f5;min-he
 .form-input:focus{border-color:#c0392b}
 textarea.form-input{resize:vertical;min-height:80px}
 
-/* キーワード入力 */
-.keyword-input-area{border:1px solid #ddd;border-radius:6px;padding:8px;display:flex;flex-wrap:wrap;gap:5px;min-height:44px;cursor:text}
-.keyword-input-area:focus-within{border-color:#c0392b}
+/* キーワードグループ（AND/OR） */
+.kw-groups{display:flex;flex-direction:column;gap:0}
+.kw-group-wrap{position:relative}
+.kw-group{border:2px solid #ddd;border-radius:8px;padding:8px 10px;background:#fff}
+.kw-group-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.kw-group-label{font-size:11px;font-weight:800;color:#c0392b;background:#ffeaea;padding:2px 8px;border-radius:10px;letter-spacing:.04em}
+.btn-kw-group-del{background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;line-height:1;padding:0 4px}
+.btn-kw-group-del:hover{color:#c0392b}
+.keyword-input-area{border:1px solid #ddd;border-radius:6px;padding:6px 8px;display:flex;flex-wrap:wrap;gap:5px;min-height:38px;cursor:text;background:#fafafa}
+.keyword-input-area:focus-within{border-color:#c0392b;background:#fff}
 .kw-chip{background:#ffeaea;color:#c0392b;border:1px solid #f5c6c6;padding:3px 8px;border-radius:12px;font-size:12px;display:flex;align-items:center;gap:4px}
 .kw-chip-del{cursor:pointer;font-size:14px;line-height:1;color:#c0392b}
-.kw-raw-input{border:none;outline:none;font-size:14px;flex:1;min-width:80px;font-family:inherit}
+.kw-raw-input{border:none;outline:none;font-size:14px;flex:1;min-width:80px;font-family:inherit;background:transparent}
+.kw-or-sep{display:flex;align-items:center;gap:6px;padding:4px 0;color:#f39c12}
+.kw-or-label{font-size:11px;font-weight:800;background:#fff8e1;color:#b45309;border:1px solid #f39c12;padding:2px 10px;border-radius:10px}
+.kw-or-line{flex:1;height:1px;background:#fde68a}
+.btn-kw-add-group{background:transparent;border:2px dashed #f39c12;color:#b45309;border-radius:8px;padding:7px 0;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:6px;transition:.2s}
+.btn-kw-add-group:hover{background:#fff8e1}
+.btn-kw-add-group:disabled{opacity:.38;cursor:not-allowed}
 
 /* 写真アップロード */
 .photo-area{border:2px dashed #ddd;border-radius:8px;padding:16px;text-align:center;cursor:pointer;color:#aaa;font-size:13px;transition:border-color .2s}
@@ -121,11 +135,9 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
 
     <div class="form-group">
-      <label class="form-label">キーワード<span class="req">*</span>　<span style="font-weight:normal;color:#aaa">（Enterまたは読点「、」で追加）</span></label>
-      <div class="keyword-input-area" id="kwArea" onclick="document.getElementById('kwRaw').focus()">
-        <input class="kw-raw-input" id="kwRaw" placeholder="キーワードを入力…"
-          onkeydown="handleKwKey(event)" onblur="flushKwInput()">
-      </div>
+      <label class="form-label">キーワードグループ<span class="req">*</span>　<span style="font-weight:normal;color:#aaa">グループ内=AND　グループ間=OR（最大5グループ）</span></label>
+      <div class="kw-groups" id="kwGroups"></div>
+      <button type="button" class="btn-kw-add-group" id="btnAddKwGroup" onclick="addKwGroup()">＋ OR グループを追加</button>
     </div>
 
     <div class="form-group">
@@ -204,7 +216,7 @@ const storage = getStorage(app);
 // ============================================================
 let troubles         = [];   // 全件キャッシュ
 let editingId        = null; // 編集中のドキュメントID
-let currentKeywords  = [];   // フォーム上のキーワード配列
+let kwGroups         = [[]]; // キーワードグループ [[kw,...], ...] グループ内AND, グループ間OR
 let selectedPhotos   = [];   // 新規選択写真 (File[])
 let existingPhotoURLs= [];   // 編集時の既存写真URL[]
 
@@ -250,7 +262,7 @@ function renderList() {
         ${(t.photoURLs||[]).length ? '　📷 '+t.photoURLs.length+'枚' : ''}
       </div>
       <div class="card-keywords">
-        ${(t.keywords||[]).map(k=>`<span class="keyword-tag">${esc(k)}</span>`).join('')}
+        ${_renderKwGroupChips(t)}
       </div>
       <div class="card-actions" onclick="event.stopPropagation()">
         <button class="btn-edit" onclick="openEditModal('${t.id}')">✏️ 編集</button>
@@ -272,8 +284,8 @@ function openDetail(id) {
       <div class="detail-value" style="font-size:16px;font-weight:bold;color:#c0392b">${esc(t.title)}</div>
     </div>
     <div class="detail-section">
-      <div class="detail-label">キーワード</div>
-      <div class="card-keywords">${(t.keywords||[]).map(k=>`<span class="keyword-tag">${esc(k)}</span>`).join('')}</div>
+      <div class="detail-label">検索条件（AND/OR）</div>
+      <div class="card-keywords">${_renderKwGroupChipsDetail(t)}</div>
     </div>
     ${t.date ? `<div class="detail-section"><div class="detail-label">発生日</div><div class="detail-value">${t.date}</div></div>` : ''}
     ${t.department ? `<div class="detail-section"><div class="detail-label">担当部署・工程</div><div class="detail-value">${esc(t.department)}</div></div>` : ''}
@@ -299,7 +311,7 @@ function closeDetailModalForce(){ document.getElementById('detailOverlay').class
 // フォームモーダル（登録 / 編集）
 // ============================================================
 function openAddModal() {
-  editingId = null; currentKeywords = []; selectedPhotos = []; existingPhotoURLs = [];
+  editingId = null; kwGroups = [[]]; selectedPhotos = []; existingPhotoURLs = [];
   document.getElementById('formTitle').textContent  = '過去トラ登録';
   document.getElementById('submitBtn').textContent  = '登録する';
   clearForm();
@@ -310,7 +322,11 @@ function openEditModal(id) {
   const t = troubles.find(x => x.id === id);
   if (!t) return;
   editingId = id;
-  currentKeywords   = [...(t.keywords||[])];
+  // keywordGroups があれば使用、なければ空グループ
+  kwGroups = (t.keywordGroups && t.keywordGroups.length)
+    ? t.keywordGroups.map(g => [...(g.keywords||[])])
+    : [[]];
+  if (!kwGroups.length) kwGroups = [[]];
   selectedPhotos    = [];
   existingPhotoURLs = [...(t.photoURLs||[])];
 
@@ -321,7 +337,7 @@ function openEditModal(id) {
   document.getElementById('fCountermeasure').value   = t.countermeasure||'';
   document.getElementById('fDate').value             = t.date||'';
   document.getElementById('fDepartment').value       = t.department||'';
-  renderKeywords();
+  renderKwGroups();
   renderPhotoPreviews();
   document.getElementById('formOverlay').classList.add('active');
 }
@@ -329,49 +345,128 @@ function openEditModal(id) {
 function clearForm() {
   ['fTitle','fContent','fCountermeasure','fDepartment'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fDate').value = '';
-  document.getElementById('kwRaw').value = '';
   document.getElementById('photoPreviews').innerHTML = '';
-  renderKeywords();
+  kwGroups = [[]];
+  renderKwGroups();
 }
 
 function closeFormModal(e)    { if(e.target===document.getElementById('formOverlay')) closeFormModalForce(); }
 function closeFormModalForce(){ document.getElementById('formOverlay').classList.remove('active'); }
 
 // ============================================================
-// キーワード入力
+// キーワードグループ入力（AND/OR）
 // ============================================================
-function handleKwKey(e) {
-  const triggers = ['Enter','、',',','　'];
+const MAX_GROUPS = 5;
+
+function addKwGroup() {
+  if (kwGroups.length >= MAX_GROUPS) return;
+  kwGroups.push([]);
+  renderKwGroups();
+  updateAddGroupBtn();
+}
+
+function removeKwGroup(gi) {
+  if (kwGroups.length <= 1) { kwGroups[0] = []; renderKwGroups(); return; }
+  kwGroups.splice(gi, 1);
+  renderKwGroups();
+  updateAddGroupBtn();
+}
+
+function addKwToGroup(gi, val) {
+  const v = val.trim().replace(/[,、]/g, '');
+  if (!v || kwGroups[gi].includes(v)) return;
+  kwGroups[gi].push(v);
+  renderKwGroups();
+}
+
+function removeKwFromGroup(gi, ki) {
+  kwGroups[gi].splice(ki, 1);
+  renderKwGroups();
+}
+
+function handleKwKey(e, gi) {
+  const triggers = ['Enter', '、', ',', '　'];
   if (triggers.includes(e.key)) {
     e.preventDefault();
-    addKwFromInput();
+    flushGroupInput(gi);
   }
-  if (e.key === 'Backspace' && document.getElementById('kwRaw').value === '' && currentKeywords.length) {
-    currentKeywords.pop(); renderKeywords();
+  const inp = document.getElementById(`kwRaw_${gi}`);
+  if (e.key === 'Backspace' && inp && inp.value === '' && kwGroups[gi].length) {
+    kwGroups[gi].pop();
+    renderKwGroups();
   }
 }
+
+function flushGroupInput(gi) {
+  const inp = document.getElementById(`kwRaw_${gi}`);
+  if (!inp) return;
+  addKwToGroup(gi, inp.value);
+  inp.value = '';
+}
+
 function flushKwInput() {
-  addKwFromInput();
+  kwGroups.forEach((_, gi) => flushGroupInput(gi));
 }
-function addKwFromInput() {
-  const raw = document.getElementById('kwRaw');
-  const v   = raw.value.trim().replace(/[,、]/g,'');
-  if (v && !currentKeywords.includes(v)) { currentKeywords.push(v); renderKeywords(); }
-  raw.value = '';
+
+function updateAddGroupBtn() {
+  const btn = document.getElementById('btnAddKwGroup');
+  if (btn) btn.disabled = kwGroups.length >= MAX_GROUPS;
 }
-function removeKeyword(i) { currentKeywords.splice(i,1); renderKeywords(); }
-function renderKeywords() {
-  const area = document.getElementById('kwArea');
-  const raw  = document.getElementById('kwRaw');
-  area.innerHTML = '';
-  currentKeywords.forEach((k,i) => {
-    const chip = document.createElement('span');
-    chip.className = 'kw-chip';
-    chip.innerHTML = `${esc(k)}<span class="kw-chip-del" onclick="removeKeyword(${i})">×</span>`;
-    area.appendChild(chip);
+
+function renderKwGroups() {
+  const container = document.getElementById('kwGroups');
+  if (!container) return;
+  container.innerHTML = '';
+  kwGroups.forEach((kws, gi) => {
+    // OR セパレーター
+    if (gi > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'kw-or-sep';
+      sep.innerHTML = '<div class="kw-or-line"></div><span class="kw-or-label">OR</span><div class="kw-or-line"></div>';
+      container.appendChild(sep);
+    }
+    const wrap = document.createElement('div');
+    wrap.className = 'kw-group-wrap';
+
+    const group = document.createElement('div');
+    group.className = 'kw-group';
+
+    // グループヘッダー
+    const hdr = document.createElement('div');
+    hdr.className = 'kw-group-header';
+    hdr.innerHTML = `<span class="kw-group-label">グループ${gi+1}（AND条件）</span>
+      <button type="button" class="btn-kw-group-del" title="このグループを削除" onclick="removeKwGroup(${gi})">✕</button>`;
+    group.appendChild(hdr);
+
+    // キーワード入力エリア
+    const area = document.createElement('div');
+    area.className = 'keyword-input-area';
+    area.id = `kwArea_${gi}`;
+    area.addEventListener('click', () => document.getElementById(`kwRaw_${gi}`)?.focus());
+
+    kws.forEach((k, ki) => {
+      const chip = document.createElement('span');
+      chip.className = 'kw-chip';
+      chip.innerHTML = `${esc(k)}<span class="kw-chip-del" onclick="removeKwFromGroup(${gi},${ki})">×</span>`;
+      area.appendChild(chip);
+    });
+
+    const inp = document.createElement('input');
+    inp.className = 'kw-raw-input';
+    inp.id = `kwRaw_${gi}`;
+    inp.placeholder = kws.length ? 'AND条件を追加…' : 'キーワードを入力…';
+    inp.setAttribute('onkeydown', `handleKwKey(event,${gi})`);
+    inp.setAttribute('onblur', `flushGroupInput(${gi})`);
+    area.appendChild(inp);
+    group.appendChild(area);
+    wrap.appendChild(group);
+    container.appendChild(wrap);
   });
-  area.appendChild(raw);
+  updateAddGroupBtn();
 }
+
+// 旧関数名の互換シム（念のため）
+function renderKeywords() { renderKwGroups(); }
 
 // ============================================================
 // 写真
@@ -412,9 +507,12 @@ async function submitForm() {
   const title   = document.getElementById('fTitle').value.trim();
   const content = document.getElementById('fContent').value.trim();
 
-  if (!title)                    { showToast('タイトルを入力してください'); return; }
-  if (!currentKeywords.length)   { showToast('キーワードを1つ以上入力してください'); return; }
-  if (!content)                  { showToast('詳細内容を入力してください'); return; }
+  // 空グループを除去
+  const validGroups = kwGroups.map(g => g.filter(k => k)).filter(g => g.length > 0);
+
+  if (!title)                { showToast('タイトルを入力してください'); return; }
+  if (!validGroups.length)   { showToast('キーワードを1つ以上入力してください'); return; }
+  if (!content)              { showToast('詳細内容を入力してください'); return; }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = '処理中…';
@@ -429,7 +527,7 @@ async function submitForm() {
 
     const data = {
       title,
-      keywords:        currentKeywords,
+      keywordGroups:   validGroups.map(kws => ({ keywords: kws })),
       content,
       countermeasure:  document.getElementById('fCountermeasure').value.trim(),
       date:            document.getElementById('fDate').value,
@@ -471,6 +569,30 @@ async function deleteTrouble(id) {
 // ユーティリティ
 // ============================================================
 // 全角→半角・小文字正規化（キーワードマッチング用）
+// キーワードグループ表示ヘルパー
+function _renderKwGroupChips(t) {
+  const groups = t.keywordGroups || [];
+  if (!groups.length) return '';
+  return groups.map((g, i) => {
+    const chips = (g.keywords||[]).map(k => `<span class="keyword-tag">${esc(k)}</span>`).join(
+      '<span style="font-size:10px;color:#f39c12;font-weight:800;margin:0 2px;">AND</span>'
+    );
+    const sep = i > 0 ? '<span style="font-size:10px;color:#b45309;font-weight:800;background:#fff8e1;padding:1px 5px;border-radius:6px;margin:0 4px;">OR</span>' : '';
+    return sep + chips;
+  }).join('');
+}
+function _renderKwGroupChipsDetail(t) {
+  const groups = t.keywordGroups || [];
+  if (!groups.length) return '<span style="color:#aaa;">（未設定）</span>';
+  return groups.map((g, i) => {
+    const label = i > 0 ? '<span style="font-size:11px;font-weight:800;color:#b45309;background:#fff8e1;border:1px solid #f39c12;padding:2px 8px;border-radius:8px;margin:0 6px;">OR</span>' : '';
+    const chips = (g.keywords||[]).map(k => `<span class="keyword-tag">${esc(k)}</span>`).join(
+      '<span style="font-size:11px;color:#f39c12;font-weight:800;margin:0 3px;">AND</span>'
+    );
+    return `${label}<span style="display:inline-flex;align-items:center;background:#fafafa;border:1px solid #e0e0e0;padding:3px 8px;border-radius:8px;gap:4px;">${chips}</span>`;
+  }).join('');
+}
+
 function normText(str){
   return (str||'').replace(/[Ａ-Ｚａ-ｚ０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).toLowerCase();
 }
@@ -487,7 +609,6 @@ function showToast(msg){
 window.openAddModal        = openAddModal;
 window.closeFormModalForce = closeFormModalForce;
 window.closeFormModal      = closeFormModal;
-window.handleKwKey         = handleKwKey;
 window.flushKwInput        = flushKwInput;
 window.removeKeyword       = removeKeyword;
 window.handlePhotoSelect   = handlePhotoSelect;
@@ -500,6 +621,11 @@ window.deleteTrouble       = deleteTrouble;
 window.closeDetailModalForce = closeDetailModalForce;
 window.closeDetailModal    = closeDetailModal;
 window.renderList          = renderList;
+window.addKwGroup          = addKwGroup;
+window.removeKwGroup       = removeKwGroup;
+window.removeKwFromGroup   = removeKwFromGroup;
+window.handleKwKey         = handleKwKey;
+window.flushGroupInput     = flushGroupInput;
 
 </script>
 </body>
