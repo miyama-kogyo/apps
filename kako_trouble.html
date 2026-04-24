@@ -482,6 +482,25 @@ function showToast(msg){
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
+
+// ===== onclick から呼べるようにグローバル公開 =====
+window.openAddModal        = openAddModal;
+window.closeFormModalForce = closeFormModalForce;
+window.closeFormModal      = closeFormModal;
+window.handleKwKey         = handleKwKey;
+window.flushKwInput        = flushKwInput;
+window.removeKeyword       = removeKeyword;
+window.handlePhotoSelect   = handlePhotoSelect;
+window.removeExistingPhoto = removeExistingPhoto;
+window.removeNewPhoto      = removeNewPhoto;
+window.submitForm          = submitForm;
+window.openDetail          = openDetail;
+window.openEditModal       = openEditModal;
+window.deleteTrouble       = deleteTrouble;
+window.closeDetailModalForce = closeDetailModalForce;
+window.closeDetailModal    = closeDetailModal;
+window.renderList          = renderList;
+
 </script>
 </body>
 </html>
