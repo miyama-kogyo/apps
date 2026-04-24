@@ -839,7 +839,7 @@
         <div style="background:#fff4e6;padding:15px;border-radius:6px;margin-bottom:14px;">
           <h3 style="color:#f57c00;margin-bottom:12px;font-size:1.05rem;">📍 どこで</h3>
           <div class="form-group"><label>発信部署 *</label><select id="department" required></select></div>
-          <div class="form-group"><label>ライン名 *</label><select id="lineName" required><option value="">部署を先に選択してください</option></select></div>
+          <div class="form-group"><label>ライン名 *</label><select id="lineName" required onchange="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))"><option value="">部署を先に選択してください</option></select></div>
           <div class="form-group"><label>処置者 *</label><select id="handler" required><option value="">部署を先に選択してください</option></select></div>
         </div>
 
@@ -847,7 +847,7 @@
           <h3 style="color:#8e24aa;margin-bottom:12px;font-size:1.05rem;">🔢 整理No</h3>
           <div class="form-group word-suggestions">
             <label>整理No *</label>
-            <input type="text" id="serialNo" required placeholder="例:6769" list="serialNoList">
+            <input type="text" id="serialNo" required oninput="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))" placeholder="例:6769" list="serialNoList">
             <datalist id="serialNoList"></datalist>
             <div id="serialNoInfo" style="margin-top:8px;padding:8px;background:#f3e5f5;border-radius:4px;font-size:.85rem;color:#8e24aa;display:none;">
               <strong>💡 ヒント:</strong> この整理Noの過去データ: <span id="serialNoCount">0</span>件
@@ -1087,7 +1087,7 @@
           </select>
         </div>
         <div class="form-group"><label>保全単位</label><input type="text" id="maintenanceUnit"></div>
-        <div class="form-group"><label>何が悪くどうした</label><textarea id="rootCauseAction"></textarea></div>
+        <div class="form-group"><label>何が悪くどうした</label><textarea id="rootCauseAction" oninput="showPastTroubleWarning(checkPastTroubles(_ptBuildSearchText()))"></textarea></div>
         <div class="form-group">
           <label>原因分類</label>
           <select id="causeCategory">
@@ -5736,15 +5736,20 @@ if (editCurrentTab === 'tech') {
 let _ptTroubles = [];
 let _ptLoaded   = false;
 
-async function loadPastTroubles() {
-  try {
-    const snap = await getDocs(collection(db, 'pastTroubles'));
-    _ptTroubles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    _ptLoaded   = true;
-    console.log('[過去トラ] ロード完了:', _ptTroubles.length, '件');
-  } catch(e) {
-    console.warn('[過去トラ] ロードエラー:', e);
-  }
+function loadPastTroubles() {
+  // onSnapshot でリアルタイム同期（kako_trouble.html での登録が即反映）
+  onSnapshot(
+    collection(db, 'pastTroubles'),
+    snap => {
+      _ptTroubles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _ptLoaded   = true;
+      console.log('[過去トラ] 同期:', _ptTroubles.length, '件');
+      // ロード/更新後にフォームの現在値で再チェック
+      const text = _ptBuildSearchText();
+      if (text.trim()) showPastTroubleWarning(checkPastTroubles(text));
+    },
+    e => console.warn('[過去トラ] エラー:', e)
+  );
 }
 
 function _ptNorm(str) {
