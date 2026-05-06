@@ -871,6 +871,10 @@
               <div class="pt-warn-body" id="ptWarnBody"></div>
             </div>
           </div>
+          <div class="form-group">
+            <label>原因</label>
+            <textarea id="cause" placeholder="原因を入力してください"></textarea>
+          </div>
             <div class="form-group">
           <label>発見タイミング *</label>
           <select id="discoveryTiming" required>
@@ -4359,6 +4363,7 @@ const base = {
   occurrenceTime: document.getElementById('occurrenceTime').value || '',
   restartTime: document.getElementById('restartTime').value || '',
   anomalyContent: document.getElementById('anomalyContent').value,
+  cause: document.getElementById('cause').value || '',
   actionTaken: document.getElementById('actionTaken').value,
   traceback: document.getElementById('traceback').value,
   qualityResponse: document.getElementById('qualityResponse').value || '',
@@ -5404,6 +5409,7 @@ function saveEditTabData() {
       restartTime:         document.getElementById('edit_restartTime')?.value         ?? null,
       anomalyContent:      document.getElementById('edit_anomalyContent')?.value      ?? null,
       anomalyCategory:     document.getElementById('edit_anomalyCategory')?.value     ?? null,
+      cause:               document.getElementById('edit_cause')?.value               ?? null,
       actionTaken:         document.getElementById('edit_actionTaken')?.value         ?? null,
       traceback:           document.getElementById('edit_traceback')?.value           ?? null,
       lotNo:               document.getElementById('edit_lotNo')?.value               ?? null,
@@ -5461,6 +5467,7 @@ function ep(tab, field, itemValue) {
             <option value="その他" ${item.anomalyCategory === 'その他' ? 'selected' : ''}>その他</option>
           </select>
         </div>
+        <div class="form-group"><label>原因</label><textarea id="edit_cause">${item.cause || ''}</textarea></div>
         <div class="form-group"><label>現場対応</label><textarea id="edit_actionTaken">${item.actionTaken || ''}</textarea></div>
         <div class="form-group"><label>遡り</label><input type="text" id="edit_traceback" value="${item.traceback || ''}"></div>
         <div class="form-group"><label>LotNo</label><input type="text" id="edit_lotNo" value="${item.lotNo || ''}"></div>
@@ -5614,6 +5621,7 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
       updates.restartTime = document.getElementById('edit_restartTime')?.value || '';
       updates.anomalyContent = document.getElementById('edit_anomalyContent')?.value || '';
       updates.anomalyCategory = document.getElementById('edit_anomalyCategory')?.value || '';
+      updates.cause = document.getElementById('edit_cause')?.value || '';
       updates.actionTaken = document.getElementById('edit_actionTaken')?.value || '';
       updates.traceback = document.getElementById('edit_traceback')?.value || '';
       updates.lotNo = document.getElementById('edit_lotNo')?.value || '';
