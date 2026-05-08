@@ -732,8 +732,8 @@
         <input type="password" id="authPassword" placeholder="••••••••">
       </div>
       <button class="btn btn-primary" id="authLoginBtn">ログイン</button>
-      <button class="btn btn-secondary" id="googleLoginBtn" style="margin-top:10px;background:#fff;color:#333;border:1px solid #d0d7de;">Googleでログイン</button>
-      <p style="font-size:.85rem;color:#666;margin-top:10px;line-height:1.5;">メールアドレス/パスワード、または Google アカウントでログインしてください。</p>
+      <button class="btn btn-secondary" id="googleLoginBtn" style="margin-top:10px;background:#fff;color:#333;border:1px solid #d0d7de;">Googleでログイン（管理者）</button>
+      <p style="font-size:.85rem;color:#666;margin-top:10px;line-height:1.5;">一般ユーザーはメールアドレス/パスワードでログイン、管理者は Google ログインを利用してください。</p>
       <p id="authMsg" style="color:#c62828;margin-top:10px;"></p>
 
       <!-- ===== 端末ID発行・申請セクション ===== -->
@@ -1840,15 +1840,20 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
   }
 });
 
-// Google ログイン
+// 管理者向け Google ログイン
 document.getElementById('googleLoginBtn')?.addEventListener('click', async ()=>{
   const msg = document.getElementById('authMsg');
   msg.textContent = '';
   try{
     await setPersistence(auth, browserLocalPersistence);
     const result = await signInWithPopup(auth, googleProvider);
-    lastLoginEmail = result.user?.email || '';
-    try{ localStorage.setItem('abn_last_login_email', lastLoginEmail); }catch(_e){}
+    const email = (result.user?.email || '').toLowerCase();
+    const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
+    if (!isAllowedAdmin) {
+      await logAudit('blocked_google_non_admin', { email });
+      await signOut(auth);
+      msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
+    }
   }catch(e){
     msg.textContent = 'Googleログイン失敗: ' + (e.code||e.message);
   }
