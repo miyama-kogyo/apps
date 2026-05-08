@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin';
+    }
+
+    // 自分のユーザープロフィールは読み書き可、管理者は全ユーザー読み取り可
+    match /users/{userId} {
+      allow read, write: if isAuth() && request.auth.uid == userId;
+      allow read: if isAdmin();
+    }
+
+    // 端末管理（読み取りは全認証ユーザー、書き込みは管理者のみ）
+    match /devices/{deviceId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // 端末申請（作成は全認証ユーザー、管理は管理者）
+    match /deviceRequests/{requestId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // 監査ログ（書き込みは全認証ユーザー、読み取りは管理者）
+    match /auditLogs/{logId} {
+      allow create: if isAuth();
+      allow read: if isAdmin();
+    }
+
+    // 異常履歴（全認証ユーザーが読み書き可）
+    match /anomalies/{anomalyId} {
+      allow read, write: if isAuth();
+    }
+
+    // マスタデータ（読み取りは全認証ユーザー、書き込みは管理者）
+    match /masters/{masterId}/{subcollection=**} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // 修理報告
+    match /repairReports/{reportId} {
+      allow read, write: if isAuth();
+    }
+
+    // 品質案件
+    match /quality_cases/{caseId} {
+      allow read, write: if isAuth();
+    }
+
+    // 変化点
+    match /changepoints/{changepointId} {
+      allow read, write: if isAuth();
+    }
+
+    // 過去不具合
+    match /pastTroubles/{troubleId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+  }
+}
