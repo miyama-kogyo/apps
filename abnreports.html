@@ -732,8 +732,8 @@
         <input type="password" id="authPassword" placeholder="••••••••">
       </div>
       <button class="btn btn-primary" id="authLoginBtn">ログイン</button>
-      <button class="btn btn-secondary" id="googleLoginBtn" style="margin-top:10px;background:#fff;color:#333;border:1px solid #d0d7de;">Googleでログイン（管理者）</button>
-      <p style="font-size:.85rem;color:#666;margin-top:10px;line-height:1.5;">一般ユーザーはメールアドレス/パスワードでログイン、管理者は Google ログインを利用してください。</p>
+      <button class="btn btn-secondary" id="googleLoginBtn" style="margin-top:10px;background:#fff;color:#333;border:1px solid #d0d7de;">Googleでログイン</button>
+      <p style="font-size:.85rem;color:#666;margin-top:10px;line-height:1.5;">メールアドレス/パスワード、または Google アカウントでログインしてください。</p>
       <p id="authMsg" style="color:#c62828;margin-top:10px;"></p>
 
       <!-- ===== 端末ID発行・申請セクション ===== -->
@@ -1603,6 +1603,7 @@ const ADMIN_EMAILS = [
   'motsu922@icloud.com',
   'miyama.firebase@gmail.com'
 ];
+let lastLoginEmail = '';
 
 // 端末ID（ブラウザに固定保存）
 function getDeviceId(){
@@ -1707,6 +1708,10 @@ function applyRoleUi(role){
 // ===== 端末申請UI =====
 
 function showDeviceApplyUI(userEmail) {
+  lastLoginEmail = userEmail || lastLoginEmail || '';
+  try {
+    if (lastLoginEmail) localStorage.setItem('abn_last_login_email', lastLoginEmail);
+  } catch(e) {}
   const msg = document.getElementById('authMsg');
   if (msg) {
     msg.style.color = '#b45309';
@@ -1753,7 +1758,13 @@ function initDeviceApplyUI() {
   const applyBtn = document.getElementById('btnDeviceApply');
   if (applyBtn) {
     applyBtn.addEventListener('click', async () => {
-      const userEmail = (document.getElementById('authEmail')?.value || '').trim();
+      let userEmail = (document.getElementById('authEmail')?.value || '').trim()
+        || lastLoginEmail
+        || auth.currentUser?.email
+        || '';
+      try {
+        userEmail = userEmail || localStorage.getItem('abn_last_login_email') || '';
+      } catch(e) {}
       const userName   = (document.getElementById('applyUserName')?.value || '').trim();
       const deviceName = (document.getElementById('applyDeviceName')?.value || '').trim();
       if (!userName) {
@@ -1819,6 +1830,8 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
   const msg = document.getElementById('authMsg');
   msg.textContent = '';
   try{
+    lastLoginEmail = email;
+    try{ localStorage.setItem('abn_last_login_email', email); }catch(_e){}
     await setPersistence(auth, browserLocalPersistence);
     await signInWithEmailAndPassword(auth, email, pw);
     // onAuthStateChanged 側で後処理
@@ -1827,20 +1840,15 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
   }
 });
 
-// 管理者向け Google ログイン
+// Google ログイン
 document.getElementById('googleLoginBtn')?.addEventListener('click', async ()=>{
   const msg = document.getElementById('authMsg');
   msg.textContent = '';
   try{
     await setPersistence(auth, browserLocalPersistence);
     const result = await signInWithPopup(auth, googleProvider);
-    const email = (result.user?.email || '').toLowerCase();
-    const isAllowedAdmin = ADMIN_EMAILS.map(x=>String(x).toLowerCase()).includes(email);
-    if (!isAllowedAdmin) {
-      await logAudit('blocked_google_non_admin', { email });
-      await signOut(auth);
-      msg.textContent = 'Googleログインは管理者アカウントのみ利用できます。';
-    }
+    lastLoginEmail = result.user?.email || '';
+    try{ localStorage.setItem('abn_last_login_email', lastLoginEmail); }catch(_e){}
   }catch(e){
     msg.textContent = 'Googleログイン失敗: ' + (e.code||e.message);
   }
