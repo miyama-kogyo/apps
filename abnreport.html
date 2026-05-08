@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -871,10 +870,6 @@
               <div class="pt-warn-body" id="ptWarnBody"></div>
             </div>
           </div>
-          <div class="form-group">
-            <label>原因</label>
-            <textarea id="cause" placeholder="原因を入力してください"></textarea>
-          </div>
             <div class="form-group">
           <label>発見タイミング *</label>
           <select id="discoveryTiming" required>
@@ -1092,7 +1087,6 @@
           </select>
         </div>
         <div class="form-group"><label>保全単位</label><input type="text" id="maintenanceUnit"></div>
-        <div class="form-group"><label>原因</label><textarea id="tech_cause" placeholder="原因を入力してください"></textarea></div>
         <div class="form-group"><label>何が悪くどうした</label><textarea id="rootCauseAction"></textarea></div>
         <div class="form-group">
           <label>原因分類</label>
@@ -3483,7 +3477,6 @@ document.getElementById('selectSerialNo').addEventListener('change', async ()=>{
     <p><strong>部署:</strong> ${d.department} / ${d.lineName}</p>
     <p><strong>発生日時:</strong> ${d.occurrenceDate} ${d.occurrenceTime||''}</p>
     <p><strong>異常内容:</strong> ${d.anomalyContent}</p>
-    <p><strong>原因:</strong> ${d.cause || '-'}</p>
     <p><strong>現場対応:</strong> ${d.actionTaken}</p>
     <p><strong>異常分類:</strong> ${d.anomalyCategory || '-'}</p>
     <p><strong>原因分類:</strong> ${d.causeCategory || '-'}</p>
@@ -3492,9 +3485,6 @@ document.getElementById('selectSerialNo').addEventListener('change', async ()=>{
   box.style.display='block';
 
   // 発信部署が入力した変化点があれば、技術側にも反映
-  const techCauseInput = document.getElementById('tech_cause');
-  if (techCauseInput) techCauseInput.value = d.cause || '';
-
   const causeInput = document.getElementById('causeCategory');
   if (causeInput) bindCauseCategorySuggestions(d.causeCategory || '');
 
@@ -4368,7 +4358,6 @@ const base = {
   occurrenceTime: document.getElementById('occurrenceTime').value || '',
   restartTime: document.getElementById('restartTime').value || '',
   anomalyContent: document.getElementById('anomalyContent').value,
-  cause: document.getElementById('cause').value || '',
   actionTaken: document.getElementById('actionTaken').value,
   traceback: document.getElementById('traceback').value,
   qualityResponse: document.getElementById('qualityResponse').value || '',
@@ -4524,7 +4513,6 @@ const updates = {
   lifespan: document.getElementById('lifespan').value,
   lifespanReached: document.getElementById('lifespanReached').value,
   maintenanceUnit: document.getElementById('maintenanceUnit').value,
-  cause: (document.getElementById('tech_cause')?.value || '').trim(),
   rootCauseAction: rootText,
   causeCategory: (document.getElementById('causeCategory')?.value || '').trim(),
   recurrenceType: recType,
@@ -5415,7 +5403,6 @@ function saveEditTabData() {
       restartTime:         document.getElementById('edit_restartTime')?.value         ?? null,
       anomalyContent:      document.getElementById('edit_anomalyContent')?.value      ?? null,
       anomalyCategory:     document.getElementById('edit_anomalyCategory')?.value     ?? null,
-      cause:               document.getElementById('edit_cause')?.value               ?? null,
       actionTaken:         document.getElementById('edit_actionTaken')?.value         ?? null,
       traceback:           document.getElementById('edit_traceback')?.value           ?? null,
       lotNo:               document.getElementById('edit_lotNo')?.value               ?? null,
@@ -5473,7 +5460,6 @@ function ep(tab, field, itemValue) {
             <option value="その他" ${item.anomalyCategory === 'その他' ? 'selected' : ''}>その他</option>
           </select>
         </div>
-        <div class="form-group"><label>原因</label><textarea id="edit_cause">${item.cause || ''}</textarea></div>
         <div class="form-group"><label>現場対応</label><textarea id="edit_actionTaken">${item.actionTaken || ''}</textarea></div>
         <div class="form-group"><label>遡り</label><input type="text" id="edit_traceback" value="${item.traceback || ''}"></div>
         <div class="form-group"><label>LotNo</label><input type="text" id="edit_lotNo" value="${item.lotNo || ''}"></div>
@@ -5627,7 +5613,6 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
       updates.restartTime = document.getElementById('edit_restartTime')?.value || '';
       updates.anomalyContent = document.getElementById('edit_anomalyContent')?.value || '';
       updates.anomalyCategory = document.getElementById('edit_anomalyCategory')?.value || '';
-      updates.cause = document.getElementById('edit_cause')?.value || '';
       updates.actionTaken = document.getElementById('edit_actionTaken')?.value || '';
       updates.traceback = document.getElementById('edit_traceback')?.value || '';
       updates.lotNo = document.getElementById('edit_lotNo')?.value || '';
