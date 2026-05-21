@@ -957,16 +957,16 @@
   </select>
 </div>
 
-<!-- 対策状況（再発のときだけ表示） -->
+<!-- 対策状況（再発・新規のとき表示） -->
 <div class="form-group" id="mfg_measureStatusGroup" style="display:none;">
-  <label>対策状況（再発の場合）</label>
+  <label>対策状況</label>
   <select id="mfg_measureStatus">
     <option value="">選択してください</option>
-    <option value="対策検討中">対策検討中</option>
-    <option value="暫定対策中">暫定対策中</option>
-    <option value="対策部品待ち">対策部品待ち</option>
-    <option value="恒久対策済">恒久対策済</option>
-    <option value="対策効果確認中">対策効果確認中</option>
+    <option value="原因調査中">原因調査中</option>
+    <option value="データ収集中">データ収集中</option>
+    <option value="対策準備中">対策準備中</option>
+    <option value="効果確認中">効果確認中</option>
+    <option value="対策済">対策済</option>
   </select>
 </div>
 
@@ -1116,14 +1116,14 @@
         </div>
 
 <div class="form-group" id="measureStatusGroup" style="display:none;">
-  <label>対策状況（再発時のみ）</label>
+  <label>対策状況</label>
   <select id="measureStatus">
     <option value="">選択してください</option>
-    <option value="対策検討中">対策検討中</option>
-    <option value="暫定対策中">暫定対策中</option>
-    <option value="対策部品待ち">対策部品待ち</option>
-    <option value="恒久対策済">恒久対策済</option>
-    <option value="対策効果確認中">対策効果確認中</option>
+    <option value="原因調査中">原因調査中</option>
+    <option value="データ収集中">データ収集中</option>
+    <option value="対策準備中">対策準備中</option>
+    <option value="効果確認中">効果確認中</option>
+    <option value="対策済">対策済</option>
   </select>
 </div>
 
@@ -1548,7 +1548,8 @@ const measureStatusGroup = document.getElementById('measureStatusGroup');
 const measureStatusInput = document.getElementById('measureStatus');
 
 function toggleMeasureStatusUI(){
-  if (recurrenceSelect.value === '再発'){
+  const v = recurrenceSelect.value;
+  if (v === '再発' || v === '新規'){
     measureStatusGroup.style.display = 'block';
     measureStatusInput.setAttribute('required', '');
   } else {
@@ -1567,7 +1568,8 @@ const mfgRecurrenceSelect = document.getElementById('mfg_recurrenceType');
 const mfgMeasureStatusGroup = document.getElementById('mfg_measureStatusGroup');
 
 function toggleMfgMeasureStatusUI(){
-  if (mfgRecurrenceSelect && mfgRecurrenceSelect.value === '再発'){
+  const v = mfgRecurrenceSelect ? mfgRecurrenceSelect.value : '';
+  if (v === '再発' || v === '新規'){
     mfgMeasureStatusGroup.style.display = 'block';
   } else {
     mfgMeasureStatusGroup.style.display = 'none';
@@ -1611,14 +1613,75 @@ const ADMIN_EMAILS = [
 ];
 
 // 端末ID（ブラウザに固定保存）
-function getDeviceId(){
-  const KEY = 'abn_device_id_v17_1';
-  let id = null;
-  try{ id = localStorage.getItem(KEY); }catch(e){}
-  if (!id){
-    id = (crypto?.randomUUID?.() || ('dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36)));
-    try{ localStorage.setItem(KEY, id); }catch(e){}
+const DEVICE_ID_KEY = 'abn_device_id_v17_1';
+const DEVICE_ID_STATUS = {
+  source: 'new',
+  savedToLocalStorage: false,
+  savedToCookie: false
+};
+
+function isValidDeviceId(id){
+  return typeof id === 'string' && id.trim().length >= 8 && id.trim().length <= 128;
+}
+
+function getStoredDeviceId(store){
+  try {
+    const id = store.getItem(DEVICE_ID_KEY);
+    return isValidDeviceId(id) ? id.trim() : null;
+  } catch(e) {
+    return null;
   }
+}
+
+function setStoredDeviceId(store, id){
+  try {
+    store.setItem(DEVICE_ID_KEY, id);
+    return store.getItem(DEVICE_ID_KEY) === id;
+  } catch(e) {
+    return false;
+  }
+}
+
+function getCookieDeviceId(){
+  try {
+    const parts = document.cookie ? document.cookie.split(';') : [];
+    for (const part of parts) {
+      const [rawName, ...rawValue] = part.trim().split('=');
+      if (rawName === DEVICE_ID_KEY) {
+        const id = decodeURIComponent(rawValue.join('=') || '');
+        return isValidDeviceId(id) ? id.trim() : null;
+      }
+    }
+  } catch(e) {}
+  return null;
+}
+
+function setCookieDeviceId(id){
+  try {
+    const secure = location.protocol === 'https:' ? '; secure' : '';
+    document.cookie = `${DEVICE_ID_KEY}=${encodeURIComponent(id)}; max-age=315360000; path=/; samesite=lax${secure}`;
+    return getCookieDeviceId() === id;
+  } catch(e) {
+    return false;
+  }
+}
+
+function createDeviceId(){
+  return (crypto?.randomUUID?.() || ('dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36)));
+}
+
+function getDeviceId(){
+  const candidates = [
+    ['localStorage', getStoredDeviceId(localStorage)],
+    ['cookie', getCookieDeviceId()]
+  ];
+  const found = candidates.find(([, id]) => isValidDeviceId(id));
+  const id = found ? found[1] : createDeviceId();
+
+  DEVICE_ID_STATUS.source = found ? found[0] : 'new';
+  DEVICE_ID_STATUS.savedToLocalStorage = setStoredDeviceId(localStorage, id);
+  DEVICE_ID_STATUS.savedToCookie = setCookieDeviceId(id);
+
   return id;
 }
 const DEVICE_ID = getDeviceId();
@@ -1630,6 +1693,7 @@ async function logAudit(action, detail={}){
       action,
       detail,
       deviceId: DEVICE_ID,
+      deviceIdStorage: { ...DEVICE_ID_STATUS },
       uid: user?.uid || null,
       email: user?.email || null,
       ua: navigator.userAgent,
@@ -1737,6 +1801,14 @@ function initDeviceApplyUI() {
   const el = document.getElementById('displayDeviceId');
   if (el) el.textContent = DEVICE_ID;
 
+  if (!DEVICE_ID_STATUS.savedToLocalStorage && !DEVICE_ID_STATUS.savedToCookie) {
+    const msg = document.getElementById('authMsg');
+    if (msg && !msg.textContent) {
+      msg.style.color = '#b45309';
+      msg.textContent = 'ブラウザの保存機能が制限されているため、端末IDが毎回変わる可能性があります。通常モードで開くか、サイトデータ保存を許可してください。';
+    }
+  }
+
 
 
   const copyBtn = document.getElementById('btnCopyDeviceId');
@@ -1777,6 +1849,7 @@ function initDeviceApplyUI() {
       try {
         await addDoc(collection(db, 'deviceRequests'), {
           deviceId: DEVICE_ID,
+          deviceIdStorage: { ...DEVICE_ID_STATUS },
           userEmail: userEmail || '（未入力）',
           applicantName: userName,
           deviceName: deviceName,
@@ -2753,7 +2826,7 @@ ${item.traceback ? `
                 ${item.lifespan ? `<div class="tech-info-item"><span class="tech-info-label">命数:</span><span class="tech-info-value">${item.lifespan}</span></div>` : ''}
                 ${item.rootCauseAction ? `<div class="tech-info-item" style="grid-column:1/-1;"><span class="tech-info-label">処置方法:</span><span class="tech-info-value">${item.rootCauseAction}</span></div>` : ''}
                 ${item.causeCategory ? `<div class="tech-info-item" style="grid-column:1/-1;"><span class="tech-info-label">原因分類:</span><span class="tech-info-value">${item.causeCategory}</span></div>` : ''}
-                ${(item.recurrenceType==='再発' && item.measureStatus)
+                ${item.measureStatus
                   ? `<div class="tech-info-item" style="grid-column:1/-1;">
                        <span class="tech-info-label">対策状況:</span>
                        <span class="tech-info-value">${item.measureStatus}</span>
