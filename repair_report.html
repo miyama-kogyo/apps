@@ -1,0 +1,2781 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>修理報告書（入力＋マスター管理）</title>
+<style>
+  :root{
+    --bg:#f5f5f5;
+    --card:#fff;
+    --fg:#111827;
+    --muted:#6b7280;
+    --border:#e5e7eb;
+    --accent:#667eea;
+    --accent2:#764ba2;
+    --ok:#16a34a;
+    --warn:#f59e0b;
+    --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans",system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+  .header{
+    background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+    color:#fff;padding:18px 14px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.12);
+    position:sticky;top:0;z-index:10;
+  }
+  .header h1{margin:0;font-size:1.2rem}
+  .header .sub{margin-top:6px;font-size:.9rem;opacity:.95}
+  .container{max-width:1100px;margin:0 auto;padding:12px}
+  .tabs{display:flex;background:#fff;margin:12px 0 0;border-radius:10px 10px 0 0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+  .tab{flex:1;padding:14px;text-align:center;cursor:pointer;background:#f8f9fa;border:none;font-size:1rem;font-weight:800;transition:.2s;color:#666}
+  .tab.active{background:#fff;color:var(--accent);border-bottom:3px solid var(--accent)}
+  .tab-content{display:none;background:#fff;padding:18px;border-radius:0 0 10px 10px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+  .tab-content.active{display:block}
+
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:850px){ .row{grid-template-columns:1fr} }
+
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;
+  }
+  .card h2{margin:0 0 10px;font-size:1.05rem;color:var(--accent);display:flex;align-items:center;gap:8px}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-weight:800;font-size:.8rem
+  }
+  .badge.ok{background:#e7f8ee;color:#0f7a2e}
+  .badge.warn{background:#fff7ed;color:#9a3412}
+  .badge.gray{background:#f3f4f6;color:#374151}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  @media (max-width:950px){ .grid3{grid-template-columns:1fr} }
+
+  label{display:block;font-weight:800;color:#374151;margin:6px 0 6px;font-size:.92rem}
+  input,select,textarea{
+    width:100%;padding:11px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:1rem;
+    transition:border-color .15s;background:#fff;color:#111827;
+  }
+  textarea{min-height:90px;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .help{color:var(--muted);font-size:.85rem;margin-top:6px;line-height:1.35}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .btn{
+    border:none;border-radius:8px;padding:12px 14px;font-weight:900;cursor:pointer;transition:.15s;
+    font-size:.95rem;
+  }
+.btn-xs{
+  border:none;border-radius:8px;padding:8px 10px;font-weight:900;cursor:pointer;transition:.15s;
+  font-size:.88rem;
+}
+.btn-xs.primary{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);color:#fff}
+  .btn.primary{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);color:#fff}
+  .btn.secondary{background:#6c757d;color:#fff}
+  .btn.outline{background:#fff;border:2px solid var(--accent);color:var(--accent)}
+  .btn.danger{background:var(--danger);color:#fff}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:8px;font-size:.92rem}
+  @media (max-width:650px){ .kv{grid-template-columns:1fr} }
+  .kv .k{color:#6b7280;font-weight:800}
+  .kv .v{color:#111827}
+
+  .divider{height:1px;background:var(--border);margin:12px 0}
+
+  /* ログイン */
+  #authGate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000}
+  #authCard{background:#fff;max-width:380px;width:92%;padding:22px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+  #signOutBtn{position:fixed;right:12px;top:12px;background:#ef5350;color:#fff;border:none;border-radius:8px;padding:9px 12px;cursor:pointer;z-index:1500;display:none}
+
+  /* マスター管理 */
+  .master-top{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  /* master simple mode */
+  .master-advanced{ display:none !important; }
+
+  .master-top > div{flex:1;min-width:220px}
+  .list{display:grid;gap:8px;margin-top:12px}
+  .list-item{
+    display:flex;gap:10px;align-items:center;justify-content:space-between;
+    padding:10px 12px;background:#f8f9fa;border-radius:10px;border-left:4px solid var(--accent);
+  }
+  .li-left{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{font-size:.8rem;font-weight:900;padding:3px 10px;border-radius:999px;background:#eef2ff;color:#3730a3}
+  .tiny{font-size:.85rem;color:#374151;font-weight:700}
+  .li-actions{display:flex;gap:8px}
+  .btn-xs{padding:7px 10px;border-radius:8px;font-weight:900;border:none;cursor:pointer}
+  .btn-xs.edit{background:#fbbf24;color:#111}
+  .btn-xs.del{background:#dc2626;color:#fff}
+  .btn-xs.toggle{background:#e5e7eb;color:#111}
+  .btn-xs.toggle.on{background:#d1fae5;color:#065f46}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center}
+  .modal.active{display:flex}
+  .modal-content{background:#fff;border-radius:12px;max-width:560px;width:94%;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.25)}
+  .modal-title{font-weight:1000;color:#111827;font-size:1.05rem;margin-bottom:10px}
+
+
+  /* ===== 必須項目の視覚強調（A+B） ===== */
+  .req-badge{
+    display:inline-flex; align-items:center;
+    margin-left:8px; padding:2px 8px;
+    border-radius:999px; font-size:.75rem; font-weight:900;
+    background:#fff7ed; color:#9a3412; border:1px solid #fed7aa;
+  }
+  label.is-required{
+    display:flex; align-items:center; gap:6px;
+  }
+  .req-field{
+    border-color:#f59e0b !important;
+    background:#fffbeb;
+  }
+  .req-field:focus{
+    border-color:#f59e0b !important;
+    box-shadow:0 0 0 4px rgba(245, 158, 11, .18);
+  }
+
+  /* 未入力エラー（B） */
+  .req-missing{
+    border-color:#dc2626 !important;
+    background:#fff1f2 !important;
+  }
+  .req-missing:focus{
+    box-shadow:0 0 0 4px rgba(220, 38, 38, .18);
+  }
+
+  /* 必須がまとまっているカードに目印（任意） */
+  .card.req-card{
+    border-left:6px solid #f59e0b;
+  }
+
+/* ===== 一覧（修理報告書） ===== */
+  .list-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .list-toolbar input{max-width:360px}
+  .list-toolbar select{max-width:160px}
+  .list-dates{display:flex;gap:6px;align-items:center}
+  .tiny{font-size:.8rem;color:var(--muted)}
+  .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:10px;background:#fff}
+  .list-table{width:100%;border-collapse:collapse;min-width:980px}
+  .list-table th,.list-table td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  .list-table th{position:sticky;top:0;background:#f8fafc;text-align:left;font-size:.9rem;color:#374151}
+  .list-table tr:hover td{background:#fafafa}
+  .opbtn{display:inline-flex;gap:6px;flex-wrap:wrap}
+  .btn-xs{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:#fff;cursor:pointer;font-weight:800;font-size:.85rem}
+  .btn-xs.primary{border-color:#c7d2fe;background:#eef2ff;color:#3730a3}
+  .btn-xs.danger{border-color:#fecaca;background:#fff1f2;color:#9f1239}
+
+
+/* === Auto-grow textareas: 文字が隠れないように自動拡張 === */
+.autogrow-textarea{
+  width:100%;
+  min-height:44px;
+  resize:vertical;
+  overflow:hidden;
+  line-height:1.6;
+  padding:10px;
+}
+
+
+
+  /* ===== 異常写真（アップロード/表示） ===== */
+  .image-uploader{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .image-uploader .hint{ color: var(--muted); font-size: .85rem; font-weight:700; }
+  .image-preview-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+    gap:10px;
+    margin-top:10px;
+  }
+  .image-preview{
+    position:relative;
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:hidden;
+    background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+  }
+  .image-preview img{
+    width:100%;
+    height:120px;
+    object-fit:cover;
+    display:block;
+  }
+  .image-preview .meta{
+    padding:6px 8px;
+    font-size:.78rem;
+    color:#374151;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .image-preview .meta .name{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width:100%;
+    font-weight:800;
+  }
+  .image-preview button{
+    position:absolute;
+    top:6px;
+    right:6px;
+    width:28px;
+    height:28px;
+    border:none;
+    border-radius:999px;
+    background:rgba(17,24,39,.75);
+    color:#fff;
+    cursor:pointer;
+    font-weight:1000;
+    line-height:28px;
+  }
+  .image-preview button:hover{ background:rgba(220,38,38,.92); }
+/* ===== 画像注釈編集（フキダシ/矢印/テキスト） ===== */
+.image-preview button.edit{
+  right:40px;
+  background:rgba(17,24,39,.70);
+}
+.image-preview button.edit:hover{ background:rgba(245,158,11,.95); color:#111; }
+.annot-modal .modal-content{ max-width:980px; }
+.annot-toolbar{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+  margin:6px 0 10px;
+}
+.annot-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.annot-tools .btn-xs{ border:1px solid var(--border); background:#fff; }
+.annot-tools .btn-xs.active{ border-color:var(--accent); background:#eef2ff; color:#3730a3; }
+.annot-stage{
+  background:#111827;
+  border-radius:12px;
+  padding:10px;
+  border:1px solid rgba(255,255,255,.12);
+}
+#annotCanvas{
+  width:100%;
+  height:auto;
+  background:#000;
+  border-radius:10px;
+  touch-action:none; /* ペン/指操作を安定化 */
+  display:block;
+  max-height:70vh;
+  object-fit:contain;
+}
+.annot-help{ color:var(--muted); font-size:.85rem; line-height:1.4; margin-top:8px; }
+  .image-preview a.zoom{
+    position:absolute;
+    left:6px;
+    top:6px;
+    background:rgba(17,24,39,.55);
+    color:#fff;
+    text-decoration:none;
+    padding:4px 8px;
+    border-radius:999px;
+    font-weight:900;
+    font-size:.75rem;
+  }
+  .image-preview a.zoom:hover{ background:rgba(17,24,39,.8); }
+
+/* ===== 承認ワークフロー ===== */
+.badge.submitted { background:#fef9c3; color:#854d0e; }
+.badge.approved  { background:#dcfce7; color:#15803d; }
+.badge.rejected  { background:#fee2e2; color:#b91c1c; }
+.st-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-weight:900; font-size:.8rem; }
+.st-draft     { background:#f3f4f6; color:#374151; }
+.st-submitted { background:#fef9c3; color:#854d0e; }
+.st-approved  { background:#dcfce7; color:#15803d; }
+.st-rejected  { background:#fee2e2; color:#b91c1c; }
+
+/* ===== 通知モーダル ===== */
+#notifyModal { z-index:4000; }
+#notifyMsg {
+  white-space:pre-wrap; background:#f8f9fa; border:1px solid var(--border);
+  border-radius:8px; padding:12px; font-size:.9rem; line-height:1.7;
+  margin:10px 0; max-height:260px; overflow-y:auto;
+}
+
+</style>
+</head>
+<body>
+  <button id="signOutBtn">サインアウト</button>
+
+  <div id="authGate">
+    <div id="authCard">
+      <h2 style="margin:0 0 16px;text-align:center;">🔐 ログイン</h2>
+      <div>
+        <label>メールアドレス</label>
+        <input type="email" id="authEmail" placeholder="user@example.com">
+      </div>
+      <div style="margin-top:10px;">
+        <label>パスワード</label>
+        <input type="password" id="authPassword" placeholder="••••••••">
+      </div>
+      <button class="btn primary" id="authLoginBtn" style="width:100%;margin-top:14px;">ログイン</button>
+      <p id="authMsg" style="color:#c62828;margin:10px 0 0;"></p>
+      <div class="help" style="margin-top:10px;">
+        ※ 異常履歴ツールと同じFirebaseプロジェクト設定で動きます。
+      </div>
+    </div>
+  </div>
+
+  <div class="header">
+    <h1>🧾 修理報告書</h1>
+    <div class="sub">入力＋マスター管理（単体HTML）</div>
+  </div>
+
+  <div class="container" id="appRoot" style="display:none;">
+    <div class="tabs">
+      <button class="tab active" data-tab="report">入力</button>
+      <button class="tab" data-tab="list">📋 一覧</button>
+      <button class="tab" data-tab="master">⚙️ マスター</button>
+    </div>
+
+    <!-- 入力 -->
+    <div id="report" class="tab-content active">
+      <div class="row">
+        <div class="card">
+          <h2>🔗 連携情報 <span id="linkBadge" class="badge gray">未読込</span></h2>
+          <div class="kv">
+            <div class="k">anomalyId</div><div class="v" id="vAnomalyId">-</div>
+            <div class="k">報告書状態</div><div class="v" id="vReportState">（未作成）</div>
+            <div class="k">承認状態</div><div class="v" id="vApprovalState">—</div>
+            <div class="k">提出者</div><div class="v" id="vSubmittedBy" style="font-size:.85rem;color:#6b7280;">—</div>
+            <div class="k">承認者</div><div class="v" id="vApprovedBy" style="font-size:.85rem;color:#6b7280;">—</div>
+          </div>
+          <div class="help">
+            ・URL例：<code>repair_report.html?anomalyId=XXXX</code><br>
+            ・anomaliesの内容は「初期値としてコピー」し、ここで編集できます。
+          </div>
+          <div class="btnrow">
+            <button class="btn outline" id="btnReloadFromAnomaly">↻ 異常履歴を再読込（上書き）</button>
+            <button class="btn secondary" id="btnLoadOnly" title="保存はせず表示だけ更新します">🔎 取得のみ</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>🧮 自動計算</h2>
+          <div class="grid3">
+            <div>
+              <label>不具合発生日時（計算）</label>
+              <input id="calcOccurrenceAt" type="text" readonly>
+              <div class="help">発生日 + 発生時刻</div>
+            </div>
+            <div>
+              <label>停止時間H（計算）</label>
+              <input id="calcStopHours" type="text" readonly>
+              <div class="help">再開時刻 - 発生時刻（跨ぎ対応）</div>
+            </div>
+            <div>
+              <label>保全費用合計（計算）</label>
+              <input id="calcTotalCost" type="text" readonly>
+              <div class="help">労務費 + 部品費/外注費</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <div class="card">
+          <h2>📌 異常情報（編集可）</h2>
+
+          <div class="grid3">
+            <div>
+              <label>整理No *</label>
+              <input id="serialNo" placeholder="例: 6769">
+            </div>
+            <div>
+              <label>発信部署 *</label>
+              <input id="department" placeholder="例: 4G">
+            </div>
+            <div>
+              <label>ライン名 *</label>
+              <input id="lineName" placeholder="例: CY">
+            </div>
+          </div>
+
+          <div class="grid3" style="margin-top:10px;">
+            <div>
+              <label>発生日 *</label>
+              <input id="occurrenceDate" type="date">
+            </div>
+            <div>
+              <label>発生時刻</label>
+              <input id="occurrenceTime" type="time">
+            </div>
+            <div>
+              <label>再開時刻</label>
+              <input id="restartTime" type="time">
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <label>異常内容 *</label>
+            <textarea id="anomalyContent" placeholder="異常内容"></textarea>
+          </div>
+
+          <div style="margin-top:10px;">
+            <label>処置内容（初期値はanomaliesから）</label>
+            <textarea id="rootCauseAction" placeholder="何が悪くどうした"></textarea>
+          </div>
+
+          <div style="margin-top:10px;">
+            <label>異常写真（任意）</label>
+            <div class="image-uploader">
+              <input type="file" id="anomalyImageInput" accept="image/*" multiple />
+              <div class="hint">最大5枚 / 1枚あたり5MBまで（推奨）</div>
+            </div>
+            <div id="anomalyImagePreview" class="image-preview-grid"></div>
+          </div>
+
+
+          <div class="grid3" style="margin-top:10px;">
+            <div>
+              <label>担当</label>
+              <input id="techHandler" placeholder="例: 杉本">
+            </div>
+            <div>
+              <label>設備名</label>
+              <input id="equipmentName" placeholder="例: 200tプレス1号機">
+            </div>
+            <div>
+              <label>不具合箇所</label>
+              <input id="failureLocation" placeholder="例: フィーダー部">
+            </div>
+          </div>
+
+        </div>
+
+        <div class="card">
+          <h2>🛠️ 修理・保全入力</h2>
+
+          <div class="grid3">
+            <div>
+              <label>保全分類</label>
+              <select id="maintenanceCategory"></select>
+              <div class="help">⚙️マスターで追加/変更</div>
+            </div>
+            <div>
+              <label>機能低下</label>
+              <select id="functionDegradation"></select>
+            </div>
+            <div>
+              <label>再発防止区分</label>
+              <select id="recurrencePreventionType"></select>
+            </div>
+          </div>
+
+          <div class="grid3" style="margin-top:10px;">
+            <div>
+              <label>保全作業開始</label>
+              <input id="maintenanceWorkStartAt" type="datetime-local">
+            </div>
+            <div>
+              <label>生産開始</label>
+              <input id="productionStartAt" type="datetime-local">
+            </div>
+            <div>
+              <label>停止除外時間H</label>
+              <input id="excludedStopHours" type="number" step="0.01" placeholder="例: 0.25">
+            </div>
+          </div>
+
+          <div class="grid3" style="margin-top:10px;">
+            <div>
+              <label>変化点ランク</label>
+              <select id="changepointRank"></select>
+            </div>
+            <div>
+              <label>FP点検</label>
+              <select id="fpCheck"></select>
+            </div>
+            <div>
+              <label>保全工数H</label>
+              <input id="maintenanceManHours" type="number" step="0.01" placeholder="例: 1.5">
+            </div>
+          </div>
+
+          <div class="grid3" style="margin-top:10px;">
+            <div>
+              <label>労務費</label>
+              <input id="laborCost" type="number" step="1" placeholder="例: 3000">
+            </div>
+            <div>
+              <label>部品費/外注費</label>
+              <input id="partsOutsourceCost" type="number" step="1" placeholder="例: 12000">
+            </div>
+            <div>
+              <label>保全費用合計（計算）</label>
+              <input id="totalMaintenanceCost" type="number" step="1" readonly>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <label>流出防止</label>
+            <textarea id="outflowPrevention" placeholder="流出防止策"></textarea>
+          </div>
+
+          <div class="grid3" style="margin-top:10px;">
+            <div>
+              <label>なぜ1</label>
+              <textarea id="why1" placeholder="なぜ1"></textarea>
+            </div>
+            <div>
+              <label>なぜ2</label>
+              <textarea id="why2" placeholder="なぜ2"></textarea>
+            </div>
+            <div>
+              <label>なぜ3</label>
+              <textarea id="why3" placeholder="なぜ3"></textarea>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <label>再発防止・残工事</label>
+            <textarea id="recurrencePreventionWork" placeholder="再発防止・残工事"></textarea>
+          </div>
+
+          <div class="btnrow">
+            <button class="btn primary" id="btnSave">💾 保存（下書き）</button>
+            <button class="btn outline" id="btnSubmit">📤 提出（確定）</button>
+            <button class="btn" id="btnApprove" style="display:none;background:#16a34a;color:#fff;">✅ 承認</button>
+            <button class="btn" id="btnReject" style="display:none;background:#dc2626;color:#fff;">↩ 差し戻し</button>
+            <button class="btn danger" id="btnDelete">🗑️ 報告書を削除</button>
+            <button class="btn secondary" id="btnExportCsv" title="現在表示中の報告書をCSV出力します">📄 CSV出力</button>
+            <button class="btn outline" id="btnImportCsv" title="CSVを読み込んで入力欄へ反映します">📥 CSVインポート</button>
+            <input id="csvImportFile" type="file" accept=".csv,text/csv" style="display:none">
+          </div>
+
+          <div class="help" id="saveMsg" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- 一覧 -->
+    <div id="list" class="tab-content">
+      <div class="card">
+        <h2>📋 修理報告書一覧</h2>
+        <div class="help">保存先：<code>repairReports</code>（docId = anomalyId）</div>
+
+        <div class="list-toolbar">
+          <input id="listSearch" placeholder="検索（整理No/部署/ライン/内容 など）" />
+          <select id="listStatus">
+            <option value="">状態：すべて</option>
+            <option value="draft">下書き</option>
+            <option value="submitted">提出済（承認待ち）</option>
+            <option value="approved">承認済</option>
+            <option value="rejected">差し戻し</option>
+          </select>
+          <div class="list-dates">
+            <input id="listFrom" type="date" title="発生日 From" />
+            <span class="tiny">〜</span>
+            <input id="listTo" type="date" title="発生日 To" />
+          </div>
+          <button class="btn outline" id="btnListReload">↻ 再読込</button>
+          <button class="btn secondary" id="btnListExport">📄 一覧CSV</button>
+        </div>
+
+        <div class="help" id="listMsg" style="margin:8px 0;"></div>
+
+        <div class="table-wrap">
+          <table class="list-table" id="listTable">
+            <thead>
+              <tr>
+                <th style="width:150px;">更新</th>
+                <th style="width:90px;">状態</th>
+                <th style="width:90px;">整理No</th>
+                <th style="width:90px;">部署</th>
+                <th style="width:90px;">ライン</th>
+                <th style="width:110px;">発生日</th>
+                <th>異常内容</th>
+                <th style="width:140px;">操作</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="btnrow" style="margin-top:10px;">
+          <button class="btn outline" id="btnListMore">＋ もっと表示</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- マスター -->
+    <div id="master" class="tab-content">
+      <div class="card">
+        <h2>⚙️ 選択肢マスター（修理報告書） <span class="badge warn">全員編集可</span></h2>
+        <div class="help">
+          ここで追加・変更した選択肢は、入力タブのプルダウンに即反映します。<br>
+          保存先：<code>masters/repairReport/items</code>（サブコレクション）
+        </div>
+
+        <div class="master-top" style="margin-top:10px;">
+          <div>
+            <label>対象マスター</label>
+            <select id="masterGroup"></select>
+          </div>
+          <div id="masterNewLabelWrap">
+            <label>新規追加（表示名）</label>
+            <input id="masterNewLabel" placeholder="例: 電気 / 機械 / 治具 など">
+          </div>
+          <div id="masterRequiredFieldWrap" style="display:none;">
+            <label>必須にする項目</label>
+            <select id="masterRequiredField"></select>
+            <div class="help">※「必須項目（入力ガイド）」を選択中のみ表示</div>
+          </div>
+          <div>
+            <label>並び順（数字が小さいほど上）</label>
+            <input id="masterNewOrder" type="number" step="1" placeholder="例: 10">
+          </div>
+          <div style="min-width:220px;">
+            <button class="btn primary" id="btnMasterAdd" style="width:100%;">＋ 追加</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="help master-advanced"><b>一括追加</b>：1行=1項目。例：<code>電気</code> / <code>機械,20</code>（カンマでorder指定）</div>
+        <div class="master-top master-advanced" style="margin-top:8px; grid-template-columns: 1fr 220px;">
+          <div>
+            <label>一括入力</label>
+            <textarea id="masterBulk" placeholder="例
+電気
+機械,20
+金型,30"></textarea>
+          </div>
+          <div style="min-width:220px; align-self:end;">
+            <button class="btn primary" id="btnMasterBulkAdd" style="width:100%;">＋ 一括追加</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="btnrow">
+          <button class="btn outline" id="btnMasterReload">↻ 再読込</button>
+          <button class="btn secondary master-advanced" id="btnMasterExportJson">📥 JSONエクスポート</button>
+          <button class="btn secondary master-advanced" id="btnMasterImportJson">📤 JSONインポート</button>
+          <input class="master-advanced" id="masterImportFile" type="file" accept="application/json" style="display:none">
+        </div>
+
+        <div id="masterList" class="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提出通知モーダル -->
+  <div id="notifyModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-title">📢 提出完了 — 通知メッセージ</div>
+      <p class="help" style="margin:0 0 4px;">以下のメッセージをコピーして上長へ通知してください。</p>
+      <div id="notifyMsg"></div>
+      <div class="btnrow">
+        <button class="btn primary" id="btnNotifyCopy">📋 コピー</button>
+        <button class="btn" id="btnNotifyLine" style="background:#06c755;color:#fff;">LINE で送る</button>
+        <button class="btn secondary" id="btnNotifyMail">📧 メール</button>
+        <button class="btn outline" id="btnNotifyClose">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div id="editModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-title">✏️ マスター項目編集</div>
+      <div class="row" style="grid-template-columns:1fr 1fr;">
+        <div>
+          <label>表示名</label>
+          <input id="editLabel">
+        </div>
+        <div>
+          <label>並び順</label>
+          <input id="editOrder" type="number" step="1">
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label>value（内部値）</label>
+        <input id="editValue" placeholder="未入力なら自動生成">
+        <div class="help">基本は自動でOK（英数スラッグ）。後から変えると既存データとズレるので注意。</div>
+      </div>
+      <div class="btnrow" style="margin-top:12px;">
+        <button class="btn primary" id="btnEditSave">保存</button>
+        <button class="btn secondary" id="btnEditCancel">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 画像注釈編集モーダル -->
+  <div id="annotModal" class="modal annot-modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-title">🖍️ 画像に注釈（フキダシ / 矢印 / テキスト）</div>
+
+      <div class="annot-toolbar">
+        <div class="annot-tools">
+          <button class="btn-xs" id="toolMove" type="button">移動</button>
+          <button class="btn-xs" id="toolText" type="button">テキスト</button>
+          <button class="btn-xs" id="toolBubble" type="button">フキダシ</button>
+          <button class="btn-xs" id="toolArrow" type="button">矢印</button>
+          <button class="btn-xs" id="toolUndo" type="button">Undo</button>
+        </div>
+        <div class="annot-tools">
+          <button class="btn-xs primary" id="annotSaveBtn" type="button">保存して反映</button>
+          <button class="btn-xs" id="annotCancelBtn" type="button">キャンセル</button>
+        </div>
+      </div>
+
+      <div class="annot-stage">
+        <canvas id="annotCanvas"></canvas>
+      </div>
+      <div class="annot-help">
+        ・「移動」で注釈をドラッグできます。<br>
+        ・「テキスト / フキダシ」はタップ位置に追加（文字は入力ダイアログ）。<br>
+        ・「矢印」はドラッグで引きます。<br>
+        ・保存すると画像に合成して、この報告書の写真として扱われます（未保存/保存済どちらも対応）。
+      </div>
+    </div>
+  </div>
+
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+  import {
+    getFirestore,
+    collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
+    query, where, orderBy, limit, startAfter, serverTimestamp
+  } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+  import {
+    getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
+  } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js';
+
+
+  // Firebase設定（異常履歴入力ツールと同一）
+  const firebaseConfig = {
+    apiKey: "AIzaSyA0YUIpIDh4WB4p1ewiNB0XfwHve0ByljU",
+    authDomain: "abnreport-fd733.firebaseapp.com",
+    databaseURL: "https://abnreport-fd733-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "abnreport-fd733",
+    storageBucket: "abnreport-fd733.firebasestorage.app",
+    messagingSenderId: "349748947315",
+    appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  const storage = getStorage(app);
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab==='list'){ try{ renderReportList(true); }catch(e){ console.error(e); } }
+      });
+    });
+
+  // Auth
+  const gate = document.getElementById('authGate');
+  const appRoot = document.getElementById('appRoot');
+  const signOutBtn = document.getElementById('signOutBtn');
+
+  document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
+    const email = (document.getElementById('authEmail').value||'').trim();
+    const pw = document.getElementById('authPassword').value;
+    try{
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithEmailAndPassword(auth, email, pw);
+    }catch(e){
+      document.getElementById('authMsg').textContent = 'ログイン失敗: ' + (e.code || e.message);
+    }
+  });
+  signOutBtn.addEventListener('click', ()=> signOut(auth));
+
+  // ===== Required fields UI (master-driven) =====
+  // 既定の必須（マスターが取得できない/未設定の場合に使用）
+  const REQUIRED_FIELDS = [
+    { id:'serialNo', label:'整理No' },
+    { id:'department', label:'発信部署' },
+    { id:'occurrenceDate', label:'発生日' },
+    { id:'anomalyContent', label:'異常内容' },
+  ];
+
+  // requiredFields マスター登録用（フィールドID一覧）
+  const ALL_FIELDS = [
+    { value:'serialNo', label:'整理No' },
+    { value:'department', label:'発信部署' },
+    { value:'lineName', label:'ライン名' },
+    { value:'occurrenceDate', label:'発生日' },
+    { value:'occurrenceTime', label:'発生時刻' },
+    { value:'restartTime', label:'再開時刻' },
+    { value:'anomalyContent', label:'異常内容' },
+    { value:'rootCauseAction', label:'処置内容' },
+    { value:'techHandler', label:'担当' },
+    { value:'equipmentName', label:'設備名' },
+    { value:'failureLocation', label:'不具合箇所' },
+    { value:'maintenanceCategory', label:'保全分類' },
+    { value:'functionDegradation', label:'機能低下' },
+    { value:'recurrencePreventionType', label:'再発防止区分' },
+    { value:'maintenanceWorkStartAt', label:'保全作業開始日時' },
+    { value:'productionStartAt', label:'生産開始日時' },
+    { value:'excludedStopHours', label:'停止除外時間H' },
+    { value:'changepointRank', label:'変化点ランク' },
+    { value:'fpCheck', label:'FP点検' },
+    { value:'maintenanceManHours', label:'保全工数H' },
+    { value:'laborCost', label:'労務費' },
+    { value:'partsOutsourceCost', label:'部品費/外注費' },
+    { value:'outflowPrevention', label:'流出防止' },
+    { value:'why1', label:'原因 なぜ1' },
+    { value:'why2', label:'原因 なぜ2' },
+    { value:'why3', label:'原因 なぜ3' },
+    { value:'recurrencePreventionWork', label:'再発防止・残工事' },
+  ];
+
+  // value -> label 参照用（必須マスター追加で使用）
+  const ALL_FIELDS_MAP = Object.fromEntries(ALL_FIELDS.map(f=>[f.value, f.label]));
+
+
+  // 必須UI（黄色）と未入力（赤枠）の付与
+  function markRequiredUI(){
+    try{
+      REQUIRED_FIELDS.forEach(({id, label})=>{
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('req-field');
+
+        const wrap = el.closest('div');
+        const lab = wrap?.querySelector('label');
+        if (lab && !lab.dataset.req){
+          lab.dataset.req = '1';
+          lab.classList.add('is-required');
+          const b = document.createElement('span');
+          b.className = 'req-badge';
+          b.textContent = '必須';
+          lab.appendChild(b);
+        }
+
+        const validateOne = ()=>{
+          const v = (el.value || '').trim();
+          el.classList.toggle('req-missing', !v);
+        };
+        el.addEventListener('blur', validateOne);
+        el.addEventListener('input', ()=> el.classList.remove('req-missing'));
+      });
+    }catch(e){
+      console.error('markRequiredUI failed:', e);
+    }
+  }
+
+  // Firestoreマスター（group='requiredFields'）から必須定義を読み込む
+  async function loadRequiredFieldsFromMaster(){
+    try{
+      const snap = await getDocs(query(mastersCol(), where('group','==','requiredFields')));
+      const rows = snap.docs.map(d=>({id:d.id, ...d.data()}))
+        .filter(r=>r.enabled !== false)
+        .sort((a,b)=>(a.order??999)-(b.order??999) || String(a.label||'').localeCompare(String(b.label||'')));
+
+      if (rows.length){
+        REQUIRED_FIELDS.length = 0;
+        rows.forEach(r=>{
+          const fid = String(r.value||'').trim();
+          if (!fid) return;
+          // 既存データで label が空の場合は ALL_FIELDS_MAP から補完
+          REQUIRED_FIELDS.push({ id: fid, label: r.label || ALL_FIELDS_MAP[fid] || fid });
+        });
+      }
+      markRequiredUI();
+    }catch(e){
+      console.error('loadRequiredFieldsFromMaster failed:', e);
+      // 取得失敗時は既定必須で継続
+      markRequiredUI();
+    }
+  }
+  // ===== /Required fields UI =====
+
+  // ===== Hoisted vars to avoid TDZ (auth callback may fire immediately) =====
+  var anomalyId = new URL(location.href).searchParams.get('anomalyId') || '';
+  var saveMsg = null;
+  // ===== /Hoisted vars =====
+
+  onAuthStateChanged(auth, async (user)=>{
+    if (!user){
+      appRoot.style.display='none';
+      gate.style.display='flex';
+      signOutBtn.style.display='none';
+      return;
+    }
+    gate.style.display='none';
+    appRoot.style.display='block';
+    signOutBtn.style.display='inline-block';
+    await boot();
+  });
+
+  // Utils
+  function qs(name){
+    const u = new URL(location.href);
+    return u.searchParams.get(name);
+  }
+  function clampNum(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  function slugify(s){
+    return String(s||'')
+      .trim()
+      .toLowerCase()
+      .replace(/[\u3000\s]+/g,'-')
+      .replace(/[^a-z0-9\-]/g,'')
+      .replace(/\-+/g,'-')
+      .replace(/^\-|\-$/g,'');
+  }
+  function ymdhmToISO(dtLocal){
+    if (!dtLocal) return '';
+    const d = new Date(dtLocal);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString();
+  }
+  function timeToMinutes(t){
+    if (!t) return null;
+    const m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    if (!m) return null;
+    return Number(m[1])*60 + Number(m[2]);
+  }
+  function computeStopHours(occTime, restartTime){
+    const a = timeToMinutes(occTime);
+    const b = timeToMinutes(restartTime);
+    if (a==null || b==null) return null;
+    let diff = b - a;
+    if (diff < 0) diff += 24*60;
+    return Math.round((diff/60)*100)/100;
+  }
+  function fmt2(v){
+    if (v==null || v==='') return '';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '';
+    return n.toFixed(2);
+  }
+  function isoToLocal(iso){
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad=(n)=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+// HTMLエスケープ（XSS防止）
+// 画面全体で escapeHtml() に統一する
+function escapeHtml(s){
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+
+  // Masters (repair report selects)
+  const MASTER_GROUPS = [
+    { key:'maintenanceCategory', label:'保全分類', defaults:[
+      {label:'機械', order:10},{label:'電気', order:20},{label:'治具', order:30},{label:'金型', order:40},{label:'その他', order:90}
+    ]},
+    { key:'functionDegradation', label:'機能低下', defaults:[
+      {label:'停止', order:10},{label:'速度低下', order:20},{label:'品質低下', order:30},{label:'なし', order:90}
+    ]},
+    { key:'recurrencePreventionType', label:'再発防止区分', defaults:[
+      {label:'暫定', order:10},{label:'恒久', order:20},{label:'管理', order:30},{label:'教育', order:40}
+    ]},
+    { key:'changepointRank', label:'変化点ランク', defaults:[
+      {label:'A', order:10},{label:'B', order:20},{label:'C', order:30},{label:'なし', order:90}
+    ]},
+    { key:'fpCheck', label:'FP点検', defaults:[
+      {label:'要', order:10},{label:'不要', order:20},{label:'未', order:30}
+    ]},
+
+    // ★必須項目（入力ガイド）
+    // masters/repairReport/items の group='requiredFields' を必須項目定義として利用
+    { key:'requiredFields', label:'必須項目（入力ガイド）', defaults:[] }
+  ];
+
+  const masterGroupSel = document.getElementById('masterGroup');
+  const masterListEl = document.getElementById('masterList');
+
+  function mastersCol(){
+    return collection(db,'masters','repairReport','items');
+  }
+
+  async function ensureMasterDefaults(){
+    // 「↻再読込」用：各マスターが空の場合のみ初期値を作成
+    // ※ 既に1件でもあれば何もしない（ユーザー設定を壊さない）
+
+    for (const g of MASTER_GROUPS){
+      // requiredFields は初期値を固定で入れない（必要なら下で追加）
+      const snap = await getDocs(query(mastersCol(), where('group','==', g.key)));
+      if (snap.size > 0) continue;
+
+      if (g.key === 'requiredFields'){
+        // 初期必須（いまの既定：4項目）
+        const defaults = [
+          { value:'serialNo', label:'整理No', order:10 },
+          { value:'department', label:'発信部署', order:20 },
+          { value:'occurrenceDate', label:'発生日', order:30 },
+          { value:'anomalyContent', label:'異常内容', order:40 },
+        ];
+        for (const it of defaults){
+          await addDoc(mastersCol(), {
+            group: 'requiredFields',
+            label: it.label,
+            value: it.value,
+            order: it.order,
+            enabled: true,
+            updatedAt: serverTimestamp()
+          });
+        }
+        continue;
+      }
+
+      const defs = Array.isArray(g.defaults) ? g.defaults : [];
+      for (const it of defs){
+        const label = it.label;
+        await addDoc(mastersCol(), {
+          group: g.key,
+          label,
+          value: slugify(label) || label,
+          order: Number.isFinite(Number(it.order)) ? Number(it.order) : 999,
+          enabled: true,
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+  }
+
+  async function fetchMasterMap(){
+    const snap = await getDocs(mastersCol());
+    const byGroup = {};
+    snap.forEach(d=>{
+      const x = { id:d.id, ...d.data() };
+      if (!byGroup[x.group]) byGroup[x.group] = [];
+      byGroup[x.group].push(x);
+    });
+    for (const k of Object.keys(byGroup)){
+      byGroup[k].sort((a,b)=> (a.order??999)-(b.order??999) || String(a.label||'').localeCompare(String(b.label||'')));
+    }
+    return byGroup;
+  }
+
+  function fillSelect(id, items){
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = '<option value="">選択</option>';
+    (items||[]).forEach(it=>{
+      const opt = document.createElement('option');
+      opt.value = it.value;
+      opt.textContent = it.enabled ? it.label : `（無効）${it.label}`;
+      if (!it.enabled) opt.disabled = true;
+      el.appendChild(opt);
+    });
+    if (cur) el.value = cur;
+  }
+
+  async function loadMasterOptionsToSelects(){
+    const map = await fetchMasterMap();
+    fillSelect('maintenanceCategory', map.maintenanceCategory);
+    fillSelect('functionDegradation', map.functionDegradation);
+    fillSelect('recurrencePreventionType', map.recurrencePreventionType);
+    fillSelect('changepointRank', map.changepointRank);
+    fillSelect('fpCheck', map.fpCheck);
+  }
+
+  function renderMasterGroupSelect(){
+    masterGroupSel.innerHTML='';
+    MASTER_GROUPS.forEach(g=>{
+      const opt=document.createElement('option');
+      opt.value=g.key;
+      opt.textContent=g.label;
+      masterGroupSel.appendChild(opt);
+    });
+    // 初期選択（未選択なら先頭）
+    if (!masterGroupSel.value && masterGroupSel.options.length){
+      masterGroupSel.value = masterGroupSel.options[0].value;
+    }
+  }
+
+  async function renderMasterList(){
+    try{
+      const group = masterGroupSel.value;
+      // where + orderBy は複合インデックスが必要になりやすいので、JS側ソートに寄せる
+      const snap = await getDocs(query(mastersCol(), where('group','==',group)));
+      const rows = snap.docs.map(d=>({id:d.id, ...d.data()}))
+        .sort((a,b)=> (a.order??999)-(b.order??999) || String(a.label||'').localeCompare(String(b.label||'')));
+
+      if (!rows.length){
+        masterListEl.innerHTML = '<div class="help">このマスターは未登録です。「↻再読込」で初期値を作成できます。</div>';
+        return;
+      }
+
+      masterListEl.innerHTML='';
+      rows.forEach(r=>{
+      const enabled=!!r.enabled;
+      const div=document.createElement('div');
+      div.className='list-item';
+      div.innerHTML = `
+        <div class="li-left" style="gap:10px; align-items:center; flex-wrap:wrap;">
+          <span class="pill" title="内部値">${escapeHtml(r.value||'')}</span>
+
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input class="mi-label" data-id="${escapeHtml(r.id)}" value="${escapeHtml(r.label||'')}" style="min-width:220px;" />
+            <input class="mi-order" data-id="${escapeHtml(r.id)}" type="number" step="1" value="${escapeHtml(String(r.order??''))}" style="width:110px;" />
+            ${enabled?'':'<span class="badge gray">無効</span>'}
+          </div>
+
+          <span class="tiny" style="margin-left:6px;">※ ラベル/順番を直接編集→保存</span>
+        </div>
+        <div class="li-actions" style="gap:6px;">
+          <button class="btn-xs edit" data-save="${escapeHtml(r.id)}">保存</button>
+          <button class="btn-xs toggle ${enabled?'on':''}" data-toggle="${escapeHtml(r.id)}">${enabled?'有効':'無効'}</button>
+          <button class="btn-xs del" data-del="${escapeHtml(r.id)}">削除</button>
+        </div>
+      `;
+      masterListEl.appendChild(div);
+      });
+    }catch(e){
+      console.error(e);
+      masterListEl.innerHTML = `<div class="help" style="color:#b91c1c;font-weight:900;">
+        マスターの読み込みに失敗しました：${escapeHtml(e?.code||e?.message||String(e))}
+      </div>`;
+    }
+  }
+
+  // インライン保存（ラベル/順番）
+  masterListEl.addEventListener('click', async (e)=>{
+    const saveBtn = e.target.closest('button[data-save]');
+    const toggleBtn = e.target.closest('button[data-toggle]');
+    const delBtn = e.target.closest('button[data-del]');
+
+    try{
+      // 保存（ラベル/順番）
+      if (saveBtn){
+        const id = saveBtn.getAttribute('data-save');
+        const labelEl = masterListEl.querySelector(`.mi-label[data-id="${CSS.escape(id)}"]`);
+        const orderEl = masterListEl.querySelector(`.mi-order[data-id="${CSS.escape(id)}"]`);
+        const label = (labelEl?.value||'').trim();
+        const order = Number(orderEl?.value||'');
+        if (!label){ alert('表示名は必須です'); return; }
+        await updateDoc(doc(db,'masters','repairReport','items', id), {
+          label,
+          order: Number.isFinite(order) ? order : 999,
+          updatedAt: serverTimestamp()
+        });
+        await renderMasterList();
+        await loadMasterOptionsToSelects();
+        // 必須項目の見た目に反映
+        if (masterGroupSel.value === 'requiredFields'){
+          await loadRequiredFieldsFromMaster();
+          markRequiredUI(true);
+        }
+        return;
+      }
+
+      // 有効/無効
+      if (toggleBtn){
+        const id = toggleBtn.getAttribute('data-toggle');
+        const nextEnabled = !toggleBtn.classList.contains('on');
+        await updateDoc(doc(db,'masters','repairReport','items', id), {
+          enabled: nextEnabled,
+          updatedAt: serverTimestamp()
+        });
+        await renderMasterList();
+        await loadMasterOptionsToSelects();
+        if (masterGroupSel.value === 'requiredFields'){
+          await loadRequiredFieldsFromMaster();
+          markRequiredUI(true);
+        }
+        return;
+      }
+
+      // 削除
+      if (delBtn){
+        const id = delBtn.getAttribute('data-del');
+        if (!confirm('この項目を削除します。よろしいですか？')) return;
+        await deleteDoc(doc(db,'masters','repairReport','items', id));
+        await renderMasterList();
+        await loadMasterOptionsToSelects();
+        if (masterGroupSel.value === 'requiredFields'){
+          await loadRequiredFieldsFromMaster();
+          markRequiredUI(true);
+        }
+        return;
+      }
+
+    }catch(err){
+      console.error(err);
+      alert('操作に失敗しました：' + (err?.code || err?.message || String(err)));
+    }
+  });
+
+  // Enterキーで保存
+  masterListEl.addEventListener('keydown', (e)=>{
+    if (e.key !== 'Enter') return;
+    const id = e.target?.getAttribute?.('data-id');
+    if (!id) return;
+    const btn = masterListEl.querySelector(`button[data-save="${CSS.escape(id)}"]`);
+    btn?.click();
+  });
+
+
+  document.getElementById('btnMasterAdd').addEventListener('click', async ()=>{
+    const group = masterGroupSel.value;
+
+    let label = '';
+    let value = '';
+
+    if (group === 'requiredFields'){
+      const sel = document.getElementById('masterRequiredField');
+      value = (sel?.value || '').trim();
+      label = ALL_FIELDS_MAP[value] || value;
+      if (!value){ alert('必須にする項目を選択してください'); return; }
+    }else{
+      label = (document.getElementById('masterNewLabel').value||'').trim();
+      if (!label){ alert('表示名を入力してください'); return; }
+      value = slugify(label) || label;
+    }
+
+    const order = Number(document.getElementById('masterNewOrder').value||'');
+
+    await addDoc(mastersCol(), {
+      group,
+      label,
+      value,
+      order: Number.isFinite(order) ? order : 999,
+      enabled: true,
+      updatedAt: serverTimestamp()
+    });
+
+    document.getElementById('masterNewLabel').value='';
+    document.getElementById('masterNewOrder').value='';
+
+    await renderMasterList();
+    await loadMasterOptionsToSelects();
+
+    if (group === 'requiredFields'){
+      await loadRequiredFieldsFromMaster();
+      markRequiredUI(true);
+    }
+  });
+
+  document.getElementById('btnMasterBulkAdd').addEventListener('click', async ()=>{
+    const group = masterGroupSel.value;
+    const raw = (document.getElementById('masterBulk').value||'').trim();
+    if (!raw){ alert('一括入力が空です'); return; }
+    const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    if (!lines.length){ alert('一括入力が空です'); return; }
+
+    // 既存の最大orderを取得（足りない行のorderに採番）
+    // where + orderBy を避けて、JS側で最大値を算出する
+    const snap = await getDocs(query(mastersCol(), where('group','==',group)));
+    let maxOrder = 0;
+    snap.docs.forEach(d=>{
+      const o = Number(d.data()?.order);
+      if (Number.isFinite(o)) maxOrder = Math.max(maxOrder, o);
+    });
+
+    for (const line of lines){
+      const parts = line.split(',').map(x=>x.trim());
+      const label = parts[0];
+      const order = (parts[1]!==undefined && parts[1]!=='' && Number.isFinite(Number(parts[1]))) ? Number(parts[1]) : (maxOrder+=10);
+      if (!label) continue;
+      await addDoc(mastersCol(), {
+        group,
+        label,
+        value: slugify(label) || label,
+        order,
+        enabled: true,
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    document.getElementById('masterBulk').value='';
+    await renderMasterList();
+    await loadMasterOptionsToSelects();
+  });
+
+
+  document.getElementById('btnMasterReload').addEventListener('click', async ()=>{
+    await ensureMasterDefaults();
+    await renderMasterList();
+    await loadMasterOptionsToSelects();
+  });
+
+  masterGroupSel.addEventListener('change', async ()=> {
+    // requiredFields の時だけ、フィールド選択UIを表示
+    const isReq = (masterGroupSel.value === 'requiredFields');
+    const w1 = document.getElementById('masterNewLabelWrap');
+    const w2 = document.getElementById('masterRequiredFieldWrap');
+    if (w1) w1.style.display = isReq ? 'none' : '';
+    if (w2) w2.style.display = isReq ? '' : 'none';
+
+    if (isReq){
+      const sel = document.getElementById('masterRequiredField');
+      if (sel){
+        sel.innerHTML = '';
+        for (const f of ALL_FIELDS){
+          const opt=document.createElement('option');
+          // ALL_FIELDS は { value, label }
+          opt.value = f.value;
+          opt.textContent = f.label + `（${f.value}）`;
+          sel.appendChild(opt);
+        }
+      }
+    }
+
+    await renderMasterList();
+  });
+
+  // JSON export/import
+  document.getElementById('btnMasterExportJson').addEventListener('click', async ()=>{
+    const snap = await getDocs(mastersCol());
+    const all = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const blob = new Blob([JSON.stringify({exportedAt:new Date().toISOString(), masters:all}, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `repair_masters_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+
+
+  // ===== List state + CSV export (fix) =====
+  const __listState = window.__rrListState || { rows: [], view: [] };
+  window.__rrListState = __listState;
+  // keep backward name
+  const listState = __listState;
+
+  // ===== List core (修理報告書一覧) =====
+  // ※ fixed8ではイベントだけ残っていて本体関数が無いので、ここで実装する
+  const LIST_PAGE_SIZE = 50;
+  listState.rows = Array.isArray(listState.rows) ? listState.rows : [];
+  listState.view = Array.isArray(listState.view) ? listState.view : [];
+  listState._lastDoc = null;
+  listState._done = false;
+
+  function _tsToText(ts){
+    try{
+      if (!ts) return '';
+      // Firestore Timestamp / Date / ISO string
+      if (typeof ts.toDate === 'function') ts = ts.toDate();
+      const d = (ts instanceof Date) ? ts : new Date(ts);
+      if (Number.isNaN(d.getTime())) return String(ts);
+      const pad=n=>String(n).padStart(2,'0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }catch(e){ return ''; }
+  }
+
+  async function renderReportList(reset=true){
+    // reset: true で最初から読み直し
+    if (reset){
+      listState.rows = [];
+      listState.view = [];
+      listState._lastDoc = null;
+      listState._done = false;
+      const tbody = document.querySelector('#listTable tbody');
+      if (tbody) tbody.innerHTML = '';
+    }
+    await fetchReportListPage(reset);
+  }
+
+  async function fetchReportListPage(reset=false){
+    const msg = document.getElementById('listMsg');
+    const moreBtn = document.getElementById('btnListMore');
+    try{
+      if (listState._done){
+        if (msg) msg.textContent = 'これ以上データはありません。';
+        if (moreBtn) moreBtn.disabled = true;
+        return;
+      }
+      if (msg) msg.textContent = '読込中...';
+      if (moreBtn) moreBtn.disabled = true;
+
+      let qy;
+      try{
+        qy = query(
+          collection(db,'repairReports'),
+          orderBy('updatedAt','desc'),
+          limit(LIST_PAGE_SIZE),
+          ...(listState._lastDoc ? [startAfter(listState._lastDoc)] : [])
+        );
+      }catch(e){
+        // updatedAt が無いデータが多い場合の保険
+        qy = query(
+          collection(db,'repairReports'),
+          orderBy('createdAt','desc'),
+          limit(LIST_PAGE_SIZE),
+          ...(listState._lastDoc ? [startAfter(listState._lastDoc)] : [])
+        );
+      }
+
+      const snap = await getDocs(qy);
+      if (snap.empty){
+        listState._done = true;
+        if (msg) msg.textContent = 'データがありません。';
+        if (moreBtn) moreBtn.disabled = true;
+        renderListTable();
+        return;
+      }
+
+      listState._lastDoc = snap.docs[snap.docs.length-1];
+      const added = snap.docs.map(d=>{
+        const x = d.data() || {};
+        const updatedAt = x.updatedAt || x.createdAt || '';
+        return {
+          id: d.id,
+          ...x,
+          status: x.status || 'draft',
+          updatedAtText: _tsToText(updatedAt),
+          _updatedAtSort: (typeof updatedAt?.toMillis === 'function') ? updatedAt.toMillis() : (updatedAt instanceof Date ? updatedAt.getTime() : Date.parse(updatedAt) || 0)
+        };
+      });
+
+      // append (重複回避)
+      const seen = new Set(listState.rows.map(r=>r.id));
+      for (const r of added){
+        if (seen.has(r.id)) continue;
+        listState.rows.push(r);
+        seen.add(r.id);
+      }
+
+      // ボタン状態
+      if (snap.size < LIST_PAGE_SIZE) listState._done = true;
+      if (moreBtn) moreBtn.disabled = listState._done;
+
+      if (msg) msg.textContent = `表示件数：${listState.rows.length}${listState._done?'（最終）':''}`;
+      renderListTable();
+    }catch(e){
+      console.error(e);
+      if (msg) msg.textContent = '一覧の読込に失敗しました: ' + (e?.code || e?.message || e);
+      if (moreBtn) moreBtn.disabled = false;
+    }
+  }
+
+  function renderListTable(){
+    const tbody = document.querySelector('#listTable tbody');
+    if (!tbody) return;
+
+    const q = (document.getElementById('listSearch')?.value || '').trim().toLowerCase();
+    const st = (document.getElementById('listStatus')?.value || '').trim();
+    const from = (document.getElementById('listFrom')?.value || '').trim();
+    const to = (document.getElementById('listTo')?.value || '').trim();
+
+    let view = (listState.rows || []).slice();
+
+    // sort by updatedAt desc (client safety)
+    view.sort((a,b)=> (b._updatedAtSort||0) - (a._updatedAtSort||0));
+
+    if (st){
+      view = view.filter(r=> (r.status||'') === st);
+    }
+    if (from){
+      view = view.filter(r=> String(r.occurrenceDate||'') >= from);
+    }
+    if (to){
+      view = view.filter(r=> String(r.occurrenceDate||'') <= to);
+    }
+    if (q){
+      view = view.filter(r=>{
+        const hay = [
+          r.id, r.anomalyId, r.serialNo, r.department, r.lineName, r.occurrenceDate,
+          r.anomalyContent, r.rootCauseAction, r.equipmentName, r.failureLocation
+        ].map(x=>String(x||'')).join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    listState.view = view;
+
+    tbody.innerHTML = '';
+    view.forEach(r=>{
+      const tr = document.createElement('tr');
+      const stLabel = {draft:'下書き', submitted:'承認待ち', approved:'承認済', rejected:'差し戻し'};
+      const stCls   = {draft:'st-draft', submitted:'st-submitted', approved:'st-approved', rejected:'st-rejected'};
+      const st = r.status || 'draft';
+      const statusHtml = `<span class="st-badge ${stCls[st]||'st-draft'}">${stLabel[st]||st}</span>`;
+      tr.innerHTML = `
+        <td>${escapeHtml(r.updatedAtText || '')}</td>
+        <td>${statusHtml}</td>
+        <td>${escapeHtml(r.serialNo || '')}</td>
+        <td>${escapeHtml(r.department || '')}</td>
+        <td>${escapeHtml(r.lineName || '')}</td>
+        <td>${escapeHtml(r.occurrenceDate || '')}</td>
+        <td>${escapeHtml((r.anomalyContent || '').replace(/[\r\n]+/g,' '))}</td>
+        <td>
+          <span class="opbtn">
+            <button class="btn-xs primary" data-open-rr="${escapeHtml(r.id)}">開く</button>
+            <button class="btn-xs danger" data-del-rr="${escapeHtml(r.id)}">削除</button>
+          </span>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  // ===== /List core =====
+
+
+  function exportListCsv(){
+    try{
+      const rows = (listState.view && listState.view.length) ? listState.view : (listState.rows || []);
+      const header = ['anomalyId','status','updatedAt','serialNo','department','lineName','occurrenceDate','anomalyContent'];
+      // CSV用エスケープ（HTML用の escapeHtml と混同しないよう名称分離）
+      const csvEsc = (v)=>{
+        const s = String(v ?? '');
+        return (/[",\n\r]/.test(s)) ? '"'+s.replace(/"/g,'""')+'"' : s;
+      };
+      const lines = [header.join(',')].concat(rows.map(r=>[
+        r.id || r.anomalyId || '',
+        r.status || 'draft',
+        (r.updatedAtText || r.updatedAt || r.createdAt || ''),
+        r.serialNo || '',
+        r.department || '',
+        r.lineName || '',
+        r.occurrenceDate || '',
+        (r.anomalyContent || '').replace(/[\r\n]+/g,' ')
+      ].map(csvEsc).join(',')));
+      const blob = new Blob(['\ufeff'+lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `repairReports_list_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }catch(e){
+      console.error(e);
+      alert('一覧CSV出力でエラーが発生しました。コンソールを確認してください。');
+    }
+  }
+  // ===== /List state + CSV export =====
+
+  // List UI events
+  document.getElementById('btnListReload').addEventListener('click', ()=> renderReportList(true));
+  document.getElementById('btnListMore').addEventListener('click', ()=> fetchReportListPage(false));
+  document.getElementById('btnListExport').addEventListener('click', exportListCsv);
+  ['listSearch','listStatus','listFrom','listTo'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=> renderListTable());
+    document.getElementById(id).addEventListener('change', ()=> renderListTable());
+  });
+
+  document.addEventListener('click', async (e)=>{
+    const openBtn = e.target.closest('[data-open-rr]');
+    if (openBtn){
+      const id = openBtn.getAttribute('data-open-rr');
+      const u = new URL(location.href);
+      u.searchParams.set('anomalyId', id);
+      location.href = u.toString();
+      return;
+    }
+    const delBtn = e.target.closest('[data-del-rr]');
+    if (delBtn){
+      const id = delBtn.getAttribute('data-del-rr');
+      if (!confirm('この修理報告書を削除しますか？（復元できません）')) return;
+      await deleteDoc(doc(db,'repairReports', id));
+      listState.rows = listState.rows.filter(r=>r.id!==id);
+      renderListTable();
+      return;
+    }
+  });
+
+  // Report
+  // CSV インポート/エクスポート（単票）
+  const CSV_HEADERS = [
+    '報告書区分','担当','保全\n分類','不具合発生日時','保全作業開始日時','保全作業完了日時','生産開始日時',
+    '停止除外\n時間H','機能\n低下','停止\n時間H','部署','ライン','設備名','不具合現象','不具合箇所',
+    '原因　なぜ１','原因　なぜ２','原因　なぜ３','処置','再発防止区分','再発防止・残工事','流出防止',
+    '変化点\nランク','FP点検','保全\n工数H','労務費','部品費\n外注費','保全費用\n合計'
+  ];
+
+  function toLocalTextFromISO(iso){
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    const pad=n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function toDateTimeText(dateStr, timeStr){
+    if (!dateStr && !timeStr) return '';
+    if (dateStr && timeStr) return `${dateStr} ${timeStr}`;
+    return dateStr || timeStr;
+  }
+
+  function csvEscape(v){
+    const s = (v===null || v===undefined) ? '' : String(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+    return s;
+  }
+
+  function makeCsv(headers, row){
+    const h = headers.map(csvEscape).join(',');
+    const r = row.map(csvEscape).join(',');
+    return h + "\n" + r + "\n";
+  }
+
+  function parseCsv(text){
+    // シンプルCSVパーサ（ダブルクォート対応）
+    const rows=[];
+    let cur=[];
+    let field='';
+    let inQ=false;
+    for (let i=0;i<text.length;i++){
+      const ch=text[i];
+      if (inQ){
+        if (ch==='"'){
+          if (text[i+1]==='"'){ field+='"'; i++; }
+          else inQ=false;
+        } else field+=ch;
+      }else{
+        if (ch==='"'){ inQ=true; }
+        else if (ch===','){ cur.push(field); field=''; }
+        else if (ch==='\n'){ cur.push(field); rows.push(cur); cur=[]; field=''; }
+        else if (ch==='\r'){ /* skip */ }
+        else field+=ch;
+      }
+    }
+    if (field.length || cur.length){ cur.push(field); rows.push(cur); }
+    return rows.filter(r=>r.some(x=>String(x).trim()!==''));
+  }
+
+  function buildCsvRowFromForm(){
+    const payload = getForm();
+    // 計算
+    const stopH = computeStopHours(payload.occurrenceTime, payload.restartTime);
+    const total = clampNum(payload.laborCost) + clampNum(payload.partsOutsourceCost);
+
+    return [
+      '保全作業報告書',
+      payload.techHandler || '',
+      payload.maintenanceCategory || '',
+      toDateTimeText(payload.occurrenceDate, payload.occurrenceTime),
+      toLocalTextFromISO(payload.maintenanceWorkStartAt),
+      // 完了日時は現状フィールドが無いので、生産開始日時を暫定で入れる
+      toLocalTextFromISO(payload.productionStartAt),
+      toLocalTextFromISO(payload.productionStartAt),
+      payload.excludedStopHours ?? '',
+      payload.functionDegradation || '',
+      (stopH==null?'':stopH),
+      payload.department || '',
+      payload.lineName || '',
+      payload.equipmentName || '',
+      payload.anomalyContent || '',
+      payload.failureLocation || '',
+      payload.why1 || '',
+      payload.why2 || '',
+      payload.why3 || '',
+      payload.rootCauseAction || '',
+      payload.recurrencePreventionType || '',
+      payload.recurrencePreventionWork || '',
+      payload.outflowPrevention || '',
+      payload.changepointRank || '',
+      payload.fpCheck || '',
+      payload.maintenanceManHours ?? '',
+      payload.laborCost ?? '',
+      payload.partsOutsourceCost ?? '',
+      total
+    ];
+  }
+
+  function downloadText(filename, text, mime='text/plain'){
+    const blob = new Blob([text], {type:mime});
+    const a=document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function applyCsvToForm(map){
+    // map: header->value
+    const get=(h)=> (map[h] ?? '').toString();
+
+    setVal('techHandler', get('担当'));
+    setVal('maintenanceCategory', get('保全\n分類'));
+
+    const occ = get('不具合発生日時');
+    if (occ){
+      const m = occ.match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})?/);
+      if (m){
+        setVal('occurrenceDate', m[1]||'');
+        if (m[2]) setVal('occurrenceTime', m[2]);
+      }
+    }
+
+    const mws = get('保全作業開始日時');
+    if (mws){
+      // YYYY-MM-DD HH:MM を datetime-local に
+      const mm = mws.match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})/);
+      if (mm) setVal('maintenanceWorkStartAt', `${mm[1]}T${mm[2].padStart(5,'0')}`);
+    }
+
+    const ps = get('生産開始日時');
+    if (ps){
+      const mm = ps.match(/(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})/);
+      if (mm) setVal('productionStartAt', `${mm[1]}T${mm[2].padStart(5,'0')}`);
+    }
+
+    setVal('excludedStopHours', get('停止除外\n時間H'));
+    setVal('functionDegradation', get('機能\n低下'));
+    setVal('department', get('部署'));
+    setVal('lineName', get('ライン'));
+    setVal('equipmentName', get('設備名'));
+    setVal('anomalyContent', get('不具合現象'));
+    setVal('failureLocation', get('不具合箇所'));
+
+    setVal('why1', get('原因　なぜ１'));
+    setVal('why2', get('原因　なぜ２'));
+    setVal('why3', get('原因　なぜ３'));
+    setVal('rootCauseAction', get('処置'));
+
+    setVal('recurrencePreventionType', get('再発防止区分'));
+    setVal('recurrencePreventionWork', get('再発防止・残工事'));
+    setVal('outflowPrevention', get('流出防止'));
+    setVal('changepointRank', get('変化点\nランク'));
+    setVal('fpCheck', get('FP点検'));
+    setVal('maintenanceManHours', get('保全\n工数H'));
+    setVal('laborCost', get('労務費'));
+    setVal('partsOutsourceCost', get('部品費\n外注費'));
+
+    recomputeAll();
+  }
+
+
+  anomalyId = qs('anomalyId') || '';
+  const vAnomalyId = document.getElementById('vAnomalyId');
+  const vReportState = document.getElementById('vReportState');
+  const linkBadge = document.getElementById('linkBadge');
+  saveMsg = document.getElementById('saveMsg');
+
+  let reportExists = false;
+
+  // ===== 異常写真（Storage） =====
+  const MAX_IMAGES = 5;
+  const MAX_IMAGE_MB = 5;
+  let pendingAnomalyImageFiles = []; // File[]（未保存）
+  let existingAnomalyImages = [];    // [{url, path, name, uploadedAt}]
+
+  const imgInput = document.getElementById('anomalyImageInput');
+  const imgPreview = document.getElementById('anomalyImagePreview');
+// ===== 画像注釈編集（フキダシ/矢印/テキスト） =====
+const annotModal = document.getElementById('annotModal');
+const annotCanvas = document.getElementById('annotCanvas');
+const annotCtx = annotCanvas.getContext('2d', { willReadFrequently: true });
+
+const btnToolMove = document.getElementById('toolMove');
+const btnToolText = document.getElementById('toolText');
+const btnToolBubble = document.getElementById('toolBubble');
+const btnToolArrow = document.getElementById('toolArrow');
+const btnToolUndo = document.getElementById('toolUndo');
+const btnAnnotSave = document.getElementById('annotSaveBtn');
+const btnAnnotCancel = document.getElementById('annotCancelBtn');
+
+let annotTool = 'move'; // move | text | bubble | arrow
+let annotBgImg = null;  // HTMLImageElement
+let annotItems = [];    // overlays
+let annotTarget = null; // {mode:'existing'|'pending', index:number}
+let annotDrag = null;   // dragging state
+
+function setAnnotTool(t){
+  annotTool = t;
+  [btnToolMove, btnToolText, btnToolBubble, btnToolArrow].forEach(b=>b.classList.remove('active'));
+  if (t==='move') btnToolMove.classList.add('active');
+  if (t==='text') btnToolText.classList.add('active');
+  if (t==='bubble') btnToolBubble.classList.add('active');
+  if (t==='arrow') btnToolArrow.classList.add('active');
+}
+btnToolMove?.addEventListener('click', ()=>setAnnotTool('move'));
+btnToolText?.addEventListener('click', ()=>setAnnotTool('text'));
+btnToolBubble?.addEventListener('click', ()=>setAnnotTool('bubble'));
+btnToolArrow?.addEventListener('click', ()=>setAnnotTool('arrow'));
+btnToolUndo?.addEventListener('click', ()=>{
+  if (annotItems.length){ annotItems.pop(); renderAnnot(); }
+});
+btnAnnotCancel?.addEventListener('click', closeAnnotEditor);
+
+function openAnnotEditor(target){
+  try{
+    annotTarget = target;
+    annotItems = [];
+    annotDrag = null;
+    setAnnotTool('move');
+
+    const srcUrl = (target.mode==='existing')
+      ? (existingAnomalyImages[target.index]?.url || '')
+      : (pendingAnomalyImageFiles[target.index] ? URL.createObjectURL(pendingAnomalyImageFiles[target.index]) : '');
+
+    if (!srcUrl){ alert('画像が見つかりません'); return; }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // Storage URLでも描画できる可能性を上げる（※署名URLだと不要）
+    img.onload = ()=>{
+      annotBgImg = img;
+      // 大きすぎると重いので、最大幅を抑える（保存品質と相談）
+      const maxW = 1600;
+      const scale = (img.width > maxW) ? (maxW / img.width) : 1;
+      annotCanvas.width = Math.round(img.width * scale);
+      annotCanvas.height = Math.round(img.height * scale);
+      renderAnnot();
+      annotModal?.classList.add('active');
+    };
+    img.onerror = ()=>{
+      alert('画像の読み込みに失敗しました（CORSの可能性があります）。\n一度「拡大」リンクで開けるか確認してください。');
+    };
+    img.src = srcUrl;
+  }catch(e){
+    console.error(e);
+    alert('画像編集の開始に失敗しました: ' + (e?.message || e));
+  }
+}
+
+function closeAnnotEditor(){
+  try{
+    annotModal?.classList.remove('active');
+    // pendingの時に作ったObjectURLを開放（保存済のURLは不要）
+    if (annotTarget?.mode==='pending'){
+      // createObjectURLは openAnnotEditor 内で作っているので、ここでは安全側で放置でもOK
+    }
+    annotBgImg = null;
+    annotItems = [];
+    annotTarget = null;
+    annotDrag = null;
+  }catch(e){ console.warn(e); }
+}
+
+function canvasToLocalPoint(ev){
+  const rect = annotCanvas.getBoundingClientRect();
+  const scaleX = annotCanvas.width / rect.width;
+  const scaleY = annotCanvas.height / rect.height;
+  const x = (ev.clientX - rect.left) * scaleX;
+  const y = (ev.clientY - rect.top) * scaleY;
+  return {x, y};
+}
+
+function hitTest(x,y){
+  // 後ろから（上にあるもの優先）
+  for (let i=annotItems.length-1;i>=0;i--){
+    const it = annotItems[i];
+    if (it.type==='arrow'){
+      // 矢印は当たり判定を太めに
+      const d = distToSeg(x,y,it.x1,it.y1,it.x2,it.y2);
+      if (d <= 14) return {index:i, item:it};
+    }else{
+      if (x>=it.x && x<=it.x+it.w && y>=it.y && y<=it.y+it.h) return {index:i, item:it};
+    }
+  }
+  return null;
+}
+function distToSeg(px,py,x1,y1,x2,y2){
+  const vx=x2-x1, vy=y2-y1;
+  const wx=px-x1, wy=py-y1;
+  const c1 = vx*wx + vy*wy;
+  if (c1<=0) return Math.hypot(px-x1, py-y1);
+  const c2 = vx*vx + vy*vy;
+  if (c2<=c1) return Math.hypot(px-x2, py-y2);
+  const b = c1 / c2;
+  const bx = x1 + b*vx, by = y1 + b*vy;
+  return Math.hypot(px-bx, py-by);
+}
+
+function drawBubble(x,y,w,h){
+  const r = Math.min(18, w/6, h/6);
+  annotCtx.beginPath();
+  annotCtx.moveTo(x+r, y);
+  annotCtx.lineTo(x+w-r, y);
+  annotCtx.quadraticCurveTo(x+w, y, x+w, y+r);
+  annotCtx.lineTo(x+w, y+h-r);
+  annotCtx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  // tail
+  const tx = x + Math.min(w*0.35, w-40);
+  annotCtx.lineTo(tx+18, y+h);
+  annotCtx.lineTo(tx, y+h+22);
+  annotCtx.lineTo(tx+42, y+h);
+  //
+  annotCtx.lineTo(x+r, y+h);
+  annotCtx.quadraticCurveTo(x, y+h, x, y+h-r);
+  annotCtx.lineTo(x, y+r);
+  annotCtx.quadraticCurveTo(x, y, x+r, y);
+  annotCtx.closePath();
+}
+
+function drawArrow(x1,y1,x2,y2){
+  const head = 18;
+  const ang = Math.atan2(y2-y1, x2-x1);
+  annotCtx.beginPath();
+  annotCtx.moveTo(x1,y1);
+  annotCtx.lineTo(x2,y2);
+  annotCtx.stroke();
+  // head
+  annotCtx.beginPath();
+  annotCtx.moveTo(x2,y2);
+  annotCtx.lineTo(x2 - head*Math.cos(ang - Math.PI/7), y2 - head*Math.sin(ang - Math.PI/7));
+  annotCtx.lineTo(x2 - head*Math.cos(ang + Math.PI/7), y2 - head*Math.sin(ang + Math.PI/7));
+  annotCtx.closePath();
+  annotCtx.fill();
+}
+
+function renderAnnot(){
+  if (!annotBgImg) return;
+  annotCtx.clearRect(0,0,annotCanvas.width, annotCanvas.height);
+  annotCtx.drawImage(annotBgImg, 0,0, annotCanvas.width, annotCanvas.height);
+
+  // overlays
+  annotItems.forEach((it)=>{
+    if (it.type==='text'){
+      annotCtx.save();
+      annotCtx.font = `bold ${it.fontSize||34}px system-ui, -apple-system, "Hiragino Sans", sans-serif`;
+      annotCtx.textBaseline = 'top';
+      // 背景プレート
+      annotCtx.fillStyle = 'rgba(255,255,255,.78)';
+      annotCtx.strokeStyle = 'rgba(17,24,39,.65)';
+      annotCtx.lineWidth = 2;
+      roundRect(annotCtx, it.x, it.y, it.w, it.h, 10);
+      annotCtx.fill(); annotCtx.stroke();
+      // 文字
+      annotCtx.fillStyle = '#111827';
+      wrapText(annotCtx, it.text, it.x+10, it.y+8, it.w-20, (it.fontSize||34)+8);
+      annotCtx.restore();
+    }else if (it.type==='bubble'){
+      annotCtx.save();
+      annotCtx.fillStyle = 'rgba(255,255,255,.92)';
+      annotCtx.strokeStyle = 'rgba(17,24,39,.75)';
+      annotCtx.lineWidth = 3;
+      drawBubble(it.x,it.y,it.w,it.h);
+      annotCtx.fill(); annotCtx.stroke();
+      annotCtx.fillStyle = '#111827';
+      annotCtx.font = `900 ${it.fontSize||32}px system-ui, -apple-system, "Hiragino Sans", sans-serif`;
+      annotCtx.textBaseline='top';
+      wrapText(annotCtx, it.text, it.x+14, it.y+12, it.w-28, (it.fontSize||32)+10);
+      annotCtx.restore();
+    }else if (it.type==='arrow'){
+      annotCtx.save();
+      annotCtx.strokeStyle = 'rgba(245,158,11,.95)';
+      annotCtx.fillStyle = 'rgba(245,158,11,.95)';
+      annotCtx.lineWidth = 8;
+      annotCtx.lineCap = 'round';
+      drawArrow(it.x1,it.y1,it.x2,it.y2);
+      annotCtx.restore();
+    }
+  });
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = String(text||'').split(/\s+/);
+  let line='';
+  let cy=y;
+  for (let n=0;n<words.length;n++){
+    const test = line ? (line + ' ' + words[n]) : words[n];
+    const m = ctx.measureText(test).width;
+    if (m > maxWidth && line){
+      ctx.fillText(line, x, cy);
+      line = words[n];
+      cy += lineHeight;
+    }else{
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, x, cy);
+}
+
+// pointer interactions
+annotCanvas?.addEventListener('pointerdown', (ev)=>{
+  if (!annotBgImg) return;
+  annotCanvas.setPointerCapture(ev.pointerId);
+  const p = canvasToLocalPoint(ev);
+
+  if (annotTool==='move'){
+    const h = hitTest(p.x,p.y);
+    if (h){
+      annotDrag = { type:'move', hitIndex:h.index, startX:p.x, startY:p.y, orig: JSON.parse(JSON.stringify(h.item)) };
+    }
+    return;
+  }
+
+  if (annotTool==='arrow'){
+    const it = { type:'arrow', x1:p.x, y1:p.y, x2:p.x, y2:p.y };
+    annotItems.push(it);
+    annotDrag = { type:'arrow', hitIndex: annotItems.length-1 };
+    renderAnnot();
+    return;
+  }
+
+  if (annotTool==='text' || annotTool==='bubble'){
+    const t = prompt('文字を入力してください', '');
+    if (!t) return;
+    const fontSize = (annotTool==='text') ? 34 : 32;
+    const w = Math.min(annotCanvas.width*0.75, Math.max(260, t.length*26));
+    const h = Math.min(annotCanvas.height*0.45, 130 + Math.min(140, Math.floor(t.length/18)*40));
+    const x = Math.max(10, Math.min(p.x, annotCanvas.width - w - 10));
+    const y = Math.max(10, Math.min(p.y, annotCanvas.height - h - 10));
+    annotItems.push({
+      type: annotTool,
+      x, y, w, h,
+      text: t,
+      fontSize
+    });
+    renderAnnot();
+    return;
+  }
+});
+
+annotCanvas?.addEventListener('pointermove', (ev)=>{
+  if (!annotDrag) return;
+  const p = canvasToLocalPoint(ev);
+
+  if (annotDrag.type==='arrow'){
+    const it = annotItems[annotDrag.hitIndex];
+    if (!it) return;
+    it.x2 = p.x; it.y2 = p.y;
+    renderAnnot();
+    return;
+  }
+
+  if (annotDrag.type==='move'){
+    const it = annotItems[annotDrag.hitIndex];
+    if (!it) return;
+    const dx = p.x - annotDrag.startX;
+    const dy = p.y - annotDrag.startY;
+    if (it.type==='arrow'){
+      it.x1 = annotDrag.orig.x1 + dx; it.y1 = annotDrag.orig.y1 + dy;
+      it.x2 = annotDrag.orig.x2 + dx; it.y2 = annotDrag.orig.y2 + dy;
+    }else{
+      it.x = annotDrag.orig.x + dx; it.y = annotDrag.orig.y + dy;
+    }
+    renderAnnot();
+    return;
+  }
+});
+
+annotCanvas?.addEventListener('pointerup', (ev)=>{
+  if (!annotDrag) return;
+  annotDrag = null;
+});
+
+btnAnnotSave?.addEventListener('click', async ()=>{
+  try{
+    if (!annotTarget) return;
+    // 合成結果を Blob に
+    const blob = await new Promise((resolve)=> annotCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!blob){ alert('保存用の画像生成に失敗しました'); return; }
+
+    if (annotTarget.mode === 'pending'){
+      // pending の File を差し替え（未保存）
+      const old = pendingAnomalyImageFiles[annotTarget.index];
+      const name = (old?.name || `edited_${Date.now()}.jpg`).replace(/\.(png|webp)$/i,'.jpg');
+      const f = new File([blob], name, {type:'image/jpeg'});
+      pendingAnomalyImageFiles[annotTarget.index] = f;
+      renderAllAnomalyImages();
+      closeAnnotEditor();
+      return;
+    }
+
+    if (annotTarget.mode === 'existing'){
+      // 保存済：Storageへ新規アップロード→旧オブジェクト削除→配列更新→Firestore更新
+      const cur = existingAnomalyImages[annotTarget.index];
+      if (!cur){ alert('対象画像が見つかりません'); return; }
+
+      if (!anomalyId){
+        alert('anomalyId が無いため、保存済画像の置き換えができません（URLパラメータを確認してください）');
+        return;
+      }
+
+      const safeName = String(cur.name||'image').replace(/[^a-zA-Z0-9._-]+/g,'_');
+      const newPath = `repairReports/${anomalyId}/images/${crypto.randomUUID()}_edited_${safeName.replace(/\.(png|webp)$/i,'.jpg')}`;
+      const r = storageRef(storage, newPath);
+      await uploadBytes(r, blob, { contentType:'image/jpeg' });
+      const url = await getDownloadURL(r);
+
+      // 旧削除（失敗しても続行）
+      try{
+        if (cur.path) await deleteObject(storageRef(storage, cur.path));
+      }catch(e){ console.warn('old image delete failed', e); }
+
+      // 更新
+      existingAnomalyImages[annotTarget.index] = {
+        ...cur,
+        url,
+        path: newPath,
+        name: cur.name || safeName,
+        editedAt: new Date().toISOString()
+      };
+
+      await updateDoc(rrDocRef(anomalyId), { anomalyImages: existingAnomalyImages });
+      renderAllAnomalyImages();
+      closeAnnotEditor();
+      return;
+    }
+  }catch(e){
+    console.error(e);
+    alert('画像の保存に失敗しました: ' + (e?.code || e?.message || e));
+  }
+});
+
+// モーダル外クリックで閉じる（誤操作防止で過剰には閉じないが、背景クリックは閉じる）
+annotModal?.addEventListener('click', (e)=>{
+  if (e.target === annotModal) closeAnnotEditor();
+});
+
+// ===== /画像注釈編集 =====
+
+
+  function bytesToMB(n){ return n / (1024*1024); }
+  // HTMLエスケープは escapeHtml() を使用
+
+  function renderAllAnomalyImages(){
+    if (!imgPreview) return;
+    imgPreview.innerHTML = '';
+
+    // 保存済み
+    existingAnomalyImages.forEach((img, idx)=>{
+      const card = document.createElement('div');
+      card.className = 'image-preview';
+      const a = document.createElement('a');
+      a.className = 'zoom';
+      a.href = img.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = '拡大';
+
+      const im = document.createElement('img');
+      im.src = img.url;
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `<span class="name">${escapeHtml(img.name || 'image')}</span><span>保存済</span>`;
+
+      const del = document.createElement('button');
+      del.title = '削除（Storageも削除）';
+      del.textContent = '×';
+      del.addEventListener('click', async ()=>{
+        if (!confirm('この写真を削除しますか？')) return;
+        try{
+          if (img.path){
+            await deleteObject(storageRef(storage, img.path));
+          }
+          existingAnomalyImages = existingAnomalyImages.filter((_,i)=>i!=idx);
+          if (anomalyId){
+            await updateDoc(rrDocRef(anomalyId), { anomalyImages: existingAnomalyImages });
+          }
+          renderAllAnomalyImages();
+        }catch(e){
+          console.error(e);
+          alert('画像削除に失敗しました: ' + (e?.message || e));
+        }
+      });
+
+const edit = document.createElement('button');
+edit.className = 'edit';
+edit.title = '注釈編集';
+edit.textContent = '✎';
+edit.addEventListener('click', (ev)=>{
+  ev.preventDefault();
+  ev.stopPropagation();
+  openAnnotEditor({ mode:'existing', index: idx });
+});
+
+      card.appendChild(a);
+      card.appendChild(im);
+      card.appendChild(del);
+      card.appendChild(meta);
+      imgPreview.appendChild(card);
+    });
+
+    // 未保存（ローカル）
+    pendingAnomalyImageFiles.forEach((file, idx)=>{
+      const card = document.createElement('div');
+      card.className = 'image-preview';
+
+      const im = document.createElement('img');
+      im.src = URL.createObjectURL(file);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `<span class="name">${escapeHtml(file.name)}</span><span>未保存</span>`;
+
+      const del = document.createElement('button');
+      del.title = '未保存のため削除（ローカル）';
+      del.textContent = '×';
+      del.addEventListener('click', ()=>{
+        pendingAnomalyImageFiles = pendingAnomalyImageFiles.filter((_,i)=>i!=idx);
+        renderAllAnomalyImages();
+      });
+
+const edit = document.createElement('button');
+edit.className = 'edit';
+edit.title = '注釈編集';
+edit.textContent = '✎';
+edit.addEventListener('click', (ev)=>{
+  ev.preventDefault();
+  ev.stopPropagation();
+  openAnnotEditor({ mode:'pending', index: idx });
+});
+
+      card.appendChild(im);
+      card.appendChild(del);
+      card.appendChild(meta);
+      imgPreview.appendChild(card);
+    });
+  }
+
+  async function uploadPendingAnomalyImages(reportId){
+    if (!pendingAnomalyImageFiles.length) return [];
+    const uploaded = [];
+    for (const file of pendingAnomalyImageFiles){
+      const safeName = String(file.name||'image').replace(/[^a-zA-Z0-9._-]+/g,'_');
+      const path = `repairReports/${reportId}/images/${crypto.randomUUID()}_${safeName}`;
+      const r = storageRef(storage, path);
+      await uploadBytes(r, file);
+      const url = await getDownloadURL(r);
+      uploaded.push({ url, path, name: file.name || safeName, uploadedAt: new Date().toISOString() });
+    }
+    pendingAnomalyImageFiles = [];
+    return uploaded;
+  }
+
+  async function deleteAllImagesForReport(images){
+    for (const img of (images||[])){
+      try{
+        if (img.path) await deleteObject(storageRef(storage, img.path));
+      }catch(e){
+        console.warn('delete image failed', img, e);
+      }
+    }
+  }
+
+  if (imgInput){
+    imgInput.addEventListener('change', ()=>{
+      const files = Array.from(imgInput.files || []);
+      imgInput.value = '';
+      if (!files.length) return;
+
+      for (const f of files){
+        if (pendingAnomalyImageFiles.length + existingAnomalyImages.length >= MAX_IMAGES){
+          alert(`画像は最大${MAX_IMAGES}枚までです`);
+          break;
+        }
+        if (bytesToMB(f.size) > MAX_IMAGE_MB){
+          alert(`「${f.name}」は${MAX_IMAGE_MB}MBを超えています`);
+          continue;
+        }
+        pendingAnomalyImageFiles.push(f);
+      }
+      renderAllAnomalyImages();
+    });
+  }
+ // 既に修理報告書が存在するか
+
+  function rrDocRef(id){ return doc(db,'repairReports', id); }
+  function anDocRef(id){ return doc(db,'anomalies', id); }
+
+  function val(id){ return (document.getElementById(id).value || '').trim(); }
+  function setVal(id, v){ document.getElementById(id).value = (v ?? ''); }
+
+  function getForm(){
+    return {
+      serialNo: val('serialNo'),
+      department: val('department'),
+      lineName: val('lineName'),
+      occurrenceDate: val('occurrenceDate'),
+      occurrenceTime: val('occurrenceTime'),
+      restartTime: val('restartTime'),
+      anomalyContent: val('anomalyContent'),
+      rootCauseAction: val('rootCauseAction'),
+      techHandler: val('techHandler'),
+      equipmentName: val('equipmentName'),
+      failureLocation: val('failureLocation'),
+
+      maintenanceCategory: val('maintenanceCategory'),
+      functionDegradation: val('functionDegradation'),
+      recurrencePreventionType: val('recurrencePreventionType'),
+      maintenanceWorkStartAt: ymdhmToISO(val('maintenanceWorkStartAt')),
+      productionStartAt: ymdhmToISO(val('productionStartAt')),
+      excludedStopHours: clampNum(val('excludedStopHours')),
+      changepointRank: val('changepointRank'),
+      fpCheck: val('fpCheck'),
+      maintenanceManHours: clampNum(val('maintenanceManHours')),
+      laborCost: clampNum(val('laborCost')),
+      partsOutsourceCost: clampNum(val('partsOutsourceCost')),
+      totalMaintenanceCost: clampNum(val('totalMaintenanceCost')),
+
+      outflowPrevention: val('outflowPrevention'),
+      why1: val('why1'),
+      why2: val('why2'),
+      why3: val('why3'),
+      recurrencePreventionWork: val('recurrencePreventionWork'),
+    };
+  }
+
+  function setForm(d){
+    setVal('serialNo', d.serialNo);
+    setVal('department', d.department);
+    setVal('lineName', d.lineName);
+    setVal('occurrenceDate', d.occurrenceDate);
+    setVal('occurrenceTime', d.occurrenceTime);
+    setVal('restartTime', d.restartTime);
+    setVal('anomalyContent', d.anomalyContent);
+    setVal('rootCauseAction', d.rootCauseAction);
+    setVal('techHandler', d.techHandler);
+    setVal('equipmentName', d.equipmentName);
+    setVal('failureLocation', d.failureLocation);
+
+    setVal('maintenanceCategory', d.maintenanceCategory);
+    setVal('functionDegradation', d.functionDegradation);
+    setVal('recurrencePreventionType', d.recurrencePreventionType);
+
+    setVal('maintenanceWorkStartAt', isoToLocal(d.maintenanceWorkStartAt));
+    setVal('productionStartAt', isoToLocal(d.productionStartAt));
+
+    setVal('excludedStopHours', d.excludedStopHours ?? '');
+    setVal('changepointRank', d.changepointRank);
+    setVal('fpCheck', d.fpCheck);
+    setVal('maintenanceManHours', d.maintenanceManHours ?? '');
+    setVal('laborCost', d.laborCost ?? '');
+    setVal('partsOutsourceCost', d.partsOutsourceCost ?? '');
+    setVal('totalMaintenanceCost', d.totalMaintenanceCost ?? '');
+
+    setVal('outflowPrevention', d.outflowPrevention);
+    setVal('why1', d.why1);
+    setVal('why2', d.why2);
+    setVal('why3', d.why3);
+    setVal('recurrencePreventionWork', d.recurrencePreventionWork);
+
+    recomputeAll();
+  }
+
+  function setCalc(){
+    const od = val('occurrenceDate');
+    const ot = val('occurrenceTime');
+    const rt = val('restartTime');
+    document.getElementById('calcOccurrenceAt').value = (od && ot) ? `${od} ${ot}` : (od ? `${od}` : '');
+    const sh = computeStopHours(ot, rt);
+    document.getElementById('calcStopHours').value = (sh==null) ? '' : fmt2(sh);
+    const total = clampNum(val('laborCost')) + clampNum(val('partsOutsourceCost'));
+    document.getElementById('calcTotalCost').value = String(total);
+    document.getElementById('totalMaintenanceCost').value = String(total);
+  }
+  function recomputeAll(){ setCalc(); }
+  ['occurrenceDate','occurrenceTime','restartTime','laborCost','partsOutsourceCost'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', recomputeAll);
+    document.getElementById(id).addEventListener('change', recomputeAll);
+  });
+
+  async function loadFromAnomaly({overwrite=true}={}){
+    if (!anomalyId){ alert('URLに anomalyId がありません'); return null; }
+    const snap = await getDoc(anDocRef(anomalyId));
+    if (!snap.exists()){
+      alert('anomalies に該当IDが見つかりません');
+      return null;
+    }
+    const a = snap.data();
+    const mapped = {
+      serialNo: a.serialNo || '',
+      department: a.department || '',
+      lineName: a.lineName || '',
+      occurrenceDate: a.occurrenceDate || '',
+      occurrenceTime: a.occurrenceTime || '',
+      restartTime: a.restartTime || '',
+      anomalyContent: a.anomalyContent || '',
+      rootCauseAction: a.rootCauseAction || '',
+      techHandler: a.techHandler || '',
+      equipmentName: a.equipmentName || '',
+      failureLocation: a.failureLocation || ''
+    };
+    if (overwrite) setForm(mapped);
+    return mapped;
+  }
+
+  async function loadRepairReport(){
+    if (!anomalyId){
+      vAnomalyId.textContent = '（URLに anomalyId がありません）';
+      linkBadge.textContent = 'anomalyIdなし';
+      linkBadge.className = 'badge warn';
+      return;
+    }
+    vAnomalyId.textContent = anomalyId;
+    linkBadge.textContent = '読込中...';
+    linkBadge.className = 'badge gray';
+
+    const rrSnap = await getDoc(rrDocRef(anomalyId));
+    const reloadBtn = document.getElementById('btnReloadFromAnomaly');
+
+    if (rrSnap.exists()){
+      reportExists = true;
+      const d = rrSnap.data();
+      const stMap = { draft:'下書き', submitted:'提出済（承認待ち）', approved:'承認済', rejected:'差し戻し' };
+      const apMap = { submitted:'承認待ち', approved:'✅ 承認済', rejected:'↩ 差し戻し' };
+      vReportState.textContent = stMap[d.status] || d.status || '下書き';
+      document.getElementById('vApprovalState').textContent = apMap[d.status] || '—';
+      document.getElementById('vSubmittedBy').textContent = d.submittedByEmail ? `${d.submittedByEmail}（${d.submittedAt?.toDate?.().toLocaleString?.() || ''}）` : '—';
+      document.getElementById('vApprovedBy').textContent = d.approvedByEmail ? `${d.approvedByEmail}（${d.approvedAt?.toDate?.().toLocaleString?.() || ''}）` : '—';
+      linkBadge.textContent = '報告書あり';
+      linkBadge.className = 'badge ok';
+      // 承認/差し戻しボタン: 提出済のときだけ表示
+      document.getElementById('btnApprove').style.display = (d.status === 'submitted') ? '' : 'none';
+      document.getElementById('btnReject').style.display  = (d.status === 'submitted') ? '' : 'none';
+
+      // 既存報告書がある場合：anomalies での自動上書きはしない（NG）
+      setForm(d);
+
+      existingAnomalyImages = Array.isArray(d.anomalyImages) ? d.anomalyImages : [];
+      pendingAnomalyImageFiles = [];
+      renderAllAnomalyImages();
+
+      // 上書きボタンは無効化
+      if (reloadBtn){
+        reloadBtn.disabled = true;
+        reloadBtn.title = '既に報告書があるため、異常履歴での上書きはできません';
+      }
+      return;
+    }
+
+    reportExists = false;
+    if (reloadBtn){
+      reloadBtn.disabled = false;
+      reloadBtn.title = '';
+    }
+
+    vReportState.textContent = '（未作成）';
+    linkBadge.textContent = '新規';
+    linkBadge.className = 'badge warn';
+
+    // 新規の場合のみ、anomalies から初期値として取り込む
+    await loadFromAnomaly({overwrite:true});
+    existingAnomalyImages = [];
+    pendingAnomalyImageFiles = [];
+    renderAllAnomalyImages();
+  }
+
+  async function saveReport(status){
+    if (!anomalyId){ alert('anomalyIdがありません'); return; }
+
+    // 必須チェック（B）：未入力を赤枠＋最初の未入力へスクロール
+    let firstMissing = null;
+    for (const {id, label} of REQUIRED_FIELDS){
+      const el = document.getElementById(id);
+      const v = (el?.value || '').trim();
+      if (!v){
+        el?.classList.add('req-missing');
+        if (!firstMissing) firstMissing = {el, label};
+      }
+    }
+    if (firstMissing){
+      alert(`「${firstMissing.label}」は必須です`);
+      firstMissing.el.scrollIntoView({behavior:'smooth', block:'center'});
+      firstMissing.el.focus();
+      return;
+    }
+
+    const payload = getForm();
+    payload.anomalyId = anomalyId;
+    payload.anomalyRef = `anomalies/${anomalyId}`;
+    payload.status = status;
+    payload.updatedAt = serverTimestamp();
+    if (status === 'submitted') {
+      payload.submittedAt = serverTimestamp();
+      payload.submittedByEmail = auth.currentUser?.email || null;
+    }
+    payload.updatedByUid = auth.currentUser?.uid || null;
+
+    const ref = rrDocRef(anomalyId);
+    const prev = await getDoc(ref);
+    if (!prev.exists()){
+      payload.createdAt = serverTimestamp();
+      payload.createdByUid = auth.currentUser?.uid || null;
+
+      const snapA = await getDoc(anDocRef(anomalyId));
+      if (snapA.exists()){
+        const a = snapA.data();
+        payload.sourceSnapshot = {
+          serialNo: a.serialNo || '',
+          department: a.department || '',
+          lineName: a.lineName || '',
+          occurrenceDate: a.occurrenceDate || '',
+          occurrenceTime: a.occurrenceTime || '',
+          restartTime: a.restartTime || '',
+          anomalyContent: a.anomalyContent || '',
+          rootCauseAction: a.rootCauseAction || '',
+          techHandler: a.techHandler || '',
+          importedAt: new Date().toISOString(),
+          importedByUid: auth.currentUser?.uid || null
+        };
+      }
+    }
+
+    payload.occurrenceAtText = (payload.occurrenceDate && payload.occurrenceTime)
+      ? `${payload.occurrenceDate} ${payload.occurrenceTime}`
+      : payload.occurrenceDate;
+    payload.stopHours = computeStopHours(payload.occurrenceTime, payload.restartTime);
+    payload.totalMaintenanceCost = clampNum(payload.laborCost) + clampNum(payload.partsOutsourceCost);
+
+    await setDoc(ref, payload, {merge:true});
+
+    // 画像（未保存）があれば Storage にアップロードして追記
+    const newImgs = await uploadPendingAnomalyImages(anomalyId);
+    if (newImgs.length){
+      existingAnomalyImages = [...existingAnomalyImages, ...newImgs];
+      await updateDoc(ref, { anomalyImages: existingAnomalyImages });
+      renderAllAnomalyImages();
+    }
+
+    saveMsg.style.color = '#065f46';
+    saveMsg.textContent = `保存しました（${status==='submitted'?'提出済':'下書き'}）: ${new Date().toLocaleString()}`;
+    await loadRepairReport();
+    if (status === 'submitted') showNotifyModal(payload);
+  }
+
+  document.getElementById('btnSave').addEventListener('click', ()=>saveReport('draft'));
+  document.getElementById('btnSubmit').addEventListener('click', ()=>saveReport('submitted'));
+
+  document.getElementById('btnDelete').addEventListener('click', async ()=>{
+    if (!anomalyId) return;
+    if (!confirm('この修理報告書を削除しますか？')) return;
+    // 画像も削除（Storage）
+    try{
+      const snap = await getDoc(rrDocRef(anomalyId));
+      const imgs = snap.exists() ? (snap.data().anomalyImages||[]) : existingAnomalyImages;
+      await deleteAllImagesForReport(imgs);
+    }catch(e){ console.warn(e); }
+
+    await deleteDoc(rrDocRef(anomalyId));
+    existingAnomalyImages = [];
+    pendingAnomalyImageFiles = [];
+    renderAllAnomalyImages();
+    saveMsg.style.color = '#b91c1c';
+    saveMsg.textContent = '削除しました';
+    await loadRepairReport();
+  });
+
+  
+  // CSV出力（単票）
+  document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+    try{
+      const row = buildCsvRowFromForm();
+      const csv = makeCsv(CSV_HEADERS, row);
+      const name = `repair_report_${(anomalyId||'noid')}_${new Date().toISOString().slice(0,10)}.csv`;
+      downloadText(name, csv, 'text/csv');
+    }catch(e){
+      console.error(e);
+      alert('CSV出力に失敗しました: ' + (e?.message||e));
+    }
+  });
+
+  // CSVインポート（単票）
+  const csvFile = document.getElementById('csvImportFile');
+  document.getElementById('btnImportCsv').addEventListener('click', ()=> csvFile.click());
+  csvFile.addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0];
+    e.target.value='';
+    if (!f) return;
+    const text = await f.text();
+    const rows = parseCsv(text);
+    if (!rows.length){ alert('CSVが空です'); return; }
+    const header = rows[0].map(x=>String(x||'').trim());
+    const data = rows[1] || [];
+    const map = {};
+    for (let i=0;i<header.length;i++){
+      const h = header[i];
+      if (!h) continue;
+      map[h] = data[i] ?? '';
+    }
+    if (!confirm(`CSVの内容を入力欄へ反映します。
+（未保存の変更は上書きされます）
+よろしいですか？`)) return;
+    applyCsvToForm(map);
+    saveMsg.style.color = '#374151';
+    saveMsg.textContent = 'CSVを読み込みました（まだ保存していません）';
+  });
+
+document.getElementById('btnReloadFromAnomaly').addEventListener('click', async ()=>{
+    if (!anomalyId) return;
+    if (reportExists){
+      alert('既に修理報告書があるため、異常履歴での上書きはできません。');
+      return;
+    }
+    if (!confirm('異常履歴の内容で、入力欄を上書きします。\n（未保存の変更は消えます）\nよろしいですか？')) return;
+    await loadFromAnomaly({overwrite:true});
+    existingAnomalyImages = [];
+    pendingAnomalyImageFiles = [];
+    renderAllAnomalyImages();
+    saveMsg.style.color = '#9a3412';
+    saveMsg.textContent = '異常履歴から再読込しました（まだ保存していません）';
+  });
+
+  document.getElementById('btnLoadOnly').addEventListener('click', async ()=>{
+    await loadRepairReport();
+    saveMsg.style.color = '#374151';
+    saveMsg.textContent = '読込しました（保存はしていません）';
+  });
+
+  // ===== 承認・差し戻し =====
+  async function approveReport(){
+    if (!anomalyId) return;
+    if (!confirm('この修理報告書を承認しますか？')) return;
+    await setDoc(rrDocRef(anomalyId), {
+      status: 'approved',
+      approvedAt: serverTimestamp(),
+      approvedByEmail: auth.currentUser?.email || null,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    saveMsg.style.color = '#15803d';
+    saveMsg.textContent = `承認しました: ${new Date().toLocaleString()}`;
+    await loadRepairReport();
+  }
+
+  async function rejectReport(){
+    if (!anomalyId) return;
+    const reason = prompt('差し戻し理由を入力してください（省略可）');
+    if (reason === null) return; // キャンセル
+    await setDoc(rrDocRef(anomalyId), {
+      status: 'rejected',
+      rejectedAt: serverTimestamp(),
+      rejectedReason: reason.trim(),
+      approvedByEmail: auth.currentUser?.email || null,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    saveMsg.style.color = '#b91c1c';
+    saveMsg.textContent = `差し戻しました: ${new Date().toLocaleString()}`;
+    await loadRepairReport();
+  }
+
+  document.getElementById('btnApprove').addEventListener('click', approveReport);
+  document.getElementById('btnReject').addEventListener('click', rejectReport);
+
+  // ===== 通知モーダル =====
+  const notifyModal = document.getElementById('notifyModal');
+
+  function showNotifyModal(payload){
+    const lines = [
+      '【修理報告書 提出通知】',
+      `整理No　: ${payload.serialNo || '—'}`,
+      `部署　　: ${payload.department || '—'}　ライン: ${payload.lineName || '—'}`,
+      `設備　　: ${payload.equipmentName || '—'}`,
+      `発生日時: ${payload.occurrenceDate || '—'} ${payload.occurrenceTime || ''}`,
+      `異常内容: ${(payload.anomalyContent || '').replace(/\n/g,' ')}`,
+      `担当　　: ${payload.techHandler || '—'}`,
+      '',
+      `承認をお願いします。`,
+      `URL: ${location.href}`
+    ].join('\n');
+
+    document.getElementById('notifyMsg').textContent = lines;
+
+    document.getElementById('btnNotifyCopy').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(lines);
+        document.getElementById('btnNotifyCopy').textContent = '✅ コピー済';
+        setTimeout(() => { document.getElementById('btnNotifyCopy').textContent = '📋 コピー'; }, 2000);
+      } catch(e) { alert('コピーに失敗しました'); }
+    };
+    document.getElementById('btnNotifyLine').onclick = () => {
+      window.open('https://line.me/R/share?text=' + encodeURIComponent(lines), '_blank');
+    };
+    document.getElementById('btnNotifyMail').onclick = () => {
+      const sub = encodeURIComponent(`【修理報告書提出】整理No:${payload.serialNo || '—'} ${payload.department || ''}`);
+      window.location.href = `mailto:?subject=${sub}&body=${encodeURIComponent(lines)}`;
+    };
+    document.getElementById('btnNotifyClose').onclick = () => notifyModal.classList.remove('active');
+    notifyModal.addEventListener('click', (e) => { if (e.target === notifyModal) notifyModal.classList.remove('active'); }, { once: true });
+
+    notifyModal.classList.add('active');
+  }
+  // ===== /通知モーダル =====
+
+  async function boot(){
+    // 先に報告書を自動取得（マスター処理で落ちても入力を止めない）
+    try{
+      await loadRepairReport();
+      // 新規報告書かつ日付未入力の場合、現在日時をデフォルトセット
+      if (!val('occurrenceDate')) {
+        const _n = new Date(), _p = n => String(n).padStart(2,'0');
+        setVal('occurrenceDate', `${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`);
+        if (!val('occurrenceTime')) setVal('occurrenceTime', `${_p(_n.getHours())}:${_p(_n.getMinutes())}`);
+        recomputeAll();
+      }
+    }catch(e){
+      console.error(e);
+      saveMsg.style.color = '#b91c1c';
+      saveMsg.textContent = '読込に失敗しました: ' + (e?.code || e?.message || e);
+    }
+
+    // マスターは失敗しても継続
+    try{
+      renderMasterGroupSelect();
+      // 初期表示（requiredFields UI切替）
+      masterGroupSel.dispatchEvent(new Event('change'));
+      await ensureMasterDefaults();
+      await loadMasterOptionsToSelects();
+      await renderMasterList();
+    }catch(e){
+      console.error(e);
+      // マスターだけ失敗しても入力は使える
+    }
+
+    // ★必須項目の視覚強調（A+B）
+    await loadRequiredFieldsFromMaster();
+    markRequiredUI();
+  }
+
+  // === Auto-grow (textarea): 入力文字数に応じて高さを自動拡張（文字が隠れない） ===
+  (function(){
+    function autosize(el){
+      if(!el) return;
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+    }
+
+    function bindAutoGrow(ta){
+      if(!ta) return;
+      ta.classList.add('autogrow-textarea');
+      const handler = ()=>autosize(ta);
+      ta.addEventListener('input', handler);
+      ta.addEventListener('change', handler);
+      ta.addEventListener('focus', handler);
+      // 初期値で広げる
+      requestAnimationFrame(()=>autosize(ta));
+    }
+
+    function setup(){
+      document.querySelectorAll('textarea').forEach(bindAutoGrow);
+
+      // モーダル編集などでtextareaが後から追加されるケースに対応
+      const mo = new MutationObserver((mutations)=>{
+        for (const m of mutations){
+          for (const n of m.addedNodes){
+            if (!n || n.nodeType !== 1) continue;
+            if (n.tagName === 'TEXTAREA') bindAutoGrow(n);
+            n.querySelectorAll?.('textarea')?.forEach(bindAutoGrow);
+          }
+        }
+      });
+      mo.observe(document.body, { childList:true, subtree:true });
+    }
+
+    if (document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', setup);
+    } else {
+      setup();
+    }
+  })();
+</script>
+</body>
+</html>
