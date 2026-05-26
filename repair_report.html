@@ -2864,6 +2864,13 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
   const notifyModal = document.getElementById('notifyModal');
 
   function showNotifyModal(payload){
+    // 閲覧モードURL（?view=repview 付き）を生成
+    const viewUrl = (() => {
+      const u = new URL(location.href);
+      u.searchParams.set('view', 'repview');
+      return u.toString();
+    })();
+
     const lines = [
       '【修理報告書 提出通知】',
       `整理No　: ${payload.serialNo || '—'}`,
@@ -2874,7 +2881,7 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
       `担当　　: ${payload.techHandler || '—'}`,
       '',
       `承認をお願いします。`,
-      `URL: ${location.href}`
+      `URL: ${viewUrl}`
     ].join('\n');
 
     document.getElementById('notifyMsg').textContent = lines;
