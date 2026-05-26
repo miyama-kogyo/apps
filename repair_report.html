@@ -447,29 +447,16 @@ body.view-mode body           { padding-bottom:0; }
     <!-- 入力 -->
     <div id="report" class="tab-content active">
 
-      <!-- ① 連携情報（collapsed） -->
-      <div class="acc-section">
-        <button class="acc-header" type="button">
-          <span>🔗 連携情報 <span id="linkBadge" class="badge gray">未読込</span></span>
-          <span class="acc-chev">▼</span>
-        </button>
-        <div class="acc-body">
-          <div class="kv" style="margin-top:8px;">
-            <div class="k">anomalyId</div><div class="v" id="vAnomalyId">-</div>
-            <div class="k">報告書状態</div><div class="v" id="vReportState">（未作成）</div>
-            <div class="k">承認状態</div><div class="v" id="vApprovalState">—</div>
-            <div class="k">提出者</div><div class="v" id="vSubmittedBy" style="font-size:.85rem;color:#6b7280;">—</div>
-            <div class="k">承認者</div><div class="v" id="vApprovedBy" style="font-size:.85rem;color:#6b7280;">—</div>
-          </div>
-          <div class="help" style="margin-top:8px;">
-            ・URL例：<code>repair_report.html?anomalyId=XXXX</code><br>
-            ・anomaliesの内容は「初期値としてコピー」し、ここで編集できます。
-          </div>
-          <div class="btnrow" style="margin-top:10px;">
-            <button class="btn outline" id="btnReloadFromAnomaly">↻ 異常履歴を再読込（上書き）</button>
-            <button class="btn secondary" id="btnLoadOnly" title="保存はせず表示だけ更新します">🔎 取得のみ</button>
-          </div>
-        </div>
+      <!-- 連携情報（非表示・JSが内部参照するため DOM に残す） -->
+      <div style="display:none;" aria-hidden="true">
+        <span id="linkBadge"></span>
+        <span id="vAnomalyId"></span>
+        <span id="vReportState">（未作成）</span>
+        <span id="vApprovalState"></span>
+        <span id="vSubmittedBy"></span>
+        <span id="vApprovedBy"></span>
+        <button id="btnReloadFromAnomaly"></button>
+        <button id="btnLoadOnly"></button>
       </div>
 
       <!-- ② 基本情報（open） -->
