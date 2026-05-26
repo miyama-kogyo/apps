@@ -298,6 +298,16 @@ label { font-size:.95rem; margin:4px 0 6px; }
 .acc-header:active { background:#f0f4ff; }
 .acc-chev { font-size:1rem; color:var(--muted); transition:transform .2s; flex-shrink:0; }
 .acc-header.open .acc-chev { transform:rotate(180deg); }
+/* アコーディオン 入力ステータスバッジ */
+.acc-status {
+  display:inline-flex; align-items:center;
+  font-size:.72rem; font-weight:900; letter-spacing:.02em;
+  padding:2px 9px; border-radius:999px; margin-left:10px;
+  vertical-align:middle; flex-shrink:0;
+}
+.acc-status.st-empty   { background:#f3f4f6; color:#9ca3af; }
+.acc-status.st-partial { background:#fef9c3; color:#92400e; }
+.acc-status.st-full    { background:#dcfce7; color:#15803d; }
 .acc-body { display:none; padding:0 16px 18px; border-top:1px solid var(--border); }
 .acc-body.open { display:block; animation:accOpen .15s ease; }
 @keyframes accOpen { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
@@ -454,9 +464,9 @@ body { padding-bottom:130px; }
       </div>
 
       <!-- ② 基本情報（open） -->
-      <div class="acc-section">
+      <div class="acc-section" data-fields="serialNo,department,lineName,occurrenceDate,occurrenceTime,restartTime,techHandler,equipmentName,failureLocation">
         <button class="acc-header open" type="button">
-          <span>📌 基本情報</span>
+          <span>📌 基本情報 <span class="acc-status st-empty" data-acc-status>未入力</span></span>
           <span class="acc-chev">▼</span>
         </button>
         <div class="acc-body open">
@@ -506,9 +516,9 @@ body { padding-bottom:130px; }
       </div>
 
       <!-- ③ 異常内容・処置（open） -->
-      <div class="acc-section">
+      <div class="acc-section" data-fields="anomalyContent,rootCauseAction,outflowPrevention">
         <button class="acc-header open" type="button">
-          <span>📝 異常内容・処置</span>
+          <span>📝 異常内容・処置 <span class="acc-status st-empty" data-acc-status>未入力</span></span>
           <span class="acc-chev">▼</span>
         </button>
         <div class="acc-body open">
@@ -537,9 +547,9 @@ body { padding-bottom:130px; }
       </div>
 
       <!-- ④ 修理・保全情報（collapsed） -->
-      <div class="acc-section">
+      <div class="acc-section" data-fields="maintenanceCategory,functionDegradation,recurrencePreventionType,maintenanceWorkStartAt,productionStartAt,changepointRank,fpCheck,maintenanceManHours">
         <button class="acc-header" type="button">
-          <span>🛠️ 修理・保全情報</span>
+          <span>🛠️ 修理・保全情報 <span class="acc-status st-empty" data-acc-status>未入力</span></span>
           <span class="acc-chev">▼</span>
         </button>
         <div class="acc-body">
@@ -590,9 +600,9 @@ body { padding-bottom:130px; }
       </div>
 
       <!-- ⑤ なぜなぜ分析（collapsed） -->
-      <div class="acc-section">
+      <div class="acc-section" data-fields="why1,why2,why3,recurrencePreventionWork">
         <button class="acc-header" type="button">
-          <span>🔍 なぜなぜ分析</span>
+          <span>🔍 なぜなぜ分析 <span class="acc-status st-empty" data-acc-status>未入力</span></span>
           <span class="acc-chev">▼</span>
         </button>
         <div class="acc-body">
@@ -618,9 +628,9 @@ body { padding-bottom:130px; }
       </div>
 
       <!-- ⑥ 費用・工数（collapsed） -->
-      <div class="acc-section">
+      <div class="acc-section" data-fields="laborCost,partsOutsourceCost">
         <button class="acc-header" type="button">
-          <span>💰 費用・工数</span>
+          <span>💰 費用・工数 <span class="acc-status st-empty" data-acc-status>未入力</span></span>
           <span class="acc-chev">▼</span>
         </button>
         <div class="acc-body">
@@ -2509,6 +2519,7 @@ edit.addEventListener('click', (ev)=>{
     setVal('recurrencePreventionWork', d.recurrencePreventionWork);
 
     recomputeAll();
+    updateAccordionStatus();
   }
 
   function setCalc(){
@@ -2896,6 +2907,34 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
     });
   });
   // ===== /アコーディオン =====
+
+  // ===== アコーディオン入力ステータスバッジ =====
+  function updateAccordionStatus(){
+    document.querySelectorAll('.acc-section[data-fields]').forEach(sec=>{
+      const fields  = sec.dataset.fields.split(',').filter(Boolean);
+      const badge   = sec.querySelector('[data-acc-status]');
+      if (!badge || !fields.length) return;
+      const filled  = fields.filter(id=>{
+        const el = document.getElementById(id);
+        return el && (el.value || '').trim() !== '';
+      }).length;
+      const total = fields.length;
+      if (filled === 0){
+        badge.textContent = '未入力';
+        badge.className   = 'acc-status st-empty';
+      } else if (filled === total){
+        badge.textContent = '入力済';
+        badge.className   = 'acc-status st-full';
+      } else {
+        badge.textContent = `${filled}/${total}`;
+        badge.className   = 'acc-status st-partial';
+      }
+    });
+  }
+  // 入力イベントで随時更新
+  document.getElementById('report')?.addEventListener('input',  updateAccordionStatus);
+  document.getElementById('report')?.addEventListener('change', updateAccordionStatus);
+  // ===== /アコーディオン入力ステータスバッジ =====
 
   // ===== ステータス表示（スティッキーバー） =====
   function updateStickyStatus(){
