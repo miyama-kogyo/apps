@@ -807,13 +807,33 @@ body { padding-bottom:130px; }
     <!-- レポートビュー -->
     <div id="repview" class="tab-content">
       <div style="max-width:800px;margin:0 auto;padding:8px 0;">
+
+        <!-- 承認アクションバー -->
+        <div id="rpvActionBar" style="display:none; background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,.10);">
+          <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:.8rem; font-weight:800; color:#6b7280; margin-bottom:4px;">承認状態</div>
+              <div id="rpvStatusBadge"></div>
+              <div id="rpvSubmittedInfo" style="font-size:.82rem; color:#6b7280; margin-top:6px; line-height:1.5;"></div>
+            </div>
+            <div style="display:flex; gap:10px; flex-shrink:0; flex-wrap:wrap;">
+              <button class="btn" id="rpvBtnReject" style="display:none; background:#dc2626; color:#fff; min-width:110px;">↩ 差し戻す</button>
+              <button class="btn" id="rpvBtnApprove" style="display:none; background:#16a34a; color:#fff; min-width:110px;">✅ 承認する</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作ボタン -->
         <div class="btnrow" style="margin-bottom:12px;">
           <button class="btn primary" id="btnPrint">🖨️ 印刷</button>
           <button class="btn outline" id="btnRefreshReport">↻ 更新</button>
+          <button class="btn secondary" id="rpvBtnEdit" style="display:none;">✏️ 編集</button>
         </div>
+
+        <!-- レポート本体 -->
         <div id="rpvContent">
           <div class="help" style="text-align:center;padding:40px 20px;color:#9ca3af;">
-            ✏️ 入力タブでデータを確認・保存してから「↻ 更新」でレポートを表示します。
+            📋 一覧から報告書を開くか、入力タブでデータを選択してください。
           </div>
         </div>
       </div>
@@ -931,7 +951,7 @@ body { padding-bottom:130px; }
       btn.classList.add('active');
       document.getElementById(btn.dataset.tab).classList.add('active');
         if (btn.dataset.tab==='list'){ try{ renderReportList(true); }catch(e){ console.error(e); } }
-        if (btn.dataset.tab==='repview'){ try{ renderReportView(); }catch(e){ console.error(e); } }
+        if (btn.dataset.tab==='repview'){ try{ renderReportView(); updateRpvActionBar(); }catch(e){ console.error(e); } }
       });
     });
 
@@ -1670,7 +1690,8 @@ function escapeHtml(s){
         <td>${escapeHtml((r.anomalyContent || '').replace(/[\r\n]+/g,' '))}</td>
         <td>
           <span class="opbtn">
-            <button class="btn-xs primary" data-open-rr="${escapeHtml(r.id)}">開く</button>
+            <button class="btn-xs primary" data-view-rr="${escapeHtml(r.id)}">📄 閲覧</button>
+            <button class="btn-xs" data-open-rr="${escapeHtml(r.id)}" style="background:#e0e7ff;color:#3730a3;">✏️ 編集</button>
             <button class="btn-xs danger" data-del-rr="${escapeHtml(r.id)}">削除</button>
           </span>
         </td>
@@ -1723,12 +1744,33 @@ function escapeHtml(s){
     document.getElementById(id).addEventListener('change', ()=> renderListTable());
   });
 
+  // レポートタブへ切り替えるヘルパー
+  function switchToRepview(){
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    const tab = document.querySelector('.tab[data-tab="repview"]');
+    if (tab) tab.classList.add('active');
+    document.getElementById('repview')?.classList.add('active');
+    try{ renderReportView(); updateRpvActionBar(); }catch(e){ console.error(e); }
+  }
+
   document.addEventListener('click', async (e)=>{
+    // 📄 閲覧：レポートタブで開く
+    const viewBtn = e.target.closest('[data-view-rr]');
+    if (viewBtn){
+      const id = viewBtn.getAttribute('data-view-rr');
+      const u = new URL(location.href);
+      u.searchParams.set('anomalyId', id);
+      u.searchParams.set('view', 'repview');
+      location.href = u.toString();
+      return;
+    }
     const openBtn = e.target.closest('[data-open-rr]');
     if (openBtn){
       const id = openBtn.getAttribute('data-open-rr');
       const u = new URL(location.href);
       u.searchParams.set('anomalyId', id);
+      u.searchParams.delete('view');
       location.href = u.toString();
       return;
     }
@@ -2879,6 +2921,11 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
       saveMsg.textContent = '読込に失敗しました: ' + (e?.code || e?.message || e);
     }
 
+    // ?view=repview パラメータがあればレポートタブを自動表示
+    if (qs('view') === 'repview'){
+      switchToRepview();
+    }
+
     // マスターは失敗しても継続
     try{
       renderMasterGroupSelect();
@@ -3063,8 +3110,72 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
     `;
   }
 
+  // ===== レポートビュー — 承認アクションバー =====
+  function updateRpvActionBar(){
+    const bar        = document.getElementById('rpvActionBar');
+    const badge      = document.getElementById('rpvStatusBadge');
+    const info       = document.getElementById('rpvSubmittedInfo');
+    const btnApprove = document.getElementById('rpvBtnApprove');
+    const btnReject  = document.getElementById('rpvBtnReject');
+    const btnEdit    = document.getElementById('rpvBtnEdit');
+    if (!bar) return;
+
+    // vReportState の文字列から現ステータスを判断
+    const stText = (document.getElementById('vReportState')?.textContent || '').trim();
+    const noReport = !stText || stText === '（未作成）' || stText === '（URLに anomalyId がありません）';
+
+    if (noReport){
+      bar.style.display = 'none';
+      btnEdit.style.display = 'none';
+      return;
+    }
+
+    bar.style.display = '';
+    btnEdit.style.display = '';
+
+    // ステータスバッジ
+    const stCls = {
+      '下書き':            'st-draft',
+      '提出済（承認待ち）':'st-submitted',
+      '承認済':            'st-approved',
+      '差し戻し':          'st-rejected',
+    };
+    const cls = stCls[stText] || 'st-draft';
+    badge.innerHTML = `<span class="st-badge ${cls}" style="font-size:.95rem;">${stText}</span>`;
+
+    // 提出情報
+    const submittedBy = (document.getElementById('vSubmittedBy')?.textContent || '').trim();
+    const approvedBy  = (document.getElementById('vApprovedBy')?.textContent || '').trim();
+    const lines = [];
+    if (submittedBy && submittedBy !== '—') lines.push(`提出：${submittedBy}`);
+    if (approvedBy  && approvedBy  !== '—') lines.push(`承認：${approvedBy}`);
+    info.textContent = lines.join('\n');
+
+    // 承認/差し戻しボタン（提出済のときのみ表示）
+    const isSubmitted = stText === '提出済（承認待ち）';
+    btnApprove.style.display = isSubmitted ? '' : 'none';
+    btnReject.style.display  = isSubmitted ? '' : 'none';
+  }
+
+  document.getElementById('rpvBtnApprove')?.addEventListener('click', async ()=>{
+    await approveReport();
+    updateRpvActionBar();
+  });
+  document.getElementById('rpvBtnReject')?.addEventListener('click', async ()=>{
+    await rejectReport();
+    updateRpvActionBar();
+  });
+  document.getElementById('rpvBtnEdit')?.addEventListener('click', ()=>{
+    // 入力タブへ切り替え
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    const tab = document.querySelector('.tab[data-tab="report"]');
+    if (tab) tab.classList.add('active');
+    document.getElementById('report')?.classList.add('active');
+  });
+
   document.getElementById('btnPrint')?.addEventListener('click', ()=>{ window.print(); });
-  document.getElementById('btnRefreshReport')?.addEventListener('click', ()=>{ renderReportView(); });
+  document.getElementById('btnRefreshReport')?.addEventListener('click', ()=>{ renderReportView(); updateRpvActionBar(); });
   // ===== /レポートビュー =====
 
   // === Auto-grow (textarea): 入力文字数に応じて高さを自動拡張（文字が隠れない） ===
