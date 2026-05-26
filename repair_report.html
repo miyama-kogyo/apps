@@ -273,6 +273,103 @@
   }
   .image-preview a.zoom:hover{ background:rgba(17,24,39,.8); }
 
+/* ===== スマホ最適化 ===== */
+input:not([type=file]):not([type=checkbox]):not([readonly]):not([type=hidden]),
+select { min-height:52px; font-size:1.05rem !important; }
+textarea { font-size:1.05rem !important; min-height:70px; }
+label { font-size:.95rem; margin:4px 0 6px; }
+
+/* field-row: 2列 / スマホ1列 */
+.field-row   { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.field-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+@media (max-width:640px){ .field-row { grid-template-columns:1fr; } }
+@media (max-width:720px){ .field-row-3 { grid-template-columns:1fr; } }
+
+/* アコーディオン */
+.acc-section {
+  background:#fff; border-radius:12px; margin:10px 0;
+  box-shadow:0 2px 8px rgba(0,0,0,.08); overflow:hidden;
+}
+.acc-header {
+  width:100%; background:#fff; border:none; cursor:pointer;
+  padding:16px 18px; display:flex; justify-content:space-between; align-items:center;
+  font-size:1rem; font-weight:900; color:var(--fg); text-align:left;
+}
+.acc-header:active { background:#f0f4ff; }
+.acc-chev { font-size:1rem; color:var(--muted); transition:transform .2s; flex-shrink:0; }
+.acc-header.open .acc-chev { transform:rotate(180deg); }
+.acc-body { display:none; padding:0 16px 18px; border-top:1px solid var(--border); }
+.acc-body.open { display:block; animation:accOpen .15s ease; }
+@keyframes accOpen { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+
+/* カメラボタン */
+.cam-label {
+  display:inline-flex; align-items:center; gap:8px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff; padding:13px 20px; border-radius:10px;
+  font-weight:900; cursor:pointer; font-size:1rem;
+}
+.cam-label-gallery {
+  display:inline-flex; align-items:center; gap:8px;
+  background:#f3f4f6; color:#374151;
+  padding:13px 20px; border-radius:10px;
+  font-weight:900; cursor:pointer; font-size:1rem;
+  border:2px solid #e0e0e0;
+}
+
+/* readonly field */
+.field-readonly {
+  background:#f3f4f6 !important; color:var(--muted) !important;
+  cursor:default; min-height:44px !important;
+}
+
+/* スティッキーボトムバー */
+#stickyBar {
+  position:fixed; bottom:0; left:0; right:0; z-index:500;
+  background:#fff; padding:10px 14px 14px;
+  box-shadow:0 -3px 14px rgba(0,0,0,.13);
+  display:flex; flex-direction:column; gap:8px;
+}
+#stickyStatus {
+  font-size:.83rem; font-weight:800; color:var(--muted); text-align:center;
+}
+.sticky-btns { display:flex; gap:8px; }
+.sticky-btns .btn { flex:1; padding:15px 10px; font-size:1rem; min-width:0; }
+body { padding-bottom:130px; }
+
+/* レポートビュー */
+.rp-header { text-align:center; border-bottom:2px solid var(--accent); padding-bottom:10px; margin-bottom:16px; }
+.rp-header h2 { margin:0; font-size:1.3rem; }
+.rp-header .rp-meta { font-size:.85rem; color:var(--muted); margin-top:4px; }
+.rp-section { margin-bottom:18px; }
+.rp-section-title {
+  font-size:.85rem; font-weight:900; color:#fff;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  padding:5px 12px; border-radius:6px; margin-bottom:10px;
+}
+.rp-kv { display:grid; grid-template-columns:130px 1fr; gap:5px 10px; font-size:.92rem; align-items:baseline; }
+@media (max-width:500px){ .rp-kv { grid-template-columns:90px 1fr; } }
+.rp-k { color:var(--muted); font-weight:800; }
+.rp-v { color:var(--fg); white-space:pre-wrap; word-break:break-word; }
+.rp-why-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+@media (max-width:700px){ .rp-why-grid { grid-template-columns:1fr; } }
+.rp-why-box { background:#f3f4f6; border-radius:8px; padding:10px; font-size:.9rem; }
+.rp-why-lbl { font-weight:900; color:var(--accent); font-size:.8rem; margin-bottom:4px; }
+.rp-imgs { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:8px; }
+.rp-imgs img { width:100%; border-radius:8px; object-fit:cover; aspect-ratio:1; }
+
+/* 印刷 */
+@media print {
+  #stickyBar, .tabs, .header .sub, #signOutBtn,
+  .acc-header .acc-chev, #btnPrint, #btnRefreshReport,
+  .acc-section:not(.print-show) .acc-header { display:none !important; }
+  .acc-body { display:block !important; }
+  body { padding-bottom:0; background:#fff; }
+  .container { max-width:100%; padding:0; }
+  .acc-section { box-shadow:none; border:1px solid #ddd; page-break-inside:avoid; }
+  #repview { display:block !important; }
+}
+
 /* ===== 承認ワークフロー ===== */
 .badge.submitted { background:#fef9c3; color:#854d0e; }
 .badge.approved  { background:#dcfce7; color:#15803d; }
@@ -322,62 +419,48 @@
 
   <div class="container" id="appRoot" style="display:none;">
     <div class="tabs">
-      <button class="tab active" data-tab="report">入力</button>
+      <button class="tab active" data-tab="report">✏️ 入力</button>
+      <button class="tab" data-tab="repview">📄 レポート</button>
       <button class="tab" data-tab="list">📋 一覧</button>
       <button class="tab" data-tab="master">⚙️ マスター</button>
     </div>
 
     <!-- 入力 -->
     <div id="report" class="tab-content active">
-      <div class="row">
-        <div class="card">
-          <h2>🔗 連携情報 <span id="linkBadge" class="badge gray">未読込</span></h2>
-          <div class="kv">
+
+      <!-- ① 連携情報（collapsed） -->
+      <div class="acc-section">
+        <button class="acc-header" type="button">
+          <span>🔗 連携情報 <span id="linkBadge" class="badge gray">未読込</span></span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body">
+          <div class="kv" style="margin-top:8px;">
             <div class="k">anomalyId</div><div class="v" id="vAnomalyId">-</div>
             <div class="k">報告書状態</div><div class="v" id="vReportState">（未作成）</div>
             <div class="k">承認状態</div><div class="v" id="vApprovalState">—</div>
             <div class="k">提出者</div><div class="v" id="vSubmittedBy" style="font-size:.85rem;color:#6b7280;">—</div>
             <div class="k">承認者</div><div class="v" id="vApprovedBy" style="font-size:.85rem;color:#6b7280;">—</div>
           </div>
-          <div class="help">
+          <div class="help" style="margin-top:8px;">
             ・URL例：<code>repair_report.html?anomalyId=XXXX</code><br>
             ・anomaliesの内容は「初期値としてコピー」し、ここで編集できます。
           </div>
-          <div class="btnrow">
+          <div class="btnrow" style="margin-top:10px;">
             <button class="btn outline" id="btnReloadFromAnomaly">↻ 異常履歴を再読込（上書き）</button>
             <button class="btn secondary" id="btnLoadOnly" title="保存はせず表示だけ更新します">🔎 取得のみ</button>
           </div>
         </div>
-
-        <div class="card">
-          <h2>🧮 自動計算</h2>
-          <div class="grid3">
-            <div>
-              <label>不具合発生日時（計算）</label>
-              <input id="calcOccurrenceAt" type="text" readonly>
-              <div class="help">発生日 + 発生時刻</div>
-            </div>
-            <div>
-              <label>停止時間H（計算）</label>
-              <input id="calcStopHours" type="text" readonly>
-              <div class="help">再開時刻 - 発生時刻（跨ぎ対応）</div>
-            </div>
-            <div>
-              <label>保全費用合計（計算）</label>
-              <input id="calcTotalCost" type="text" readonly>
-              <div class="help">労務費 + 部品費/外注費</div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div class="divider"></div>
-
-      <div class="row">
-        <div class="card">
-          <h2>📌 異常情報（編集可）</h2>
-
-          <div class="grid3">
+      <!-- ② 基本情報（open） -->
+      <div class="acc-section">
+        <button class="acc-header open" type="button">
+          <span>📌 基本情報</span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body open">
+          <div class="field-row-3" style="margin-top:4px;">
             <div>
               <label>整理No *</label>
               <input id="serialNo" placeholder="例: 6769">
@@ -391,8 +474,7 @@
               <input id="lineName" placeholder="例: CY">
             </div>
           </div>
-
-          <div class="grid3" style="margin-top:10px;">
+          <div class="field-row-3" style="margin-top:12px;">
             <div>
               <label>発生日 *</label>
               <input id="occurrenceDate" type="date">
@@ -406,28 +488,7 @@
               <input id="restartTime" type="time">
             </div>
           </div>
-
-          <div style="margin-top:10px;">
-            <label>異常内容 *</label>
-            <textarea id="anomalyContent" placeholder="異常内容"></textarea>
-          </div>
-
-          <div style="margin-top:10px;">
-            <label>処置内容（初期値はanomaliesから）</label>
-            <textarea id="rootCauseAction" placeholder="何が悪くどうした"></textarea>
-          </div>
-
-          <div style="margin-top:10px;">
-            <label>異常写真（任意）</label>
-            <div class="image-uploader">
-              <input type="file" id="anomalyImageInput" accept="image/*" multiple />
-              <div class="hint">最大5枚 / 1枚あたり5MBまで（推奨）</div>
-            </div>
-            <div id="anomalyImagePreview" class="image-preview-grid"></div>
-          </div>
-
-
-          <div class="grid3" style="margin-top:10px;">
+          <div class="field-row-3" style="margin-top:12px;">
             <div>
               <label>担当</label>
               <input id="techHandler" placeholder="例: 杉本">
@@ -441,13 +502,48 @@
               <input id="failureLocation" placeholder="例: フィーダー部">
             </div>
           </div>
-
         </div>
+      </div>
 
-        <div class="card">
-          <h2>🛠️ 修理・保全入力</h2>
+      <!-- ③ 異常内容・処置（open） -->
+      <div class="acc-section">
+        <button class="acc-header open" type="button">
+          <span>📝 異常内容・処置</span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body open">
+          <div style="margin-top:4px;">
+            <label>異常内容 *</label>
+            <textarea id="anomalyContent" placeholder="異常内容"></textarea>
+          </div>
+          <div style="margin-top:12px;">
+            <label>処置内容</label>
+            <textarea id="rootCauseAction" placeholder="何が悪くどうした"></textarea>
+          </div>
+          <div style="margin-top:12px;">
+            <label>流出防止</label>
+            <textarea id="outflowPrevention" placeholder="流出防止策"></textarea>
+          </div>
+          <div style="margin-top:14px;">
+            <label>📷 異常写真（任意）</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+              <label class="cam-label" for="anomalyImageInput">📷 写真を追加</label>
+              <span class="help" style="margin:0;">最大5枚 / 1枚5MBまで</span>
+            </div>
+            <input type="file" id="anomalyImageInput" accept="image/*" multiple style="display:none">
+            <div id="anomalyImagePreview" class="image-preview-grid"></div>
+          </div>
+        </div>
+      </div>
 
-          <div class="grid3">
+      <!-- ④ 修理・保全情報（collapsed） -->
+      <div class="acc-section">
+        <button class="acc-header" type="button">
+          <span>🛠️ 修理・保全情報</span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body">
+          <div class="field-row-3" style="margin-top:4px;">
             <div>
               <label>保全分類</label>
               <select id="maintenanceCategory"></select>
@@ -462,8 +558,7 @@
               <select id="recurrencePreventionType"></select>
             </div>
           </div>
-
-          <div class="grid3" style="margin-top:10px;">
+          <div class="field-row-3" style="margin-top:12px;">
             <div>
               <label>保全作業開始</label>
               <input id="maintenanceWorkStartAt" type="datetime-local">
@@ -477,8 +572,7 @@
               <input id="excludedStopHours" type="number" step="0.01" placeholder="例: 0.25">
             </div>
           </div>
-
-          <div class="grid3" style="margin-top:10px;">
+          <div class="field-row-3" style="margin-top:12px;">
             <div>
               <label>変化点ランク</label>
               <select id="changepointRank"></select>
@@ -492,28 +586,17 @@
               <input id="maintenanceManHours" type="number" step="0.01" placeholder="例: 1.5">
             </div>
           </div>
+        </div>
+      </div>
 
-          <div class="grid3" style="margin-top:10px;">
-            <div>
-              <label>労務費</label>
-              <input id="laborCost" type="number" step="1" placeholder="例: 3000">
-            </div>
-            <div>
-              <label>部品費/外注費</label>
-              <input id="partsOutsourceCost" type="number" step="1" placeholder="例: 12000">
-            </div>
-            <div>
-              <label>保全費用合計（計算）</label>
-              <input id="totalMaintenanceCost" type="number" step="1" readonly>
-            </div>
-          </div>
-
-          <div style="margin-top:10px;">
-            <label>流出防止</label>
-            <textarea id="outflowPrevention" placeholder="流出防止策"></textarea>
-          </div>
-
-          <div class="grid3" style="margin-top:10px;">
+      <!-- ⑤ なぜなぜ分析（collapsed） -->
+      <div class="acc-section">
+        <button class="acc-header" type="button">
+          <span>🔍 なぜなぜ分析</span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body">
+          <div class="field-row-3" style="margin-top:4px;">
             <div>
               <label>なぜ1</label>
               <textarea id="why1" placeholder="なぜ1"></textarea>
@@ -527,26 +610,76 @@
               <textarea id="why3" placeholder="なぜ3"></textarea>
             </div>
           </div>
-
-          <div style="margin-top:10px;">
+          <div style="margin-top:12px;">
             <label>再発防止・残工事</label>
             <textarea id="recurrencePreventionWork" placeholder="再発防止・残工事"></textarea>
           </div>
-
-          <div class="btnrow">
-            <button class="btn primary" id="btnSave">💾 保存（下書き）</button>
-            <button class="btn outline" id="btnSubmit">📤 提出（確定）</button>
-            <button class="btn" id="btnApprove" style="display:none;background:#16a34a;color:#fff;">✅ 承認</button>
-            <button class="btn" id="btnReject" style="display:none;background:#dc2626;color:#fff;">↩ 差し戻し</button>
-            <button class="btn danger" id="btnDelete">🗑️ 報告書を削除</button>
-            <button class="btn secondary" id="btnExportCsv" title="現在表示中の報告書をCSV出力します">📄 CSV出力</button>
-            <button class="btn outline" id="btnImportCsv" title="CSVを読み込んで入力欄へ反映します">📥 CSVインポート</button>
-            <input id="csvImportFile" type="file" accept=".csv,text/csv" style="display:none">
-          </div>
-
-          <div class="help" id="saveMsg" style="margin-top:10px;"></div>
         </div>
       </div>
+
+      <!-- ⑥ 費用・工数（collapsed） -->
+      <div class="acc-section">
+        <button class="acc-header" type="button">
+          <span>💰 費用・工数</span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body">
+          <div class="field-row" style="margin-top:4px;">
+            <div>
+              <label>不具合発生日時（計算）</label>
+              <input id="calcOccurrenceAt" type="text" readonly class="field-readonly">
+            </div>
+            <div>
+              <label>停止時間H（計算）</label>
+              <input id="calcStopHours" type="text" readonly class="field-readonly">
+            </div>
+          </div>
+          <div class="field-row-3" style="margin-top:12px;">
+            <div>
+              <label>労務費</label>
+              <input id="laborCost" type="number" step="1" placeholder="例: 3000">
+            </div>
+            <div>
+              <label>部品費/外注費</label>
+              <input id="partsOutsourceCost" type="number" step="1" placeholder="例: 12000">
+            </div>
+            <div>
+              <label>保全費用合計（計算）</label>
+              <input id="calcTotalCost" type="text" readonly class="field-readonly">
+            </div>
+          </div>
+          <input id="totalMaintenanceCost" type="hidden">
+        </div>
+      </div>
+
+      <!-- ⑦ その他操作（collapsed） -->
+      <div class="acc-section">
+        <button class="acc-header" type="button">
+          <span>⚙️ その他操作</span>
+          <span class="acc-chev">▼</span>
+        </button>
+        <div class="acc-body">
+          <div class="btnrow" style="margin-top:8px;">
+            <button class="btn danger" id="btnDelete">🗑️ 報告書を削除</button>
+            <button class="btn secondary" id="btnExportCsv">📄 CSV出力</button>
+            <button class="btn outline" id="btnImportCsv">📥 CSVインポート</button>
+            <input id="csvImportFile" type="file" accept=".csv,text/csv" style="display:none">
+          </div>
+        </div>
+      </div>
+
+      <!-- スティッキーボトムバー -->
+      <div id="stickyBar">
+        <div id="stickyStatus"></div>
+        <div class="sticky-btns">
+          <button class="btn primary" id="btnSave">💾 下書き保存</button>
+          <button class="btn outline" id="btnSubmit">📤 提出</button>
+          <button class="btn" id="btnApprove" style="display:none;background:#16a34a;color:#fff;flex:1;">✅ 承認</button>
+          <button class="btn" id="btnReject" style="display:none;background:#dc2626;color:#fff;flex:1;">↩ 差し戻し</button>
+        </div>
+        <div class="help" id="saveMsg" style="text-align:center;margin-top:4px;"></div>
+      </div>
+
     </div>
 
 
@@ -658,6 +791,21 @@
         </div>
 
         <div id="masterList" class="list"></div>
+      </div>
+    </div>
+
+    <!-- レポートビュー -->
+    <div id="repview" class="tab-content">
+      <div style="max-width:800px;margin:0 auto;padding:8px 0;">
+        <div class="btnrow" style="margin-bottom:12px;">
+          <button class="btn primary" id="btnPrint">🖨️ 印刷</button>
+          <button class="btn outline" id="btnRefreshReport">↻ 更新</button>
+        </div>
+        <div id="rpvContent">
+          <div class="help" style="text-align:center;padding:40px 20px;color:#9ca3af;">
+            ✏️ 入力タブでデータを確認・保存してから「↻ 更新」でレポートを表示します。
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -773,6 +921,7 @@
       btn.classList.add('active');
       document.getElementById(btn.dataset.tab).classList.add('active');
         if (btn.dataset.tab==='list'){ try{ renderReportList(true); }catch(e){ console.error(e); } }
+        if (btn.dataset.tab==='repview'){ try{ renderReportView(); }catch(e){ console.error(e); } }
       });
     });
 
@@ -2445,6 +2594,7 @@ edit.addEventListener('click', (ev)=>{
         reloadBtn.disabled = true;
         reloadBtn.title = '既に報告書があるため、異常履歴での上書きはできません';
       }
+      updateStickyStatus();
       return;
     }
 
@@ -2463,6 +2613,7 @@ edit.addEventListener('click', (ev)=>{
     existingAnomalyImages = [];
     pendingAnomalyImageFiles = [];
     renderAllAnomalyImages();
+    updateStickyStatus();
   }
 
   async function saveReport(status){
@@ -2734,6 +2885,148 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
     await loadRequiredFieldsFromMaster();
     markRequiredUI();
   }
+
+  // ===== アコーディオン =====
+  document.querySelectorAll('.acc-header').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const body = btn.nextElementSibling;
+      const open = body.classList.contains('open');
+      body.classList.toggle('open', !open);
+      btn.classList.toggle('open', !open);
+    });
+  });
+  // ===== /アコーディオン =====
+
+  // ===== ステータス表示（スティッキーバー） =====
+  function updateStickyStatus(){
+    const el = document.getElementById('stickyStatus');
+    if (!el) return;
+    const stMap = {
+      '下書き':           { cls:'st-draft',     txt:'📝 下書き' },
+      '（未作成）':        { cls:'st-draft',     txt:'📝 新規（未保存）' },
+      '提出済（承認待ち）':{ cls:'st-submitted', txt:'📤 提出済（承認待ち）' },
+      '承認済':           { cls:'st-approved',  txt:'✅ 承認済' },
+      '差し戻し':         { cls:'st-rejected',  txt:'↩ 差し戻し' },
+    };
+    const stText = (document.getElementById('vReportState')?.textContent || '').trim();
+    const map = stMap[stText];
+    if (map){
+      el.innerHTML = `<span class="st-badge ${map.cls}">${map.txt}</span>`;
+    } else if (stText){
+      el.innerHTML = `<span class="st-badge st-draft">${stText}</span>`;
+    } else {
+      el.innerHTML = '';
+    }
+  }
+  // ===== /ステータス表示 =====
+
+  // ===== レポートビュー =====
+  function renderReportView(){
+    const c = document.getElementById('rpvContent');
+    if (!c) return;
+    const g    = id => (document.getElementById(id)?.value || '').trim();
+    const gTxt = id => (document.getElementById(id)?.textContent || '').trim();
+    const row  = (k, v) => v
+      ? `<div class="rp-k">${escapeHtml(k)}</div><div class="rp-v">${escapeHtml(v)}</div>`
+      : '';
+    const sec = (title, html) =>
+      `<div class="rp-section"><div class="rp-section-title">${title}</div><div class="rp-kv">${html}</div></div>`;
+
+    const serialNo = g('serialNo');
+    const anomalyIdTxt = gTxt('vAnomalyId');
+    const stText   = gTxt('vReportState');
+
+    // 写真
+    const imgEls = document.querySelectorAll('#anomalyImagePreview img');
+    const imgs = imgEls.length
+      ? `<div class="rp-section">
+          <div class="rp-section-title">📷 写真</div>
+          <div class="rp-imgs">${Array.from(imgEls).map(i=>`<img src="${i.src}" loading="lazy">`).join('')}</div>
+         </div>`
+      : '';
+
+    // なぜなぜ
+    const why1=g('why1'), why2=g('why2'), why3=g('why3');
+    const whyHtml = (why1||why2||why3)
+      ? `<div class="rp-section">
+          <div class="rp-section-title">🔍 なぜなぜ分析</div>
+          <div class="rp-why-grid">
+            <div class="rp-why-box"><div class="rp-why-lbl">なぜ1</div>${escapeHtml(why1)}</div>
+            <div class="rp-why-box"><div class="rp-why-lbl">なぜ2</div>${escapeHtml(why2)}</div>
+            <div class="rp-why-box"><div class="rp-why-lbl">なぜ3</div>${escapeHtml(why3)}</div>
+          </div>
+         </div>`
+      : '';
+
+    const rpw = g('recurrencePreventionWork');
+    const rpwHtml = rpw
+      ? `<div class="rp-section">
+          <div class="rp-section-title">🔁 再発防止・残工事</div>
+          <div style="white-space:pre-wrap;font-size:.92rem;line-height:1.7;">${escapeHtml(rpw)}</div>
+         </div>`
+      : '';
+
+    const laborVal = g('laborCost');
+    const partsVal = g('partsOutsourceCost');
+    const totalVal = g('calcTotalCost');
+
+    c.innerHTML = `
+      <div class="rp-header">
+        <h2>修理報告書</h2>
+        <div class="rp-meta">
+          整理No: ${escapeHtml(serialNo)}
+          ${anomalyIdTxt ? ' ／ ID: ' + escapeHtml(anomalyIdTxt) : ''}
+          ／ 状態: ${escapeHtml(stText)}
+        </div>
+      </div>
+      ${sec('📌 基本情報',
+        row('整理No',   g('serialNo'))      +
+        row('発信部署', g('department'))    +
+        row('ライン名', g('lineName'))      +
+        row('発生日',   g('occurrenceDate'))+
+        row('発生時刻', g('occurrenceTime'))+
+        row('再開時刻', g('restartTime'))   +
+        row('停止時間H', g('calcStopHours'))+
+        row('担当',     g('techHandler'))   +
+        row('設備名',   g('equipmentName')) +
+        row('不具合箇所', g('failureLocation'))
+      )}
+      <div class="rp-section">
+        <div class="rp-section-title">📝 異常内容・処置</div>
+        <div class="rp-kv">
+          ${row('異常内容', g('anomalyContent'))}
+          ${row('処置内容', g('rootCauseAction'))}
+          ${row('流出防止', g('outflowPrevention'))}
+        </div>
+      </div>
+      ${sec('🛠️ 修理・保全情報',
+        row('保全分類',     g('maintenanceCategory'))     +
+        row('機能低下',     g('functionDegradation'))     +
+        row('再発防止区分', g('recurrencePreventionType'))+
+        row('保全作業開始', g('maintenanceWorkStartAt'))  +
+        row('生産開始',     g('productionStartAt'))       +
+        row('停止除外時間H',g('excludedStopHours'))       +
+        row('変化点ランク', g('changepointRank'))         +
+        row('FP点検',       g('fpCheck'))                 +
+        row('保全工数H',    g('maintenanceManHours'))
+      )}
+      ${whyHtml}
+      ${rpwHtml}
+      ${sec('💰 費用・工数',
+        (laborVal ? row('労務費',       '¥' + Number(laborVal).toLocaleString()) : '') +
+        (partsVal ? row('部品費/外注費','¥' + Number(partsVal).toLocaleString()) : '') +
+        (totalVal ? row('保全費用合計', '¥' + Number(totalVal).toLocaleString()) : '')
+      )}
+      ${imgs}
+      <div style="font-size:.8rem;color:#9ca3af;text-align:right;margin-top:10px;">
+        出力日時：${new Date().toLocaleString('ja-JP')}
+      </div>
+    `;
+  }
+
+  document.getElementById('btnPrint')?.addEventListener('click', ()=>{ window.print(); });
+  document.getElementById('btnRefreshReport')?.addEventListener('click', ()=>{ renderReportView(); });
+  // ===== /レポートビュー =====
 
   // === Auto-grow (textarea): 入力文字数に応じて高さを自動拡張（文字が隠れない） ===
   (function(){
