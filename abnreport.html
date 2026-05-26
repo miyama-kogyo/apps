@@ -1874,23 +1874,6 @@ function initDeviceApplyUI() {
 
 // ===== /端末申請UI =====
 
-// 無操作ログアウト（30分）
-const IDLE_MS = 30 * 60 * 1000;
-let idleTimer = null;
-function resetIdleTimer(){
-  if (idleTimer) clearTimeout(idleTimer);
-  idleTimer = setTimeout(async ()=>{
-    try{
-      await logAudit('auto_sign_out_idle', { idleMs: IDLE_MS });
-      await signOut(auth);
-      alert('無操作が続いたため自動ログアウトしました。');
-    }catch(e){}
-  }, IDLE_MS);
-}
-['click','keydown','mousemove','touchstart','scroll'].forEach(ev=>{
-  window.addEventListener(ev, ()=> resetIdleTimer(), { passive:true });
-});
-
 // ===== v17: 通常ログイン（MFAなし） =====
 document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
   const email = (document.getElementById('authEmail').value||'').trim();
@@ -2125,7 +2108,6 @@ onAuthStateChanged(auth, async (user)=>{
       appRoot.style.display='block';
       signOutBtn.style.display='inline-block';
 
-      resetIdleTimer();
       await logAudit('sign_in', {});
       bootAfterLogin();
       bindPhotoInputs();
