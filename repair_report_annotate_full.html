@@ -368,6 +368,15 @@ body { padding-bottom:130px; }
 .rp-imgs { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:8px; }
 .rp-imgs img { width:100%; border-radius:8px; object-fit:cover; aspect-ratio:1; }
 
+/* ===== 閲覧モード（?view=repview） ===== */
+body.view-mode .tabs          { display:none !important; }
+body.view-mode #stickyBar     { display:none !important; }
+body.view-mode .tab-content   { display:none !important; }
+body.view-mode #repview       { display:block !important; padding-bottom:0 !important; }
+body.view-mode #rpvBtnEdit    { display:none !important; }
+body.view-mode body           { padding-bottom:0; }
+/* ===== /閲覧モード ===== */
+
 /* 印刷 */
 @media print {
   #stickyBar, .tabs, .header .sub, #signOutBtn,
@@ -2921,9 +2930,11 @@ document.getElementById('btnReloadFromAnomaly').addEventListener('click', async 
       saveMsg.textContent = '読込に失敗しました: ' + (e?.code || e?.message || e);
     }
 
-    // ?view=repview パラメータがあればレポートタブを自動表示
+    // ?view=repview パラメータがあれば閲覧モード（入力UI非表示）
     if (qs('view') === 'repview'){
-      switchToRepview();
+      document.body.classList.add('view-mode');
+      document.querySelector('.header .sub').textContent = '閲覧・承認';
+      try{ renderReportView(); updateRpvActionBar(); }catch(e){ console.error(e); }
     }
 
     // マスターは失敗しても継続
