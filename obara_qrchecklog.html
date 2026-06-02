@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オバラ工業 QR照合ログ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --border: #dfe4ea;
+      --border-2: #c8d1dc;
+      --text: #172033;
+      --muted: #667085;
+      --faint: #98a2b3;
+      --accent: #005bac;
+      --accent-2: #003f7d;
+      --ok: #237a3b;
+      --ok-bg: #eaf7ee;
+      --ng: #c0362c;
+      --ng-bg: #fff0ef;
+      --dup: #d56a00;
+      --dup-bg: #fff4e6;
+      --mono: "IBM Plex Mono", monospace;
+      --sans: "IBM Plex Sans JP", sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 62px;
+      padding: 0 22px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+    .brand-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-2);
+      white-space: nowrap;
+    }
+    .brand-sub {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      background: var(--panel-2);
+      font-family: var(--mono);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--faint);
+    }
+    .status.connected { color: var(--ok); border-color: #abd9b7; background: var(--ok-bg); }
+    .status.connected .status-dot { background: var(--ok); box-shadow: 0 0 0 4px rgba(35,122,59,.1); }
+    .status.error { color: var(--ng); border-color: #efb0ac; background: var(--ng-bg); }
+    .status.error .status-dot { background: var(--ng); }
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      min-height: 36px;
+      padding: 8px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border-2);
+      background: var(--panel);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 12px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn.primary:hover { background: var(--accent-2); color: #fff; }
+
+    .main {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 22px;
+    }
+    .title-row {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .page-title {
+      font-size: 24px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .page-meta {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .last-updated {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .filter-panel {
+      display: grid;
+      grid-template-columns: auto auto auto 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .field {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .field label {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .control {
+      height: 34px;
+      min-width: 120px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 0 10px;
+      font-family: var(--mono);
+      font-size: 12px;
+      outline: none;
+    }
+    .control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,91,172,.12); }
+    .search { min-width: 220px; width: 100%; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .summary-card {
+      min-height: 92px;
+      padding: 14px 15px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--accent);
+    }
+    .summary-card.ok::before { background: var(--ok); }
+    .summary-card.ng::before { background: var(--ng); }
+    .summary-card.dup::before { background: var(--dup); }
+    .summary-card.rate::before { background: #6f42c1; }
+    .summary-label {
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      margin-bottom: 8px;
+    }
+    .summary-value {
+      font-family: var(--mono);
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .summary-card.total .summary-value { color: var(--accent); }
+    .summary-card.ok .summary-value { color: var(--ok); }
+    .summary-card.ng .summary-value { color: var(--ng); }
+    .summary-card.dup .summary-value { color: var(--dup); }
+    .summary-card.rate .summary-value { color: #6f42c1; }
+    .summary-sub {
+      margin-top: 7px;
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
+
+    .table-shell {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .table-head {
+      min-height: 46px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .table-title {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+    .table-count {
+      color: var(--muted);
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .table-scroll { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    th {
+      padding: 10px 12px;
+      text-align: left;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover td { background: #eef5fb; }
+    tbody tr:last-child td { border-bottom: none; }
+    .td-time { color: var(--faint); white-space: nowrap; font-size: 11px; }
+    .td-part { color: var(--text); font-weight: 700; font-size: 13px; }
+    .td-qr {
+      max-width: 230px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 54px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge.ok { color: var(--ok); background: var(--ok-bg); border: 1px solid #b9dfc3; }
+    .badge.ng { color: var(--ng); background: var(--ng-bg); border: 1px solid #f0b8b4; }
+    .badge.dup { color: var(--dup); background: var(--dup-bg); border: 1px solid #ffd09a; }
+    .rule {
+      display: inline-block;
+      padding: 3px 6px;
+      color: var(--muted);
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .empty td {
+      height: 150px;
+      text-align: center;
+      color: var(--faint);
+    }
+    .pagination {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .page-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .page-btn {
+      min-width: 32px;
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .page-btn:disabled { opacity: .4; cursor: default; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(21, 30, 44, .52);
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      width: min(680px, 100%);
+      max-height: 82vh;
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--border-2);
+      border-radius: 10px;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, .25);
+    }
+    .modal-header {
+      position: sticky;
+      top: 0;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .modal-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .modal-body { padding: 16px 18px 18px; }
+    .detail-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-key {
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .detail-val {
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .close-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .header { height: auto; min-height: 62px; flex-wrap: wrap; padding: 10px 14px; }
+      .brand { width: 100%; }
+      .header-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+      .main { padding: 16px; }
+      .title-row { align-items: flex-start; flex-direction: column; gap: 6px; }
+      .filter-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .field { align-items: stretch; flex-direction: column; gap: 4px; }
+      .control, .search { width: 100%; min-width: 0; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-card.rate { grid-column: span 2; }
+    }
+    @media (max-width: 560px) {
+      .brand { align-items: flex-start; flex-direction: column; gap: 2px; }
+      .brand-name { font-size: 16px; }
+      .header-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .btn { width: 100%; }
+      .filter-panel { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .summary-card.rate { grid-column: auto; }
+      .pagination { align-items: flex-start; flex-direction: column; }
+      .detail-row { grid-template-columns: 1fr; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <div class="brand-name">オバラ工業</div>
+      <div class="brand-sub">QR CHECK LOG</div>
+    </div>
+    <div class="status" id="fbStatus">
+      <span class="status-dot"></span>
+      <span id="fbStatusText">接続中...</span>
+    </div>
+    <div class="header-actions">
+      <a class="btn" href="qrcheck.html?company=cmp_mo9do4l58yke">QR照合へ</a>
+      <button class="btn primary" type="button" onclick="exportCSV()">CSV出力</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="title-row">
+      <div>
+        <h1 class="page-title">QR照合ログ</h1>
+        <div class="page-meta">会社固定: cmp_mo9do4l58yke / オバラ工業 / 2026-06-01以降を表示</div>
+      </div>
+      <div class="last-updated" id="lastUpdated">最終更新: --</div>
+    </div>
+
+    <section class="filter-panel" aria-label="ログフィルター">
+      <div class="field">
+        <label for="filterResult">結果</label>
+        <select class="control" id="filterResult" onchange="applyFilter()">
+          <option value="all">すべて</option>
+          <option value="OK">OK</option>
+          <option value="NG">NG</option>
+          <option value="DUP">重複</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filterDateFrom">From</label>
+        <input class="control" type="date" id="filterDateFrom" onchange="applyFilter()">
+      </div>
+      <div class="field">
+        <label for="filterDateTo">To</label>
+        <input class="control" type="date" id="filterDateTo" onchange="applyFilter()">
+      </div>
+      <div class="field">
+        <label for="filterKeyword">品番 / QR</label>
+        <input class="control search" type="search" id="filterKeyword" placeholder="品番・QRで検索" oninput="applyFilter()">
+      </div>
+      <div class="field">
+        <label for="perPageSelect">表示</label>
+        <select class="control" id="perPageSelect" onchange="changePerPage()">
+          <option value="50">50件</option>
+          <option value="100" selected>100件</option>
+          <option value="200">200件</option>
+          <option value="500">500件</option>
+        </select>
+      </div>
+      <button class="btn" type="button" onclick="resetFilter()">リセット</button>
+    </section>
+
+    <section class="summary-grid" aria-label="集計">
+      <div class="summary-card total">
+        <div class="summary-label">TOTAL</div>
+        <div class="summary-value" id="sumTotal">--</div>
+        <div class="summary-sub" id="sumRange">--</div>
+      </div>
+      <div class="summary-card ok">
+        <div class="summary-label">OK</div>
+        <div class="summary-value" id="sumOK">--</div>
+      </div>
+      <div class="summary-card ng">
+        <div class="summary-label">NG</div>
+        <div class="summary-value" id="sumNG">--</div>
+      </div>
+      <div class="summary-card dup">
+        <div class="summary-label">DUP</div>
+        <div class="summary-value" id="sumDUP">--</div>
+      </div>
+      <div class="summary-card rate">
+        <div class="summary-label">OK RATE</div>
+        <div class="summary-value" id="sumRate">--</div>
+        <div class="summary-sub">フィルター適用後</div>
+      </div>
+    </section>
+
+    <section class="table-shell">
+      <div class="table-head">
+        <div class="table-title">オバラ工業 ログ</div>
+        <div class="table-count" id="tableCount">0件</div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>日時</th>
+              <th>結果</th>
+              <th>品番</th>
+              <th>QR1（正規化）</th>
+              <th>QR2（正規化）</th>
+              <th>QR1文字数</th>
+              <th>QR2文字数</th>
+              <th>ルール</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr class="empty"><td colspan="8">読み込み中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination">
+        <span id="pageInfo">-- / --</span>
+        <div class="page-buttons" id="pageButtons"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">照合詳細</div>
+        <button class="close-btn" type="button" onclick="closeModal()" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyAOMRoojKv9Hnh3OjVGwYV_k1LBTGOKepY",
+      authDomain: "miyamaunitec-fb87a.firebaseapp.com",
+      databaseURL: "https://miyamaunitec-fb87a-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "miyamaunitec-fb87a"
+    };
+    const COMPANY_ID = "cmp_mo9do4l58yke";
+    const COMPANY_NAME = "オバラ工業";
+    const VALID_LOG_START_DATE = "2026-06-01";
+
+    let database = null;
+    let allLogs = [];
+    let filteredLogs = [];
+    let currentPage = 1;
+    let perPage = 100;
+
+    window.addEventListener("DOMContentLoaded", () => {
+      setDefaultDates();
+      initFirebase();
+    });
+
+    function initFirebase() {
+      try {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        database = firebase.database();
+        database.ref(".info/connected").on("value", snap => {
+          const connected = snap.val() === true;
+          setConnectionStatus(connected ? "connected" : "waiting", connected ? "接続中" : "未接続");
+          if (connected) loadLogs();
+        });
+      } catch (error) {
+        console.error(error);
+        setConnectionStatus("error", "接続エラー");
+        showEmpty("Firebase接続エラー: " + error.message);
+      }
+    }
+
+    function setConnectionStatus(type, text) {
+      const el = document.getElementById("fbStatus");
+      el.className = "status" + (type === "connected" ? " connected" : type === "error" ? " error" : "");
+      document.getElementById("fbStatusText").textContent = text;
+    }
+
+    function setDefaultDates() {
+      const today = new Date();
+      const weekAgo = new Date(Date.now() - 7 * 86400000);
+      document.getElementById("filterDateTo").value = formatDateInput(today);
+      document.getElementById("filterDateFrom").value = maxDateInput(formatDateInput(weekAgo), VALID_LOG_START_DATE);
+    }
+
+    function loadLogs() {
+      showEmpty("読み込み中...");
+      database.ref("qr_match_logs/" + COMPANY_ID)
+        .orderByChild("timestamp")
+        .once("value", snap => {
+          const data = snap.val();
+          allLogs = data ? Object.entries(data)
+            .map(([key, val]) => ({ ...val, _key: key }))
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) : [];
+          document.getElementById("lastUpdated").textContent = "最終更新: " + new Date().toLocaleString("ja-JP");
+          applyFilter();
+        }, error => {
+          console.error(error);
+          showEmpty("読み込みエラー: " + error.message);
+        });
+    }
+
+    function applyFilter() {
+      const result = document.getElementById("filterResult").value;
+      const dateFrom = document.getElementById("filterDateFrom").value;
+      const dateTo = document.getElementById("filterDateTo").value;
+      const keyword = document.getElementById("filterKeyword").value.trim().toLowerCase();
+
+      filteredLogs = allLogs.filter(log => {
+        if (new Date(log.timestamp) < new Date(VALID_LOG_START_DATE + "T00:00:00")) return false;
+        const isDup = log.result === "DUP" || log.isDuplicate;
+        if (result === "DUP" && !isDup) return false;
+        if (result === "OK" && (isDup || log.result !== "OK")) return false;
+        if (result === "NG" && (isDup || log.result !== "NG")) return false;
+        if (dateFrom && new Date(log.timestamp) < new Date(dateFrom + "T00:00:00")) return false;
+        if (dateTo && new Date(log.timestamp) > new Date(dateTo + "T23:59:59")) return false;
+        if (keyword) {
+          const haystack = [
+            log.partNumber,
+            log.qr1,
+            log.qr2,
+            log.qr1_raw,
+            log.qr2_raw,
+            log.extractNote
+          ].join(" ").toLowerCase();
+          if (!haystack.includes(keyword)) return false;
+        }
+        return true;
+      });
+
+      currentPage = 1;
+      updateSummary();
+      renderTable();
+    }
+
+    function resetFilter() {
+      document.getElementById("filterResult").value = "all";
+      document.getElementById("filterKeyword").value = "";
+      setDefaultDates();
+      applyFilter();
+    }
+
+    function changePerPage() {
+      perPage = Number(document.getElementById("perPageSelect").value) || 100;
+      currentPage = 1;
+      renderTable();
+    }
+
+    function updateSummary() {
+      let ok = 0;
+      let ng = 0;
+      let dup = 0;
+      filteredLogs.forEach(log => {
+        if (log.result === "DUP" || log.isDuplicate) dup += 1;
+        else if (log.result === "OK") ok += 1;
+        else ng += 1;
+      });
+      const total = filteredLogs.length;
+      const rate = total ? Math.round(ok / total * 1000) / 10 + "%" : "--";
+      document.getElementById("sumTotal").textContent = total.toLocaleString();
+      document.getElementById("sumOK").textContent = ok.toLocaleString();
+      document.getElementById("sumNG").textContent = ng.toLocaleString();
+      document.getElementById("sumDUP").textContent = dup.toLocaleString();
+      document.getElementById("sumRate").textContent = rate;
+
+      if (!filteredLogs.length) {
+        document.getElementById("sumRange").textContent = "--";
+        return;
+      }
+      const oldest = new Date(filteredLogs[filteredLogs.length - 1].timestamp).toLocaleDateString("ja-JP");
+      const newest = new Date(filteredLogs[0].timestamp).toLocaleDateString("ja-JP");
+      document.getElementById("sumRange").textContent = oldest === newest ? oldest : oldest + " - " + newest;
+    }
+
+    function renderTable() {
+      const total = filteredLogs.length;
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * perPage;
+      const rows = filteredLogs.slice(start, start + perPage);
+
+      document.getElementById("tableCount").textContent = total.toLocaleString() + "件";
+      if (!total) {
+        showEmpty(allLogs.length ? "フィルター条件に一致するログがありません" : "オバラ工業のログはまだありません");
+        document.getElementById("pagination").style.display = "none";
+        return;
+      }
+
+      document.getElementById("logTableBody").innerHTML = rows.map((log, index) => {
+        const isDup = log.result === "DUP" || log.isDuplicate;
+        const type = isDup ? "dup" : log.result === "OK" ? "ok" : "ng";
+        const label = isDup ? "DUP" : log.result === "OK" ? "OK" : "NG";
+        const qr1 = shortText(log.qr1 || "");
+        const qr2 = shortText(log.qr2 || "");
+        return `
+          <tr onclick="openModal(${start + index})">
+            <td class="td-time">${escapeHtml(formatDateTime(log.timestamp))}</td>
+            <td><span class="badge ${type}">${label}</span></td>
+            <td class="td-part">${escapeHtml(log.partNumber || "--")}</td>
+            <td class="td-qr" title="${escapeHtml(log.qr1 || "")}">${escapeHtml(qr1 || "--")}</td>
+            <td class="td-qr" title="${escapeHtml(log.qr2 || "")}">${escapeHtml(qr2 || "--")}</td>
+            <td>${escapeHtml(log.qr1Length ?? "--")}</td>
+            <td>${escapeHtml(log.qr2Length ?? "--")}</td>
+            <td><span class="rule">${escapeHtml(formatRule(log.matchedRule))}</span></td>
+          </tr>
+        `;
+      }).join("");
+
+      renderPagination(total, totalPages, start);
+    }
+
+    function renderPagination(total, totalPages, start) {
+      const pagination = document.getElementById("pagination");
+      pagination.style.display = "flex";
+      document.getElementById("pageInfo").textContent = `${start + 1}-${Math.min(start + perPage, total)} / ${total}件`;
+      const pages = buildPages(currentPage, totalPages);
+      document.getElementById("pageButtons").innerHTML = [
+        `<button class="page-btn" type="button" onclick="goPage(${currentPage - 1})" ${currentPage <= 1 ? "disabled" : ""}>‹</button>`,
+        ...pages.map(page => page === "..."
+          ? `<span style="padding:6px 2px;color:var(--faint)">...</span>`
+          : `<button class="page-btn ${page === currentPage ? "active" : ""}" type="button" onclick="goPage(${page})">${page}</button>`
+        ),
+        `<button class="page-btn" type="button" onclick="goPage(${currentPage + 1})" ${currentPage >= totalPages ? "disabled" : ""}>›</button>`
+      ].join("");
+    }
+
+    function buildPages(current, total) {
+      if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+      if (current <= 4) return [1, 2, 3, 4, 5, "...", total];
+      if (current >= total - 3) return [1, "...", total - 4, total - 3, total - 2, total - 1, total];
+      return [1, "...", current - 1, current, current + 1, "...", total];
+    }
+
+    function goPage(page) {
+      const totalPages = Math.ceil(filteredLogs.length / perPage);
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      renderTable();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function openModal(index) {
+      const log = filteredLogs[index];
+      if (!log) return;
+      const isDup = log.result === "DUP" || log.isDuplicate;
+      const type = isDup ? "dup" : log.result === "OK" ? "ok" : "ng";
+      const label = isDup ? "DUP" : log.result === "OK" ? "OK" : "NG";
+      document.getElementById("modalTitle").innerHTML = `照合詳細 <span class="badge ${type}">${label}</span>`;
+
+      const rows = [
+        ["会社", COMPANY_NAME],
+        ["日時", formatDateTime(log.timestamp)],
+        ["結果", label],
+        ["重複タイプ", log.dupType || "--"],
+        ["抽出品番", log.partNumber || "--"],
+        ["1回目QR(raw)", log.qr1_raw || "--"],
+        ["2回目QR(raw)", log.qr2_raw || "--"],
+        ["1回目QR(正規化)", log.qr1 || "--"],
+        ["2回目QR(正規化)", log.qr2 || "--"],
+        ["QR1文字数", log.qr1Length ?? "--"],
+        ["QR2文字数", log.qr2Length ?? "--"],
+        ["適用ルール", formatRule(log.matchedRule, true)],
+        ["note", log.extractNote || "--"]
+      ];
+
+      document.getElementById("modalBody").innerHTML = rows.map(([key, value]) => `
+        <div class="detail-row">
+          <div class="detail-key">${escapeHtml(key)}</div>
+          <div class="detail-val">${escapeHtml(String(value))}</div>
+        </div>
+      `).join("");
+      document.getElementById("modalOverlay").classList.add("show");
+    }
+
+    function closeModal() {
+      document.getElementById("modalOverlay").classList.remove("show");
+    }
+
+    function closeModalOnBg(event) {
+      if (event.target === document.getElementById("modalOverlay")) closeModal();
+    }
+
+    function exportCSV() {
+      if (!filteredLogs.length) {
+        alert("出力するログがありません");
+        return;
+      }
+      const headers = [
+        "会社", "日時", "結果", "重複", "抽出品番",
+        "1回目QR(raw)", "2回目QR(raw)", "1回目QR(正規化)", "2回目QR(正規化)",
+        "QR1文字数", "QR2文字数", "ルール", "note"
+      ];
+      const rows = filteredLogs.map(log => {
+        const isDup = log.result === "DUP" || log.isDuplicate;
+        return [
+          COMPANY_NAME,
+          formatDateTime(log.timestamp),
+          isDup ? "DUP" : (log.result || ""),
+          isDup ? (log.dupType || "重複") : "",
+          log.partNumber ?? "",
+          log.qr1_raw ?? "",
+          log.qr2_raw ?? "",
+          log.qr1 ?? "",
+          log.qr2 ?? "",
+          log.qr1Length ?? "",
+          log.qr2Length ?? "",
+          log.matchedRule ? JSON.stringify(log.matchedRule) : "",
+          log.extractNote ?? ""
+        ];
+      });
+      const csv = [headers, ...rows]
+        .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv" }));
+      link.download = `QR照合ログ_${COMPANY_NAME}_${formatDateInput(new Date())}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function showEmpty(message) {
+      document.getElementById("logTableBody").innerHTML =
+        `<tr class="empty"><td colspan="8">${escapeHtml(message)}</td></tr>`;
+    }
+
+    function formatRule(rule, verbose = false) {
+      if (!rule) return "--";
+      const min = rule.minLen ?? "-";
+      const max = rule.maxLen ?? "-";
+      const start = rule.startPos ?? "-";
+      const count = rule.charCount ?? "-";
+      const prefix = rule.prefix ? ` prefix=${rule.prefix}` : "";
+      return verbose
+        ? `len ${min}-${max} / start ${start} / count ${count}${prefix}`
+        : `[${min}-${max}] s${start} c${count}${prefix}`;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "--";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+    }
+
+    function formatDateInput(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function maxDateInput(a, b) {
+      return a > b ? a : b;
+    }
+
+    function shortText(value) {
+      return value.length > 36 ? value.slice(0, 36) + "..." : value;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+  </script>
+</body>
+</html>
