@@ -5465,6 +5465,7 @@ function saveEditTabData() {
       traceback:           document.getElementById('edit_traceback')?.value           ?? null,
       lotNo:               document.getElementById('edit_lotNo')?.value               ?? null,
       qualityResponse:     document.getElementById('edit_qualityResponse')?.value     ?? null,
+      recurrenceType:      document.getElementById('edit_recurrenceType')?.value      ?? null,
       changePointCategory: document.getElementById('edit_changePointCategory')?.value ?? null,
       changePointContent:  document.getElementById('edit_changePointContent')?.value  ?? null,
     };
@@ -5523,6 +5524,15 @@ function ep(tab, field, itemValue) {
         <div class="form-group"><label>遡り</label><input type="text" id="edit_traceback" value="${item.traceback || ''}"></div>
         <div class="form-group"><label>LotNo</label><input type="text" id="edit_lotNo" value="${item.lotNo || ''}"></div>
         <div class="form-group"><label>品質対応</label><textarea id="edit_qualityResponse">${item.qualityResponse || ''}</textarea></div>
+        <div class="form-group">
+          <label>再発/新規</label>
+          <select id="edit_recurrenceType">
+            <option value="">選択</option>
+            <option value="再発" ${ep('mfg','recurrenceType', item.recurrenceType) === '再発' ? 'selected' : ''}>再発</option>
+            <option value="新規" ${ep('mfg','recurrenceType', item.recurrenceType) === '新規' ? 'selected' : ''}>新規</option>
+            <option value="調節" ${ep('mfg','recurrenceType', item.recurrenceType) === '調節' ? 'selected' : ''}>調節</option>
+          </select>
+        </div>
         <div class="form-group">
           <label>変化点分類</label>
           <select id="edit_changePointCategory">
@@ -5677,6 +5687,7 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
       updates.traceback = document.getElementById('edit_traceback')?.value || '';
       updates.lotNo = document.getElementById('edit_lotNo')?.value || '';
       updates.qualityResponse = document.getElementById('edit_qualityResponse')?.value || '';
+      updates.recurrenceType = document.getElementById('edit_recurrenceType')?.value || '';
       updates.changePointCategory = document.getElementById('edit_changePointCategory')?.value || '';
       updates.changePointContent = document.getElementById('edit_changePointContent')?.value || '';
       
