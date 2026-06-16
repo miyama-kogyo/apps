@@ -3728,7 +3728,7 @@ document.getElementById('btnShowPastChangePointsTech').addEventListener('click',
   const baseSN = normalizeSerial(base.serialNo);
 
   let candidates = anomalyCache
-    .filter(x => x._id !== base._id && x.status === 'complete')
+    .filter(x => x._id !== base._id)
     .filter(x => normalizeSerial(x.serialNo) === baseSN);
 
   const withScore = candidates.map(it => ({
@@ -3741,6 +3741,31 @@ document.getElementById('btnShowPastChangePointsTech').addEventListener('click',
     .sort((a,b) => (b.similarity !== a.similarity)
         ? (b.similarity - a.similarity)
         : (b.occurrenceDate || '').localeCompare(a.occurrenceDate || '')
+    )
+    .slice(0, limitN);
+}
+
+async function findSimilarCandidatesFromAllData(base, limitN = 10){
+  if (!base) return [];
+  const baseSN = normalizeSerial(base.serialNo);
+  if (!baseSN) return [];
+
+  const allData = await fetchAllData();
+  const candidates = allData
+    .filter(x => x._id !== base._id)
+    .filter(x => normalizeSerial(x.serialNo) === baseSN);
+
+  const withScore = candidates.map(it => ({
+    ...it,
+    similarity: base.anomalyContent
+      ? calculateSimilarity(base.anomalyContent || '', it.anomalyContent || '')
+      : 100
+  }));
+
+  return withScore
+    .sort((a,b) => (b.similarity !== a.similarity)
+        ? (b.similarity - a.similarity)
+        : (b.occurrenceDate || b.createdAt?.toDate?.()?.toISOString?.() || '').localeCompare(a.occurrenceDate || a.createdAt?.toDate?.()?.toISOString?.() || '')
     )
     .slice(0, limitN);
 }
@@ -5270,7 +5295,7 @@ document.addEventListener('click', async (e)=>{
       
       const matchingData = allData.filter(item => {
         const normalizedSerial = normalizeSerial(item.serialNo || '');
-        return normalizedSerial.includes(normalizedSearch) && item.status === 'complete';
+        return normalizedSerial.includes(normalizedSearch);
       }).sort((a, b) => (b.occurrenceDate || '').localeCompare(a.occurrenceDate || ''));
       
       if (matchingData.length === 0) {
@@ -5317,13 +5342,14 @@ document.addEventListener('click', async (e)=>{
     const box = document.getElementById('similarCasesBox');
     const content = document.getElementById('similarCasesContent');
     
-    const similar = findSimilarCandidates(d, 20);
+    content.innerHTML = '<div style="text-align:center;padding:20px;">検索中...</div>';
+    box.classList.add('active');
+
+    const similar = await findSimilarCandidatesFromAllData(d, 20);
     if (similar.length > 0) {
       content.innerHTML = renderSimilarList(similar);
-      box.classList.add('active');
     } else {
       content.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">類似案件がありません</div>';
-      box.classList.add('active');
     }
   });
 
@@ -5345,7 +5371,7 @@ document.addEventListener('click', async (e)=>{
 
   // 類似案件詳細表示
   window.showSimilarCaseDetail = function(id) {
-    const item = anomalyCache.find(x => x._id === id);
+    const item = anomalyCache.find(x => x._id === id) || allDataCache?.find?.(x => x._id === id);
     if (!item) return;
     
     const allPhotos = [...(item.mfgPhotoUrls || []), ...(item.techPhotoUrls || [])];
