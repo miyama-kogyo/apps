@@ -1281,6 +1281,19 @@
       </div>
       <!-- ===== /端末管理セクション ===== -->
 
+      <!-- ===== 未完了案件の強制完了（管理者のみ表示） ===== -->
+      <div id="stalePendingManageSection" style="display:none;background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-bottom:16px;border-left:4px solid #dc3545;">
+        <h3 style="color:#dc3545;margin-bottom:10px;font-size:1.05rem;">未完了案件の強制完了</h3>
+        <p style="color:#666;font-size:.9rem;line-height:1.6;margin-bottom:12px;">
+          発生日から7日以上経過してもステータスが未完了の異常履歴を、Firebase上で完了に書き換えます。
+        </p>
+        <button class="btn btn-primary" style="width:auto;padding:10px 18px;margin:0;background:#dc3545;" id="btnCompleteStalePending">
+          7日以上未完了の案件を完了にする
+        </button>
+        <div id="stalePendingResult" style="margin-top:10px;color:#666;font-size:.9rem;"></div>
+      </div>
+      <!-- ===== /未完了案件の強制完了 ===== -->
+
       <div style="background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-bottom:16px;">
         <h3 style="color:#667eea;margin-bottom:10px;">部署管理</h3>
         <div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -1772,6 +1785,10 @@ function applyRoleUi(role){
   if (deviceMgr) {
     deviceMgr.style.display = (role === 'admin') ? 'block' : 'none';
   }
+  const stalePendingMgr = document.getElementById('stalePendingManageSection');
+  if (stalePendingMgr) {
+    stalePendingMgr.style.display = (role === 'admin') ? 'block' : 'none';
+  }
 }
 
 // ===== 端末申請UI =====
@@ -2258,6 +2275,47 @@ function renderPastChangePoints(list, boxId, contentId) {
     allDataCache = results;
     allDataCacheTime = now;
     return results;
+  }
+
+  const STALE_PENDING_DAYS = 7;
+
+  function getAnomalyBaseDate(item){
+    const occurrenceDate = String(item?.occurrenceDate || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(occurrenceDate)) {
+      const [y, m, d] = occurrenceDate.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    const created = item?.createdAt?.toDate?.();
+    return created instanceof Date && !Number.isNaN(created.getTime()) ? created : null;
+  }
+
+  async function autoCompleteStalePendingAnomalies(){
+    const cutoff = Date.now() - (STALE_PENDING_DAYS * 24 * 60 * 60 * 1000);
+    const q = query(collection(db, 'anomalies'), where('status', '==', 'pending'));
+    const snap = await getDocs(q);
+    const staleDocs = snap.docs
+      .map(d => ({ ref: d.ref, id: d.id, data: d.data() || {} }))
+      .filter(row => {
+        const baseDate = getAnomalyBaseDate(row.data);
+        return baseDate && baseDate.getTime() <= cutoff;
+      });
+
+    for (let i = 0; i < staleDocs.length; i += 10) {
+      const chunk = staleDocs.slice(i, i + 10);
+      await Promise.all(chunk.map(row => updateDoc(row.ref, {
+        status: 'complete',
+        completedAt: serverTimestamp(),
+        autoCompletedAt: serverTimestamp(),
+        autoCompletedBy: auth.currentUser?.email || '',
+        autoCompleteReason: `${STALE_PENDING_DAYS}日以上未完了のため管理者が強制完了`
+      })));
+    }
+
+    if (staleDocs.length) {
+      allDataCache = null;
+      allDataCacheTime = 0;
+    }
+    return staleDocs.length;
   }
 
   // 初期データ読み込み
@@ -5060,6 +5118,47 @@ document.getElementById('actionTaken').addEventListener('blur', () => {
   }
 
   document.getElementById('btnLoadDevices')?.addEventListener('click', loadDeviceList);
+
+  document.getElementById('btnCompleteStalePending')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnCompleteStalePending');
+    const result = document.getElementById('stalePendingResult');
+    if (!btn) return;
+    const ok = confirm('発生日から7日以上経過した未完了案件を、Firebase上で完了に書き換えます。\nこの操作を実行しますか？');
+    if (!ok) return;
+
+    const prevText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '処理中...';
+    if (result) {
+      result.style.color = '#667eea';
+      result.textContent = '未完了案件を確認しています...';
+    }
+
+    try {
+      const count = await autoCompleteStalePendingAnomalies();
+      await logAudit('force_complete_stale_pending', {
+        days: STALE_PENDING_DAYS,
+        completedCount: count
+      });
+      await loadInitialData();
+      renderTechTargetSelect();
+      if (result) {
+        result.style.color = count ? '#155724' : '#666';
+        result.textContent = count
+          ? `${count}件の未完了案件を完了にしました。`
+          : '対象の未完了案件はありませんでした。';
+      }
+    } catch (error) {
+      console.error('force complete stale pending failed:', error);
+      if (result) {
+        result.style.color = '#c62828';
+        result.textContent = '処理に失敗しました: ' + (error.code || error.message);
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+  });
 
   document.addEventListener('click', async (e) => {
     const toggleBtn = e.target.closest('button[data-device-toggle]');
