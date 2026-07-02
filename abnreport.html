@@ -1294,6 +1294,21 @@
       </div>
       <!-- ===== /未完了案件の強制完了 ===== -->
 
+      <!-- ===== 操作ログ（管理者のみ表示） ===== -->
+      <div id="auditLogSection" style="display:none;background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-bottom:16px;border-left:4px solid #0b7285;">
+        <h3 style="color:#0b7285;margin-bottom:10px;font-size:1.05rem;">入力・編集・削除ログ</h3>
+        <p style="color:#666;font-size:.9rem;line-height:1.6;margin-bottom:12px;">
+          異常履歴の入力、対応部署入力、編集、削除の操作履歴を最新100件まで表示します。
+        </p>
+        <button class="btn btn-primary" style="width:auto;padding:10px 18px;margin:0;background:#0b7285;" id="btnLoadAuditLogs">
+          操作ログを読み込み
+        </button>
+        <div id="auditLogList" style="margin-top:12px;display:grid;gap:8px;">
+          <p style="color:#999;font-size:.9rem;text-align:center;">「操作ログを読み込み」を押すと一覧が表示されます</p>
+        </div>
+      </div>
+      <!-- ===== /操作ログ ===== -->
+
       <div style="background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-bottom:16px;">
         <h3 style="color:#667eea;margin-bottom:10px;">部署管理</h3>
         <div style="display:flex;gap:10px;margin-bottom:12px;">
@@ -1718,6 +1733,92 @@ async function logAudit(action, detail={}){
   }
 }
 
+function summarizeAnomalyForAudit(item = {}){
+  return {
+    anomalyId: item._id || item.id || '',
+    serialNo: item.serialNo || '',
+    department: item.department || '',
+    lineName: item.lineName || '',
+    occurrenceDate: item.occurrenceDate || '',
+    occurrenceTime: item.occurrenceTime || '',
+    status: item.status || '',
+    techRequest: item.techRequest || '',
+    anomalyContent: String(item.anomalyContent || '').slice(0, 120)
+  };
+}
+
+function formatAuditTime(value){
+  const d = value?.toDate?.() || (value ? new Date(value) : null);
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('ja-JP') : '-';
+}
+
+function getAuditActionLabel(action){
+  const map = {
+    anomaly_create: '入力',
+    anomaly_update_tech: '対応部署入力',
+    anomaly_edit: '編集',
+    anomaly_delete: '削除',
+    force_complete_stale_pending: '強制完了'
+  };
+  return map[action] || action;
+}
+
+function renderAuditDetail(detail = {}){
+  const rows = [];
+  const add = (label, value) => {
+    if (value === undefined || value === null || value === '') return;
+    rows.push(`<span style="display:inline-block;margin-right:12px;"><strong>${label}:</strong> ${escapeHtml(value)}</span>`);
+  };
+  add('整理No', detail.serialNo || detail.before?.serialNo || detail.deleted?.serialNo);
+  add('部署', detail.department || detail.before?.department || detail.deleted?.department);
+  add('発生日', detail.occurrenceDate || detail.before?.occurrenceDate || detail.deleted?.occurrenceDate);
+  add('ID', detail.anomalyId);
+  if (Array.isArray(detail.changedFields) && detail.changedFields.length) {
+    add('変更項目', detail.changedFields.join(', '));
+  }
+  if (detail.completedCount !== undefined) add('件数', `${detail.completedCount}件`);
+  return rows.length ? rows.join('<br>') : '<span style="color:#777;">詳細なし</span>';
+}
+
+async function loadAnomalyAuditLogs(){
+  const list = document.getElementById('auditLogList');
+  if (!list) return;
+  list.innerHTML = '<p style="color:#0b7285;text-align:center;padding:10px;">読み込み中...</p>';
+  try {
+    const q = query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'), limit(100));
+    const snap = await getDocs(q);
+    const rows = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(row => ['anomaly_create','anomaly_update_tech','anomaly_edit','anomaly_delete','force_complete_stale_pending'].includes(row.action));
+
+    if (!rows.length) {
+      list.innerHTML = '<p style="color:#999;text-align:center;">操作ログはありません</p>';
+      return;
+    }
+
+    list.innerHTML = rows.map(row => {
+      const isDelete = row.action === 'anomaly_delete';
+      const label = getAuditActionLabel(row.action);
+      const border = isDelete ? '#dc3545' : '#0b7285';
+      return `
+        <div style="padding:12px;background:#f8f9fa;border-radius:6px;border-left:4px solid ${border};">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+            <strong style="color:${border};">${escapeHtml(label)}</strong>
+            <span style="color:#555;font-size:.85rem;">${formatAuditTime(row.createdAt)}</span>
+          </div>
+          <div style="font-size:.88rem;color:#333;line-height:1.55;">
+            <span><strong>操作者:</strong> ${escapeHtml(row.email || row.uid || '不明')}</span><br>
+            ${renderAuditDetail(row.detail || {})}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('loadAnomalyAuditLogs failed:', error);
+    list.innerHTML = `<p style="color:#c62828;">操作ログの読み込みに失敗しました: ${escapeHtml(error.code || error.message)}</p>`;
+  }
+}
+
 async function ensureUserProfile(user){
   if (!user) return { role:'user' };
   const uref = doc(db,'users', user.uid);
@@ -1788,6 +1889,10 @@ function applyRoleUi(role){
   const stalePendingMgr = document.getElementById('stalePendingManageSection');
   if (stalePendingMgr) {
     stalePendingMgr.style.display = (role === 'admin') ? 'block' : 'none';
+  }
+  const auditLogSection = document.getElementById('auditLogSection');
+  if (auditLogSection) {
+    auditLogSection.style.display = (role === 'admin') ? 'block' : 'none';
   }
 }
 
@@ -4575,6 +4680,12 @@ const base = {
       filteredCache = [...anomalyCache];
       renderHistory();
     }
+
+    await logAudit('anomaly_create', {
+      ...summarizeAnomalyForAudit({ _id: docRef.id, ...base }),
+      usedExistingId: !!draftId,
+      mfgPhotoCount: mfgPhotos.length
+    });
     
     e.target.reset();
     mfgPhotos = [];
@@ -4677,7 +4788,13 @@ if (rootText.trim()) {
       updates.techPhotoUrls = [...existingUrls, ...photoUrls];
     }
     
+    const auditBeforeTech = anomalyCache.find(x => x._id === id) || {};
     await updateDoc(doc(db, 'anomalies', id), updates);
+    await logAudit('anomaly_update_tech', {
+      ...summarizeAnomalyForAudit({ _id: id, ...auditBeforeTech, ...updates }),
+      before: summarizeAnomalyForAudit({ _id: id, ...auditBeforeTech }),
+      changedFields: Object.keys(updates)
+    });
       // 変化点がある場合、changepointsコレクションにも記録（upsert）
     if (hasChangePoint && changePointCategory) {
       const existingItem = anomalyCache.find(x => x._id === id);
@@ -5007,7 +5124,12 @@ document.getElementById('actionTaken').addEventListener('blur', () => {
     
     const id = delBtn.getAttribute('data-del');
     try {
+      const deletedItem = anomalyCache.find(x => x._id === id) || { _id: id };
       await deleteDoc(doc(db, 'anomalies', id));
+      await logAudit('anomaly_delete', {
+        anomalyId: id,
+        deleted: summarizeAnomalyForAudit(deletedItem)
+      });
       anomalyCache = anomalyCache.filter(x => x._id !== id);
       filteredCache = filteredCache.filter(x => x._id !== id);
       renderHistory();
@@ -5118,6 +5240,7 @@ document.getElementById('actionTaken').addEventListener('blur', () => {
   }
 
   document.getElementById('btnLoadDevices')?.addEventListener('click', loadDeviceList);
+  document.getElementById('btnLoadAuditLogs')?.addEventListener('click', loadAnomalyAuditLogs);
 
   document.getElementById('btnCompleteStalePending')?.addEventListener('click', async () => {
     const btn = document.getElementById('btnCompleteStalePending');
@@ -5871,6 +5994,13 @@ if (editCurrentTab === 'tech') {
 
     // anomaliesコレクションを更新
     await updateDoc(doc(db, 'anomalies', editingId), updates);
+    await logAudit('anomaly_edit', {
+      anomalyId: editingId,
+      tab: editCurrentTab,
+      before: summarizeAnomalyForAudit({ _id: editingId, ...item }),
+      after: summarizeAnomalyForAudit({ _id: editingId, ...item, ...updates }),
+      changedFields: Object.keys(updates)
+    });
 
     if (editDeletedMfgPhotoUrls.length > 0) {
       await deletePhotosFromStorage(editDeletedMfgPhotoUrls);
