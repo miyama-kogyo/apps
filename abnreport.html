@@ -948,8 +948,8 @@
 
 <!-- 再発/新規（発信部署でも入力可） -->
 <div class="form-group">
-  <label>再発 / 新規</label>
-  <select id="mfg_recurrenceType">
+  <label>再発 / 新規 *</label>
+  <select id="mfg_recurrenceType" required>
     <option value="">選択</option>
     <option value="再発">再発</option>
     <option value="新規">新規</option>
@@ -1107,7 +1107,7 @@
        
         <div class="form-group">
           <label>再発か新規か *</label>
-          <select id="recurrenceType">
+          <select id="recurrenceType" required>
             <option value="">選択</option>
             <option value="再発">再発</option>
             <option value="新規">新規</option>
@@ -4569,6 +4569,15 @@ document.getElementById('manufacturingForm').addEventListener('submit', async (e
     const mRec = (document.getElementById('mfg_recurrenceType')?.value || '').trim();
     const mMs  = (document.getElementById('mfg_measureStatus')?.value || '').trim();
 
+    if (!mRec) {
+      alert('再発 / 新規を選択してください');
+      document.getElementById('mfg_recurrenceType')?.focus();
+      submitBtn.disabled = false;
+      submitBtn.textContent = '登録';
+      isSubmittingMfg = false;
+      return;
+    }
+
     if (mRec === '再発' && !mMs) {
       const go = confirm('「再発」が選択されていますが、対策状況が未入力です。\nこのまま登録しますか？');
       if (!go) {
@@ -4743,6 +4752,15 @@ document.getElementById('technicalForm').addEventListener('submit', async (e) =>
     const recType = document.getElementById('recurrenceType').value;
     const ms = (document.getElementById('measureStatus')?.value || '').trim();
     const rootText = document.getElementById('rootCauseAction').value || '';
+
+    if (!recType) {
+      alert('再発か新規かを選択してください');
+      document.getElementById('recurrenceType')?.focus();
+      submitBtn.disabled = false;
+      submitBtn.textContent = '登録';
+      isSubmittingTech = false;
+      return;
+    }
 
     // 変化点データ
     const hasChangePoint = document.getElementById('tech_hasChangePoint').checked;
@@ -5773,8 +5791,8 @@ function ep(tab, field, itemValue) {
         <div class="form-group"><label>LotNo</label><input type="text" id="edit_lotNo" value="${item.lotNo || ''}"></div>
         <div class="form-group"><label>品質対応</label><textarea id="edit_qualityResponse">${item.qualityResponse || ''}</textarea></div>
         <div class="form-group">
-          <label>再発/新規</label>
-          <select id="edit_recurrenceType">
+          <label>再発/新規 *</label>
+          <select id="edit_recurrenceType" required>
             <option value="">選択</option>
             <option value="再発" ${ep('mfg','recurrenceType', item.recurrenceType) === '再発' ? 'selected' : ''}>再発</option>
             <option value="新規" ${ep('mfg','recurrenceType', item.recurrenceType) === '新規' ? 'selected' : ''}>新規</option>
@@ -5840,8 +5858,8 @@ function ep(tab, field, itemValue) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group">
-            <label>再発/新規</label>
-            <select id="edit_recurrenceType">
+            <label>再発/新規 *</label>
+            <select id="edit_recurrenceType" required>
               <option value="">選択</option>
               <option value="再発" ${ep('tech','recurrenceType', item.recurrenceType) === '再発' ? 'selected' : ''}>再発</option>
               <option value="新規" ${ep('tech','recurrenceType', item.recurrenceType) === '新規' ? 'selected' : ''}>新規</option>
@@ -5968,6 +5986,12 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
       }
     }
     // ===== ここを btnEditSave の try 内、updates を作り終えた直後に追加 =====
+
+if (!updates.recurrenceType) {
+  alert('再発/新規を選択してください');
+  document.getElementById('edit_recurrenceType')?.focus();
+  return;
+}
 
 // 1) 再発なら対策状況が必須（技術タブ保存時に強制）
 //   - 「今回入力した値」優先、なければ「既存の値」を見る
