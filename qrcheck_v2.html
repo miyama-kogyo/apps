@@ -82,6 +82,28 @@
     .btn.primary { background: #0078c8; border-color: #1598ed; color: white; }
     .btn.danger { background: #3a1518; border-color: #7b2d34; color: #ffadb4; }
     .btn:disabled { opacity: .45; cursor: default; }
+    .input-mode-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #0b1118;
+      border: 1px solid #263647;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .input-mode-label { color: #8b9aab; font-size: 12px; font-weight: 800; }
+    .input-mode-toggle {
+      border: 1px solid #34536c;
+      background: #132333;
+      color: #9ed8ff;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 900;
+      min-height: 34px;
+      white-space: nowrap;
+    }
     .flow {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -296,6 +318,13 @@
         padding: 9px 10px;
         font-size: 12px;
       }
+      .input-mode-row { padding: 7px 8px; }
+      .input-mode-label { font-size: 11px; }
+      .input-mode-toggle {
+        min-height: 34px;
+        padding: 7px 10px;
+        font-size: 11px;
+      }
       #exportBtn { grid-column: 1 / -1; }
       .flow, .summary-grid { grid-template-columns: repeat(2, 1fr); }
       .flow { gap: 6px; margin-bottom: 8px; }
@@ -387,6 +416,13 @@
       <div class="scan-message" id="scanMessage">注文明細QRを読み取ってください</div>
       <input class="scan-input" id="scanInput" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="none" enterkeyhint="done" placeholder="QRリーダーで読み取り">
       <div class="hint" id="scanHint">先に注文明細を登録し、顧客かんばんと社内かんばんの照合後に明細通りか確認します。</div>
+      <div class="input-mode-row">
+        <div>
+          <div class="input-mode-label">QR入力方式</div>
+          <div class="hint" id="inputModeHint">画面全体でQRリーダー入力を受けます</div>
+        </div>
+        <button class="input-mode-toggle" id="inputModeToggle" onclick="toggleInputMode()">全体入力</button>
+      </div>
       <div class="btn-row">
         <button class="btn danger" onclick="resetCurrentPair()">現在のかんばんをリセット</button>
         <button class="btn danger" onclick="resetAll()">全リセット</button>
@@ -463,6 +499,7 @@
     const SCANNER_IDLE_MS = 80;
     const DEFAULT_UNLOCK_PIN = '0000';
     const STORAGE_KEY = 'qrcheck_v2_combined_session';
+    const INPUT_MODE_KEY = 'qrcheck_v2_input_mode';
 
     const flowLabels = [
       ['注文明細', '最初に登録'],
@@ -476,11 +513,13 @@
     let scannerIdleTimer = null;
     let ngLocked = false;
     let unlockPinBuffer = '';
+    let inputMode = localStorage.getItem(INPUT_MODE_KEY) || 'global';
 
     document.addEventListener('DOMContentLoaded', () => {
       loadSession();
       setupInputListeners();
       renderAll();
+      renderInputMode();
       focusScanInput();
     });
 
@@ -500,9 +539,12 @@
 
     function setupInputListeners() {
       document.addEventListener('keydown', handleGlobalScannerKey, { capture: true });
+      const scanInput = document.getElementById('scanInput');
+      scanInput.addEventListener('keydown', handleDirectInputKey);
     }
 
     function handleGlobalScannerKey(e) {
+      if (inputMode !== 'global') return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;
 
       if (ngLocked) {
@@ -520,6 +562,44 @@
       if (isEditable && active.id !== 'scanInput') return;
 
       handleBufferedScanKey(e);
+    }
+
+    function handleDirectInputKey(e) {
+      if (inputMode !== 'direct') return;
+      if (ngLocked) {
+        handleUnlockKey(e);
+        return;
+      }
+      if (e.key !== 'Enter' && e.key !== 'Tab') return;
+      e.preventDefault();
+      const scanInput = document.getElementById('scanInput');
+      const value = normalizeQR(scanInput.value);
+      scanInput.value = '';
+      if (value) handleScan(value);
+    }
+
+    function toggleInputMode() {
+      inputMode = inputMode === 'global' ? 'direct' : 'global';
+      localStorage.setItem(INPUT_MODE_KEY, inputMode);
+      clearScannerBuffer();
+      renderInputMode();
+      focusScanInput();
+    }
+
+    function renderInputMode() {
+      const toggle = document.getElementById('inputModeToggle');
+      const hint = document.getElementById('inputModeHint');
+      const input = document.getElementById('scanInput');
+      if (!toggle || !hint || !input) return;
+      if (inputMode === 'global') {
+        toggle.textContent = '全体入力';
+        hint.textContent = '画面全体でQRリーダー入力を受けます';
+        input.setAttribute('inputmode', 'none');
+      } else {
+        toggle.textContent = '直接入力';
+        hint.textContent = '入力欄に入ったQRをEnter/Tabで確定します';
+        input.setAttribute('inputmode', 'text');
+      }
     }
 
     function handleBufferedScanKey(e) {
