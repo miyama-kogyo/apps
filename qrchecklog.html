@@ -1,0 +1,1572 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR照合ログビューア</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #f5f7fa;
+      --bg2:      #ffffff;
+      --bg3:      #f0f2f5;
+      --bg4:      #e8eaed;
+      --border:   #e2e6ea;
+      --border2:  #cbd0d8;
+      --text:     #1a202c;
+      --text2:    #4a5568;
+      --text3:    #9aa3b0;
+      --accent:   #0077cc;
+      --accent2:  #005fa3;
+      --ok:       #2e7d32;
+      --ok-bg:    #f0faf0;
+      --ok-dim:   #d4edda;
+      --ng:       #c62828;
+      --ng-bg:    #fff5f5;
+      --ng-dim:   #fde0e0;
+      --dup:      #e65100;
+      --dup-bg:   #fff8f0;
+      --dup-dim:  #ffe0c2;
+      --mono:     'IBM Plex Mono', monospace;
+      --sans:     'IBM Plex Sans JP', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f0f2f5;
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── ヘッダー ── */
+    .header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .header-logo span { color: var(--text2); font-weight: 400; }
+    .fb-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+    .fb-dot.connected { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+    .fb-dot.error     { background: var(--ng); }
+    .fb-status-text {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    /* ── レイアウト ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 56px);
+    }
+
+    /* ── サイドバー ── */
+    .sidebar {
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 56px;
+      height: calc(100vh - 56px);
+      overflow-y: auto;
+    }
+    .sidebar-section {
+      padding: 0 12px;
+      margin-bottom: 20px;
+    }
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      color: var(--text3);
+      text-transform: uppercase;
+      padding: 0 4px;
+      margin-bottom: 8px;
+    }
+    .company-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .15s;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 2px;
+    }
+    .company-item:hover { background: var(--bg3); color: var(--text); }
+    .company-item.active {
+      background: rgba(79,195,247,.12);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .company-item .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--border2);
+      flex-shrink: 0;
+    }
+    .company-item.active .dot { background: var(--accent); }
+    .company-item .cmp-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .company-loading {
+      padding: 12px;
+      font-size: 12px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+
+    /* ── メインコンテンツ ── */
+    .main {
+      padding: 24px;
+      max-width: 1100px;
+    }
+
+    /* ── フィルターバー ── */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 20px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-label {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      white-space: nowrap;
+    }
+    .filter-select, .filter-input {
+      background: #f0f2f5;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: var(--mono);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+    .filter-input { width: 140px; }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f7f9fc;
+      color: var(--text2);
+      font-size: 12px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-btn.primary {
+      background: var(--accent2);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .filter-btn.primary:hover { background: var(--accent); }
+    .filter-sep { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+
+    /* ── サマリーカード ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .summary-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+    }
+    .summary-card.total::before  { background: var(--accent); }
+    .summary-card.ok::before     { background: var(--ok); }
+    .summary-card.ng::before     { background: var(--ng); }
+    .summary-card.dup::before    { background: var(--dup); }
+    .summary-card.rate::before   { background: #7c3aed; }
+    .summary-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--text3);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      font-family: var(--mono);
+    }
+    .summary-value {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: var(--mono);
+      line-height: 1;
+    }
+    .summary-card.total .summary-value  { color: var(--accent); }
+    .summary-card.ok    .summary-value  { color: var(--ok); }
+    .summary-card.ng    .summary-value  { color: var(--ng); }
+    .summary-card.dup   .summary-value  { color: var(--dup); }
+    .summary-card.rate  .summary-value  { color: #7c3aed; }
+    .summary-sub {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+
+    /* ── ログテーブル ── */
+    .table-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .table-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    .table-count {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      background: #f7f9fc;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    thead th {
+      background: #f7f9fc;
+      padding: 9px 14px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--text3);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+      cursor: pointer;
+    }
+    tbody tr:hover { background: #eef4fb; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      color: var(--text2);
+    }
+    .td-time { color: var(--text3); white-space: nowrap; font-size: 11px; }
+    .td-part { color: var(--text); font-weight: 600; font-size: 13px; }
+    .td-qr   { color: var(--text3); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .result-badge.ok  { background: var(--ok-dim);  color: #2e7d32; border: 1px solid #a8d5aa; }
+    .result-badge.ng  { background: var(--ng-dim);  color: #c62828; border: 1px solid #f5a8a8; }
+    .result-badge.dup { background: var(--dup-dim); color: #e65100; border: 1px solid #ffbe8a; }
+
+    .rule-text {
+      font-size: 10px;
+      color: var(--text3);
+      background: #f0f2f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .detail-board {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .detail-board-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .detail-board.collapsed .detail-board-header { border-bottom: none; }
+    .detail-board-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    .detail-board-sub {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+    .detail-board-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      background: #fbfcfe;
+    }
+    .detail-board-toggle {
+      min-width: 96px;
+      justify-content: center;
+    }
+    .detail-board-body {
+      display: block;
+    }
+    .detail-board.collapsed .detail-board-body {
+      display: none;
+    }
+    .master-editor {
+      display: grid;
+      gap: 8px;
+    }
+    .master-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 64px;
+      gap: 8px;
+      align-items: center;
+    }
+    .master-input {
+      width: 100%;
+      background: #f0f2f5;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-family: var(--mono);
+      outline: none;
+    }
+    .master-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .master-actions .filter-btn { flex: 1; }
+    .detail-session-list {
+      display: grid;
+      gap: 4px;
+      padding: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .detail-session-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 9px;
+      cursor: pointer;
+      background: #fbfcfe;
+      transition: border-color .15s, background .15s;
+    }
+    .detail-session-card:hover { border-color: var(--accent); background: #f3f9ff; }
+    .detail-session-card.active { border-color: var(--accent); background: #eef7ff; }
+    .detail-session-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .detail-session-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .detail-status {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .detail-status.done { background: var(--ok-dim); color: var(--ok); border: 1px solid #a8d5aa; }
+    .detail-status.active { background: #e6f2ff; color: var(--accent2); border: 1px solid #b8dafa; }
+    .detail-status.empty { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+    .detail-progress-row {
+      display: grid;
+      grid-template-columns: 64px 1fr 46px;
+      gap: 7px;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text2);
+    }
+    .detail-progress-bar {
+      height: 6px;
+      background: var(--bg3);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .detail-progress-fill {
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+    }
+    .detail-session-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 5px;
+      color: var(--text3);
+      font-size: 9px;
+      font-family: var(--mono);
+    }
+    .detail-lines {
+      margin-top: 5px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .detail-line-chip {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text2);
+      border-radius: 5px;
+      padding: 2px 5px;
+      font-size: 9px;
+      font-family: var(--mono);
+    }
+    .detail-line-chip.done {
+      background: var(--ok-bg);
+      border-color: #a8d5aa;
+      color: var(--ok);
+    }
+    .detail-filter-note {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid #b8dafa;
+      border-radius: 8px;
+      background: #eef7ff;
+      color: var(--accent2);
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    .detail-filter-note.show { display: flex; }
+
+    /* ── 詳細モーダル ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(30,40,60,.55);
+      z-index: 500;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 14px;
+      padding: 24px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: modalIn .2s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+    .modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+    .modal-key {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      width: 120px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .modal-val {
+      font-size: 12px;
+      color: var(--text);
+      font-family: var(--mono);
+      word-break: break-all;
+      flex: 1;
+    }
+    .modal-close {
+      width: 100%;
+      margin-top: 16px;
+      padding: 10px;
+      background: #f7f9fc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .modal-close:hover { background: var(--bg4); }
+
+    /* ── 空・ローディング ── */
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text3);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; font-family: var(--mono); }
+    .loading-row td {
+      text-align: center;
+      padding: 40px;
+      color: var(--text3);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    /* ── ページネーション ── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--text3);
+    }
+    .pagination-btns { display: flex; gap: 6px; }
+    .page-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f7f9fc;
+      color: var(--text2);
+      font-size: 11px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .page-btn:disabled { opacity: .35; cursor: default; }
+    .page-btn.active { background: var(--accent2); border-color: var(--accent); color: #fff; }
+
+    /* ── スクロールバー ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f0f2f5; }
+    ::-webkit-scrollbar-thumb { background: #c0c8d4; border-radius: 3px; }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      .summary-grid { grid-template-columns: repeat(3, 1fr); }
+      .main { padding: 16px; }
+      .detail-progress-row { grid-template-columns: 66px 1fr 64px; }
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <div class="header-logo">QR<span>/</span>LOG<span> VIEWER</span></div>
+  <div class="fb-dot" id="fbDot"></div>
+  <div class="fb-status-text" id="fbStatusText">接続中...</div>
+  <div class="header-right">
+    <button class="filter-btn primary" onclick="exportCSV()">📥 CSV出力</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- サイドバー：会社一覧 -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">ミヤマ / 仕入先</div>
+      <div id="companyList">
+        <div class="company-loading">接続中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- メイン -->
+  <div class="main">
+
+    <!-- フィルターバー -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">結果</span>
+        <select class="filter-select" id="filterResult" onchange="applyFilter()">
+          <option value="all">すべて</option>
+          <option value="OK">✅ OK</option>
+          <option value="NG">❌ NG</option>
+          <option value="DUP">⚠️ 重複</option>
+        </select>
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">日付 From</span>
+        <input type="date" class="filter-input" id="filterDateFrom" onchange="applyFilter()">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">To</span>
+        <input type="date" class="filter-input" id="filterDateTo" onchange="applyFilter()">
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">品番</span>
+        <input type="text" class="filter-input" id="filterPart" placeholder="検索..." oninput="applyFilter()">
+      </div>
+      <button class="filter-btn" onclick="resetFilter()">リセット</button>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">表示件数</span>
+        <select class="filter-select" id="perPageSelect" onchange="changePerPage()">
+          <option value="50">50件</option>
+          <option value="100" selected>100件</option>
+          <option value="200">200件</option>
+          <option value="500">500件</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- サマリー -->
+    <div class="summary-grid">
+      <div class="summary-card total">
+        <div class="summary-label">TOTAL</div>
+        <div class="summary-value" id="sumTotal">—</div>
+        <div class="summary-sub" id="sumDateRange">—</div>
+      </div>
+      <div class="summary-card ok">
+        <div class="summary-label">OK</div>
+        <div class="summary-value" id="sumOK">—</div>
+      </div>
+      <div class="summary-card ng">
+        <div class="summary-label">NG</div>
+        <div class="summary-value" id="sumNG">—</div>
+      </div>
+      <div class="summary-card dup">
+        <div class="summary-label">DUP</div>
+        <div class="summary-value" id="sumDUP">—</div>
+      </div>
+      <div class="summary-card rate">
+        <div class="summary-label">OK RATE</div>
+        <div class="summary-value" id="sumRate">—</div>
+        <div class="summary-sub">フィルタ適用後</div>
+      </div>
+    </div>
+
+    <!-- テーブル -->
+    <div class="detail-board collapsed" id="detailBoard">
+      <div class="detail-board-header" onclick="toggleDetailBoard()">
+        <div>
+          <div class="detail-board-title">注文明細の進捗</div>
+          <div class="detail-board-sub" id="detailSessionCount">0件</div>
+        </div>
+        <button class="filter-btn detail-board-toggle" id="detailBoardToggle" onclick="toggleDetailBoard(event)">表示</button>
+      </div>
+      <div class="detail-board-body">
+        <div class="detail-board-controls">
+          <select class="filter-select" id="detailSortSelect" onchange="changeOrderSessionSort()">
+            <option value="updated_desc">更新順</option>
+            <option value="customer_asc">顧客順</option>
+            <option value="progress_asc">未完了順</option>
+            <option value="progress_desc">進捗順</option>
+          </select>
+          <button class="filter-btn" onclick="openCustomerMasterModal()">顧客名マスタ</button>
+          <button class="filter-btn" onclick="clearOrderSessionFilter()">全ログ表示</button>
+        </div>
+        <div class="detail-session-list" id="detailSessionList">
+          <div class="empty-state" style="padding:24px 12px;">
+            <div class="empty-text">会社を選択してください</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-filter-note" id="detailFilterNote">
+      <span id="detailFilterText">明細セッションで絞り込み中</span>
+      <button class="filter-btn" onclick="clearOrderSessionFilter()">解除</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title" id="tableTitle">— ログ</div>
+        <div class="table-count" id="tableCount">0件</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>日時</th>
+              <th>結果</th>
+              <th>品番</th>
+              <th>QR1（正規化）</th>
+              <th>QR2（正規化）</th>
+              <th>QR1文字数</th>
+              <th>明細</th>
+              <th>ルール</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr class="loading-row"><td colspan="8">会社を選択してください</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination" style="display:none;">
+        <span id="pageInfo">— / —</span>
+        <div class="pagination-btns" id="pageBtns"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+  <div class="modal" id="modalPanel">
+    <div class="modal-title" id="modalTitle">照合詳細</div>
+    <div id="modalBody"></div>
+    <button class="modal-close" onclick="closeModal()">✕ 閉じる</button>
+  </div>
+</div>
+
+<script>
+  // ── Firebase 設定（QR照合システムと同じプロジェクト） ──
+  const FIREBASE_CONFIG = {
+    apiKey:      "AIzaSyAOMRoojKv9Hnh3OjVGwYV_k1LBTGOKepY",
+    authDomain:  "miyamaunitec-fb87a.firebaseapp.com",
+    databaseURL: "https://miyamaunitec-fb87a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:   "miyamaunitec-fb87a"
+  };
+
+  let database      = null;
+  let allLogs       = [];      // 現在選択中の会社の全ログ
+  let filteredLogs  = [];      // フィルタ後
+  let orderSessions = [];
+  let activeOrderSessionId = '';
+  let orderSessionSort = 'updated_desc';
+  let detailBoardOpen = false;
+  let customerNameMaster = {};
+  let companies     = [];
+  let activeCompany = null;
+  let currentPage   = 1;
+  let perPage       = 100;
+
+  // ── 初期化 ──
+  window.addEventListener('DOMContentLoaded', () => {
+    initFirebase();
+    // 今日の日付をデフォルトセット
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById('filterDateTo').value = today;
+    const weekAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);
+    document.getElementById('filterDateFrom').value = weekAgo;
+  });
+
+  function initFirebase() {
+    try {
+      const app = firebase.initializeApp(FIREBASE_CONFIG);
+      database = firebase.database();
+      database.ref('.info/connected').on('value', snap => {
+        const on = snap.val() === true;
+        document.getElementById('fbDot').className = 'fb-dot ' + (on ? 'connected' : '');
+        document.getElementById('fbStatusText').textContent = on ? '接続中' : '未接続';
+        if (on) loadCompanies();
+      });
+    } catch(e) {
+      console.error(e);
+      document.getElementById('fbStatusText').textContent = 'エラー';
+      document.getElementById('fbDot').className = 'fb-dot error';
+    }
+  }
+
+  // ── 会社一覧 ──
+  function loadCompanies() {
+    database.ref('qr_match_companies/profiles').once('value', snap => {
+      const data = snap.val();
+      if (!data) {
+        document.getElementById('companyList').innerHTML =
+          '<div class="company-loading">会社データなし</div>';
+        return;
+      }
+      companies = Object.values(data).sort(sortCompaniesForLogViewer);
+      renderCompanyList();
+      if (companies.length > 0) selectCompany(companies[0]);
+    });
+  }
+
+  function sortCompaniesForLogViewer(a, b) {
+    const aIsMiyama = a.name === 'ミヤマ';
+    const bIsMiyama = b.name === 'ミヤマ';
+    if (aIsMiyama !== bIsMiyama) return aIsMiyama ? -1 : 1;
+    return a.name.localeCompare(b.name, 'ja');
+  }
+
+  function renderCompanyList() {
+    document.getElementById('companyList').innerHTML = companies.map(c => `
+      <div class="company-item ${c.id === (activeCompany?.id) ? 'active' : ''}"
+           onclick="selectCompany(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+        <div class="dot"></div>
+        <div class="cmp-name">${escHtml(c.name)}</div>
+      </div>
+    `).join('');
+  }
+
+  function selectCompany(company) {
+    activeCompany = company;
+    activeOrderSessionId = '';
+    orderSessions = [];
+    renderCompanyList();
+    document.getElementById('tableTitle').textContent = company.name + ' ログ';
+    renderOrderSessions();
+    loadLogs(company.id);
+    loadOrderSessions(company.id);
+    loadCustomerNameMaster(company.id);
+  }
+
+  // ── ログ読み込み ──
+  function loadLogs(companyId) {
+    document.getElementById('logTableBody').innerHTML =
+      '<tr class="loading-row"><td colspan="8">読み込み中...</td></tr>';
+    resetSummary();
+
+    database.ref('qr_match_logs/' + companyId)
+      .orderByChild('timestamp')
+      .once('value', snap => {
+        const data = snap.val();
+        if (!data) {
+          allLogs = [];
+          renderOrderSessions();
+          applyFilter();
+          return;
+        }
+        allLogs = Object.entries(data)
+          .map(([key, val]) => ({ ...val, _key: key }))
+          .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        renderOrderSessions();
+        applyFilter();
+      }, err => {
+        console.error(err);
+        document.getElementById('logTableBody').innerHTML =
+          '<tr class="loading-row"><td colspan="8">読み込みエラー: ' + escHtml(err.message) + '</td></tr>';
+      });
+  }
+
+  // ── フィルタ ──
+  function loadOrderSessions(companyId) {
+    const list = document.getElementById('detailSessionList');
+    if (list) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">明細進捗を読み込み中...</div></div>';
+    }
+
+    database.ref('qr_match_companies/order_detail_sessions/' + companyId)
+      .orderByChild('updatedAt')
+      .once('value', snap => {
+        const data = snap.val();
+        orderSessions = data
+          ? Object.entries(data).map(([key, val]) => normalizeOrderSession({ ...val, sessionId: val.sessionId || key }))
+          : [];
+        orderSessions.sort((a,b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+        renderOrderSessions();
+      }, err => {
+        console.error(err);
+        if (list) {
+          list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">明細進捗の読み込みエラー: ' + escHtml(err.message) + '</div></div>';
+        }
+      });
+  }
+
+  function normalizeOrderSession(source) {
+    const lines = Array.isArray(source.lines) ? source.lines : Object.values(source.lines || {});
+    return {
+      sessionId: source.sessionId || '',
+      orderQr: source.orderQr || '',
+      meta: source.meta || {},
+      details: Array.isArray(source.details) ? source.details : Object.values(source.details || {}),
+      lines: lines.map((line, index) => ({
+        no: line.no || index + 1,
+        backNo: line.backNo || '',
+        partNo: line.partNo || '',
+        packQty: Number(line.packQty) || 0,
+        totalQty: Number(line.totalQty) || 0,
+        requiredBoxes: Number(line.requiredBoxes) || 0,
+        scanned: Number(line.scanned) || 0
+      })),
+      scannedIds: source.scannedIds || {},
+      completedAt: source.completedAt || '',
+      completeLoggedAt: source.completeLoggedAt || '',
+      createdAt: source.createdAt || '',
+      updatedAt: source.updatedAt || ''
+    };
+  }
+
+  function orderRequiredBoxes(session) {
+    return (session.lines || []).reduce((sum, line) => sum + (Number(line.requiredBoxes) || 0), 0);
+  }
+
+  function orderScannedBoxes(session) {
+    return (session.lines || []).reduce((sum, line) => sum + (Number(line.scanned) || 0), 0);
+  }
+
+  function orderProgressRate(session) {
+    const required = orderRequiredBoxes(session);
+    return required > 0 ? orderScannedBoxes(session) / required : 0;
+  }
+
+  function getOrderCustomerLabel(session) {
+    const customerId = getOrderCustomerId(session);
+    if (customerId && customerNameMaster[customerId]) {
+      return `${customerNameMaster[customerId]} (${customerId})`;
+    }
+    if (customerId) return customerId;
+
+    const meta = session.meta || {};
+    const explicit = meta.customerName || meta.customer || meta.customerCode ||
+      meta.deliveryName || meta.destinationName || meta.supplierName;
+    if (explicit) return String(explicit);
+
+    const detailMeta = (session.details || [])
+      .map(d => d && d.meta)
+      .find(m => m && (m.customerName || m.customer || m.customerCode || m.deliveryName || m.destinationName || m.supplierName));
+    if (detailMeta) {
+      return String(detailMeta.customerName || detailMeta.customer || detailMeta.customerCode ||
+        detailMeta.deliveryName || detailMeta.destinationName || detailMeta.supplierName);
+    }
+    return '顧客未設定';
+  }
+
+  function getOrderCustomerId(session) {
+    const fromOrder = extractCustomerIdFromOrderQr(session.orderQr || '');
+    if (fromOrder) return fromOrder;
+    const detailQr = (session.details || [])
+      .map(d => d && d.orderQr)
+      .find(Boolean);
+    return extractCustomerIdFromOrderQr(detailQr || '');
+  }
+
+  function extractCustomerIdFromOrderQr(qr) {
+    const text = String(qr || '');
+    const match = text.match(/[VL](\d{9})\s*([0-9])\b/);
+    if (match) return `${match[1]}-${match[2]}`;
+    const fallback = text.match(/[VL](\d{9})/);
+    return fallback ? fallback[1] : '';
+  }
+
+  function sortedOrderSessions() {
+    const sorted = [...orderSessions];
+    const sortMode = orderSessionSort || 'updated_desc';
+    sorted.sort((a, b) => {
+      if (sortMode === 'customer_asc') {
+        const byCustomer = getOrderCustomerLabel(a).localeCompare(getOrderCustomerLabel(b), 'ja', { numeric: true });
+        if (byCustomer) return byCustomer;
+      } else if (sortMode === 'progress_asc') {
+        const byProgress = orderProgressRate(a) - orderProgressRate(b);
+        if (byProgress) return byProgress;
+      } else if (sortMode === 'progress_desc') {
+        const byProgress = orderProgressRate(b) - orderProgressRate(a);
+        if (byProgress) return byProgress;
+      }
+      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+    });
+    return sorted;
+  }
+
+  function changeOrderSessionSort() {
+    const select = document.getElementById('detailSortSelect');
+    orderSessionSort = select ? select.value : 'updated_desc';
+    renderOrderSessions();
+  }
+
+  function toggleDetailBoard(event) {
+    if (event) event.stopPropagation();
+    detailBoardOpen = !detailBoardOpen;
+    renderDetailBoardState();
+  }
+
+  function renderDetailBoardState() {
+    const board = document.getElementById('detailBoard');
+    const toggle = document.getElementById('detailBoardToggle');
+    if (!board) return;
+    board.classList.toggle('collapsed', !detailBoardOpen);
+    if (toggle) toggle.textContent = detailBoardOpen ? '閉じる' : '表示';
+  }
+
+  function formatYmd(value) {
+    const text = String(value || '');
+    const match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+    return match ? `${match[1]}/${match[2]}/${match[3]}` : (text || '-');
+  }
+
+  function getOrderInstructionDate(session) {
+    const meta = session.meta || {};
+    const fromMeta = meta.instructionDate || meta.shipDate || meta.deliveryDate || '';
+    if (fromMeta) return formatYmd(fromMeta);
+    const qr = session.orderQr || '';
+    const fromQr = (qr.match(/16D(\d{8})/) || [])[1] || (qr.match(/12D(\d{8})/) || [])[1] || '';
+    return fromQr ? formatYmd(fromQr) : '-';
+  }
+
+  function getOrderDeliveryBin(session) {
+    const meta = session.meta || {};
+    const fromMeta = meta.deliveryBin || meta.bin || meta.deliveryRun || '';
+    if (fromMeta) return String(fromMeta).replace(/便$/, '');
+    const qr = session.orderQr || '';
+    const fromQr = (qr.match(/9D(\d)/) || [])[1] || '';
+    return fromQr || '-';
+  }
+
+  function renderOrderSessions() {
+    const list = document.getElementById('detailSessionList');
+    const count = document.getElementById('detailSessionCount');
+    const incomplete = orderSessions.filter(session => {
+      const required = orderRequiredBoxes(session);
+      return required > 0 && orderScannedBoxes(session) < required;
+    }).length;
+    if (count) {
+      count.textContent = orderSessions.length.toLocaleString() + '件 / 未完了 ' + incomplete.toLocaleString() + '件';
+    }
+    const sortSelect = document.getElementById('detailSortSelect');
+    if (sortSelect) sortSelect.value = orderSessionSort || 'updated_desc';
+    renderDetailBoardState();
+    if (!list) return;
+
+    if (!orderSessions.length) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">注文明細の進捗データはありません</div></div>';
+      renderDetailFilterNote();
+      return;
+    }
+
+    list.innerHTML = sortedOrderSessions().map(session => {
+      const required = orderRequiredBoxes(session);
+      const scanned = orderScannedBoxes(session);
+      const rate = required > 0 ? Math.min(100, Math.round(scanned / required * 100)) : 0;
+      const done = required > 0 && scanned >= required;
+      const statusClass = done ? 'done' : (scanned > 0 ? 'active' : 'empty');
+      const statusText = done ? '完了' : (scanned > 0 ? '処理中' : '未着手');
+      const customer = getOrderCustomerLabel(session);
+      const instructionDate = getOrderInstructionDate(session);
+      const deliveryBin = getOrderDeliveryBin(session);
+      const updated = session.updatedAt || session.createdAt;
+      const updatedText = updated ? new Date(updated).toLocaleString('ja-JP') : '-';
+      const detailCount = Array.isArray(session.details) ? session.details.length : 0;
+      const chips = (session.lines || []).slice(0, 5).map(line => {
+        const lineDone = Number(line.requiredBoxes) > 0 && Number(line.scanned) >= Number(line.requiredBoxes);
+        return `<span class="detail-line-chip ${lineDone ? 'done' : ''}">${escHtml(line.partNo || '-')} ${Number(line.scanned)||0}/${Number(line.requiredBoxes)||0}</span>`;
+      }).join('');
+      const more = session.lines.length > 5 ? `<span class="detail-line-chip">+${session.lines.length - 5}</span>` : '';
+      return `
+        <div class="detail-session-card ${session.sessionId === activeOrderSessionId ? 'active' : ''}"
+             onclick="selectOrderSession('${escJs(session.sessionId)}')">
+          <div class="detail-session-top">
+            <div class="detail-session-name">${escHtml(customer)} / ${escHtml(session.sessionId || '-')}</div>
+            <span class="detail-status ${statusClass}">${statusText}</span>
+          </div>
+          <div class="detail-progress-row">
+            <span>${escHtml(scanned)} / ${escHtml(required)}</span>
+            <div class="detail-progress-bar"><div class="detail-progress-fill" style="width:${rate}%"></div></div>
+            <span>${rate}%</span>
+          </div>
+          <div class="detail-session-meta">
+            <span>更新 ${escHtml(updatedText)}</span>
+            <span>指示日 ${escHtml(instructionDate)}</span>
+            <span>便 ${escHtml(deliveryBin)}</span>
+            <span>行 ${escHtml(session.lines.length)}</span>
+            <span>QR ${escHtml(detailCount)}</span>
+            <span>ログ ${escHtml(countLogsForSession(session.sessionId))}</span>
+          </div>
+          <div class="detail-lines">${chips}${more}</div>
+        </div>`;
+    }).join('');
+    renderDetailFilterNote();
+  }
+
+  function countLogsForSession(sessionId) {
+    return allLogs.filter(l => l.orderDetailSessionId === sessionId).length;
+  }
+
+  function selectOrderSession(sessionId) {
+    activeOrderSessionId = sessionId || '';
+    currentPage = 1;
+    renderOrderSessions();
+    applyFilter();
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function clearOrderSessionFilter() {
+    activeOrderSessionId = '';
+    currentPage = 1;
+    renderOrderSessions();
+    applyFilter();
+  }
+
+  function renderDetailFilterNote() {
+    const note = document.getElementById('detailFilterNote');
+    const text = document.getElementById('detailFilterText');
+    if (!note || !text) return;
+    if (!activeOrderSessionId) {
+      note.classList.remove('show');
+      return;
+    }
+    const session = orderSessions.find(s => s.sessionId === activeOrderSessionId);
+    const required = session ? orderRequiredBoxes(session) : 0;
+    const scanned = session ? orderScannedBoxes(session) : 0;
+    text.textContent = `明細セッションで絞り込み中: ${activeOrderSessionId} (${scanned}/${required})`;
+    note.classList.add('show');
+  }
+
+  function loadCustomerNameMaster(companyId) {
+    customerNameMaster = {};
+    if (!database || !companyId) return;
+    database.ref('qr_match_companies/customer_name_master/' + companyId).once('value', snap => {
+      customerNameMaster = snap.val() || {};
+      renderOrderSessions();
+    }, err => {
+      console.error('顧客名マスタ読み込みエラー:', err);
+    });
+  }
+
+  function collectCustomerIdsFromSessions() {
+    const ids = new Set(Object.keys(customerNameMaster || {}));
+    orderSessions.forEach(session => {
+      const id = getOrderCustomerId(session);
+      if (id) ids.add(id);
+    });
+    return [...ids].sort((a, b) => a.localeCompare(b, 'ja', { numeric: true }));
+  }
+
+  function openCustomerMasterModal() {
+    if (!activeCompany) {
+      alert('会社を選択してください');
+      return;
+    }
+    const ids = collectCustomerIdsFromSessions();
+    document.getElementById('modalTitle').textContent = '顧客名マスタ編集';
+    document.getElementById('modalBody').innerHTML = `
+      <div class="master-editor" id="customerMasterRows">
+        ${ids.map(id => customerMasterRowHtml(id, customerNameMaster[id] || '')).join('')}
+      </div>
+      <div class="master-actions">
+        <button class="filter-btn" onclick="addCustomerMasterRow()">追加</button>
+        <button class="filter-btn primary" onclick="saveCustomerNameMaster()">保存</button>
+      </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+
+  function customerMasterRowHtml(customerId = '', customerName = '') {
+    return `
+      <div class="master-row">
+        <input class="master-input customer-id-input" placeholder="顧客ID" value="${escHtml(customerId)}">
+        <input class="master-input customer-name-input" placeholder="顧客名" value="${escHtml(customerName)}">
+        <button class="filter-btn" onclick="this.closest('.master-row').remove()">削除</button>
+      </div>`;
+  }
+
+  function addCustomerMasterRow() {
+    const rows = document.getElementById('customerMasterRows');
+    if (!rows) return;
+    rows.insertAdjacentHTML('beforeend', customerMasterRowHtml('', ''));
+  }
+
+  function saveCustomerNameMaster() {
+    if (!activeCompany || !database) return;
+    const rows = [...document.querySelectorAll('#customerMasterRows .master-row')];
+    const next = {};
+    rows.forEach(row => {
+      const id = row.querySelector('.customer-id-input')?.value.trim();
+      const name = row.querySelector('.customer-name-input')?.value.trim();
+      if (id && name) next[id] = name;
+    });
+    database.ref('qr_match_companies/customer_name_master/' + activeCompany.id).set(next)
+      .then(() => {
+        customerNameMaster = next;
+        renderOrderSessions();
+        closeModal();
+      })
+      .catch(err => {
+        console.error('顧客名マスタ保存エラー:', err);
+        alert('顧客名マスタを保存できませんでした');
+      });
+  }
+
+  function applyFilter() {
+    const result   = document.getElementById('filterResult').value;
+    const dateFrom = document.getElementById('filterDateFrom').value;
+    const dateTo   = document.getElementById('filterDateTo').value;
+    const part     = document.getElementById('filterPart').value.trim().toLowerCase();
+
+    filteredLogs = allLogs.filter(l => {
+      if (activeOrderSessionId && l.orderDetailSessionId !== activeOrderSessionId) return false;
+      if (result !== 'all') {
+        const isDup = l.result === 'DUP' || l.isDuplicate;
+        if (result === 'DUP' && !isDup) return false;
+        if (result === 'OK' && (isDup || l.result !== 'OK')) return false;
+        if (result === 'NG' && (isDup || l.result !== 'NG')) return false;
+      }
+      if (dateFrom) {
+        if (new Date(l.timestamp) < new Date(dateFrom + 'T00:00:00')) return false;
+      }
+      if (dateTo) {
+        if (new Date(l.timestamp) > new Date(dateTo + 'T23:59:59')) return false;
+      }
+      if (part) {
+        const pn = (l.partNumber || '').toLowerCase();
+        const q1 = (l.qr1 || '').toLowerCase();
+        if (!pn.includes(part) && !q1.includes(part)) return false;
+      }
+      return true;
+    });
+
+    currentPage = 1;
+    updateSummary();
+    renderTable();
+  }
+
+  function resetFilter() {
+    document.getElementById('filterResult').value   = 'all';
+    document.getElementById('filterPart').value     = '';
+    const today   = new Date().toISOString().slice(0,10);
+    const weekAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);
+    document.getElementById('filterDateFrom').value = weekAgo;
+    document.getElementById('filterDateTo').value   = today;
+    applyFilter();
+  }
+
+  function changePerPage() {
+    perPage = parseInt(document.getElementById('perPageSelect').value);
+    currentPage = 1;
+    renderTable();
+  }
+
+  // ── サマリー ──
+  function updateSummary() {
+    const total = filteredLogs.length;
+    let ok = 0, ng = 0, dup = 0;
+    filteredLogs.forEach(l => {
+      if (l.result === 'DUP' || l.isDuplicate) dup++;
+      else if (l.result === 'OK') ok++;
+      else ng++;
+    });
+    const rate = total > 0 ? Math.round(ok / total * 1000) / 10 : 0;
+
+    document.getElementById('sumTotal').textContent = total.toLocaleString();
+    document.getElementById('sumOK').textContent    = ok.toLocaleString();
+    document.getElementById('sumNG').textContent    = ng.toLocaleString();
+    document.getElementById('sumDUP').textContent   = dup.toLocaleString();
+    document.getElementById('sumRate').textContent  = total > 0 ? rate + '%' : '—';
+
+    if (filteredLogs.length > 0) {
+      const oldest = new Date(filteredLogs[filteredLogs.length-1].timestamp).toLocaleDateString('ja-JP');
+      const newest = new Date(filteredLogs[0].timestamp).toLocaleDateString('ja-JP');
+      document.getElementById('sumDateRange').textContent =
+        oldest === newest ? oldest : oldest + ' 〜 ' + newest;
+    } else {
+      document.getElementById('sumDateRange').textContent = '—';
+    }
+  }
+
+  function resetSummary() {
+    ['sumTotal','sumOK','sumNG','sumDUP','sumRate'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('sumDateRange').textContent = '—';
+  }
+
+  // ── テーブル描画 ──
+  function formatOrderDetailLogText(l) {
+    if (!l.orderDetailActive && !l.orderDetailSessionId) return '—';
+    if (l.orderDetailRead) {
+      return `明細QR:${l.orderDetailReadResult || l.result || '-'} 行:${l.orderDetailLineCount ?? '-'}`;
+    }
+    if (l.orderDetailAction) {
+      return `${l.orderDetailAction} ${l.orderDetailScannedBoxes ?? '-'}/${l.orderDetailRequiredBoxes ?? '-'}`;
+    }
+    if (l.orderDetailCompleted) {
+      return `完了 ${l.orderDetailScannedBoxes ?? '-'}/${l.orderDetailRequiredBoxes ?? '-'}`;
+    }
+    const status = l.orderDetailResult ? `明細${l.orderDetailResult}` : '明細';
+    const count = l.orderDetailRequiredBoxes ? ` ${l.orderDetailScannedBoxes ?? 0}/${l.orderDetailRequiredBoxes}` : '';
+    const note = l.orderDetailNote ? ` ${l.orderDetailNote}` : '';
+    return `${status}${count}${note}`;
+  }
+
+  function renderTable() {
+    const total    = filteredLogs.length;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * perPage;
+    const slice = filteredLogs.slice(start, start + perPage);
+
+    document.getElementById('tableCount').textContent = total.toLocaleString() + '件';
+
+    if (total === 0) {
+      document.getElementById('logTableBody').innerHTML =
+        '<tr class="loading-row"><td colspan="8">' +
+        (allLogs.length === 0 ? 'データがありません' : 'フィルタ条件に一致するログがありません') +
+        '</td></tr>';
+      document.getElementById('pagination').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('logTableBody').innerHTML = slice.map((l, i) => {
+      const isDup = l.result === 'DUP' || l.isDuplicate;
+      const resClass = isDup ? 'dup' : (l.result === 'OK' ? 'ok' : 'ng');
+      const resLabel = isDup ? '⚠ DUP' : (l.result === 'OK' ? '✓ OK' : '✕ NG');
+      const t = new Date(l.timestamp).toLocaleString('ja-JP', {
+        month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+      });
+      const rule = l.matchedRule
+        ? `[${l.matchedRule.minLen}-${l.matchedRule.maxLen}] s${l.matchedRule.startPos} c${l.matchedRule.charCount}${l.matchedRule.prefix ? ' p:'+l.matchedRule.prefix : ''}`
+        : '—';
+      const qr1short = (l.qr1 || '').slice(0, 30) + ((l.qr1||'').length > 30 ? '…' : '');
+      const qr2short = (l.qr2 || '').slice(0, 30) + ((l.qr2||'').length > 30 ? '…' : '');
+      const detailText = formatOrderDetailLogText(l);
+      return `
+        <tr onclick="openModal(${start + i})">
+          <td class="td-time">${t}</td>
+          <td><span class="result-badge ${resClass}">${resLabel}</span></td>
+          <td class="td-part">${escHtml(l.partNumber || '—')}</td>
+          <td class="td-qr">${escHtml(qr1short)}</td>
+          <td class="td-qr">${escHtml(qr2short)}</td>
+          <td style="color:var(--text3)">${l.qr1Length ?? l.qr2Length ?? '—'}</td>
+          <td class="td-qr">${escHtml(detailText)}</td>
+          <td><span class="rule-text">${escHtml(rule)}</span></td>
+        </tr>`;
+    }).join('');
+
+    // ページネーション
+    const pag = document.getElementById('pagination');
+    pag.style.display = 'flex';
+    document.getElementById('pageInfo').textContent =
+      `${start+1}–${Math.min(start+perPage, total)} / ${total}件`;
+
+    const btns = document.getElementById('pageBtns');
+    const pages = buildPageNums(currentPage, totalPages);
+    btns.innerHTML = [
+      `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage<=1?'disabled':''}>‹</button>`,
+      ...pages.map(p => p === '…'
+        ? `<span style="color:var(--text3);padding:0 4px">…</span>`
+        : `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+      ),
+      `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>›</button>`
+    ].join('');
+  }
+
+  function buildPageNums(cur, total) {
+    if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+    const pages = [];
+    if (cur <= 4) {
+      pages.push(1,2,3,4,5,'…',total);
+    } else if (cur >= total-3) {
+      pages.push(1,'…',total-4,total-3,total-2,total-1,total);
+    } else {
+      pages.push(1,'…',cur-1,cur,cur+1,'…',total);
+    }
+    return pages;
+  }
+
+  function goPage(p) {
+    const total = Math.ceil(filteredLogs.length / perPage);
+    if (p < 1 || p > total) return;
+    currentPage = p;
+    renderTable();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  // ── 詳細モーダル ──
+  function openModal(idx) {
+    const l = filteredLogs[idx];
+    if (!l) return;
+    const isDup = l.result === 'DUP' || l.isDuplicate;
+    const resClass = isDup ? 'dup' : (l.result === 'OK' ? 'ok' : 'ng');
+    const resLabel = isDup ? '⚠ DUP' : (l.result === 'OK' ? '✓ OK' : '✕ NG');
+
+    document.getElementById('modalTitle').innerHTML =
+      `照合詳細 <span class="result-badge ${resClass}">${resLabel}</span>`;
+
+    const rule = l.matchedRule
+      ? `[${l.matchedRule.minLen}-${l.matchedRule.maxLen}] start=${l.matchedRule.startPos} count=${l.matchedRule.charCount}${l.matchedRule.prefix ? ' prefix="'+l.matchedRule.prefix+'"' : ''}`
+      : '(ルールなし)';
+
+    const rows = [
+      ['日時',         new Date(l.timestamp).toLocaleString('ja-JP')],
+      ['抽出品番',     l.partNumber || '—'],
+      ['1回目QR(raw)', l.qr1_raw || '—'],
+      ['2回目QR(raw)', l.qr2_raw || '—'],
+      ['1回目QR(正規化)', l.qr1 || '—'],
+      ['2回目QR(正規化)', l.qr2 || '—'],
+      ['QR1文字数',    l.qr1Length ?? '—'],
+      ['QR2文字数',    l.qr2Length ?? '—'],
+      ['適用ルール',   rule],
+      ['note',         l.extractNote || '—'],
+      ['明細セッション', l.orderDetailSessionId || '—'],
+      ['明細結果',      l.orderDetailResult || l.orderDetailReadResult || '—'],
+      ['明細メモ',      l.orderDetailNote || l.orderDetailAction || '—'],
+      ['明細進捗',      l.orderDetailRequiredBoxes ? `${l.orderDetailScannedBoxes ?? 0}/${l.orderDetailRequiredBoxes}` : '—'],
+      ['明細完了',      l.orderDetailCompleted ? 'YES' : '—'],
+      ['重複タイプ',   l.dupType || '—'],
+    ];
+
+    document.getElementById('modalBody').innerHTML = rows.map(([k,v]) => `
+      <div class="modal-row">
+        <div class="modal-key">${escHtml(k)}</div>
+        <div class="modal-val">${escHtml(String(v))}</div>
+      </div>
+    `).join('');
+
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('show');
+  }
+  function closeModalOnBg(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+
+  // ── CSV出力 ──
+  function exportCSV() {
+    if (!activeCompany) { alert('会社を選択してください'); return; }
+    if (filteredLogs.length === 0) { alert('出力するデータがありません'); return; }
+
+    const headers = ['日時','結果','重複','抽出品番','1回目QR(raw)','2回目QR(raw)','1回目QR(正規化)','2回目QR(正規化)','QR1文字数','QR2文字数','ルール','note','明細セッション','明細結果','明細メモ','明細完了','明細必要','明細読込'];
+    const rows = filteredLogs.map(l => {
+      const isDup = l.result === 'DUP' || l.isDuplicate;
+      const rule = l.matchedRule ? JSON.stringify(l.matchedRule) : '';
+      return [
+        new Date(l.timestamp).toLocaleString('ja-JP'),
+        isDup ? 'DUP' : (l.result || ''),
+        isDup ? (l.dupType || '重複') : '',
+        l.partNumber ?? '',
+        l.qr1_raw ?? '', l.qr2_raw ?? '',
+        l.qr1 ?? '', l.qr2 ?? '',
+        l.qr1Length ?? '', l.qr2Length ?? '',
+        rule, l.extractNote ?? '',
+        l.orderDetailSessionId ?? '',
+        l.orderDetailResult ?? l.orderDetailReadResult ?? '',
+        l.orderDetailNote ?? l.orderDetailAction ?? '',
+        l.orderDetailCompleted ?? '',
+        l.orderDetailRequiredBoxes ?? '',
+        l.orderDetailScannedBoxes ?? ''
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
+      .join('\n');
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type:'text/csv' }));
+    a.download = `QR照合ログ_${activeCompany.name}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, m =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function escJs(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+  }
+</script>
+</body>
+</html>
