@@ -80,7 +80,7 @@
         <div class="field"><label>整理No（複数選択可）</label><select id="serialFilter" multiple size="5"></select></div>
         <div class="field"><label>保全単位フィルター</label><select id="maintenanceFilter"><option value="all">すべて</option><option value="mold">金型トラブル（保全単位あり）</option><option value="nonMold">金型以外（保全単位なし）</option></select></div>
         <div class="field"><label>内訳グラフの縦軸</label><select id="breakdownMetric"><option value="count">件数</option><option value="stop">停止時間</option></select></div>
-        <div class="field"><label>表示する整理No数</label><select id="topN"><option value="8">上位8件</option><option value="12" selected>上位12件</option><option value="20">上位20件</option><option value="9999">すべて</option></select></div>
+        <div class="field"><label>表示する項目数</label><select id="topN"><option value="8">上位8件</option><option value="12" selected>上位12件</option><option value="20">上位20件</option><option value="9999">すべて</option></select></div>
         <div class="field"><button id="btnRefresh" style="width:100%;">再読み込み</button></div>
       </div>
       <div class="summary">
@@ -92,7 +92,7 @@
       <div class="grid">
         <section class="panel"><h2>月ごと・部署ごとの異常件数 <span class="hint">棒をクリックで詳細</span></h2><div class="chart-wrap" id="countChart"></div></section>
         <section class="panel"><h2>月ごと・部署ごとの異常停止時間 <span class="hint">棒をクリックで詳細</span></h2><div class="chart-wrap" id="stopChart"></div></section>
-        <section class="panel"><h2>整理Noごとのライン別内訳 <span class="hint">横軸: 整理No</span></h2><div class="chart-wrap" id="lineChart"></div></section>
+        <section class="panel"><h2>ラインごとの異常件数 <span class="hint">横軸: ライン名</span></h2><div class="chart-wrap" id="lineChart"></div></section>
         <section class="panel"><h2>整理Noごとの部署別内訳 <span class="hint">横軸: 整理No</span></h2><div class="chart-wrap" id="serialChart"></div></section>
       </div>
       <section class="details"><h2 id="detailTitle">詳細一覧</h2><div class="table-wrap" id="detailTable"></div></section>
@@ -201,7 +201,7 @@
       updateMetrics(rows);
       renderCountChart(rows);
       renderStopChart(rows);
-      renderSerialAxisBreakdown(rows, 'lineName', 'lineChart', 'ライン別内訳');
+      renderLineChart(rows);
       renderSerialAxisBreakdown(rows, 'department', 'serialChart', '部署別内訳');
       renderDetails(rows, '現在のフィルター条件の詳細一覧');
     }
@@ -223,6 +223,19 @@
       const { months, departments } = monthDeptKeys(rows);
       const datasets = departments.map((dept, idx) => ({ label: dept, data: months.map(month => rows.filter(r => r.month === month && r.department === dept).reduce((sum, r) => sum + r.stopMinutes, 0)), color: palette(idx) }));
       makeSvgChart('stopChart', months, datasets, '分', (month, dept) => renderDetails(rows.filter(r => r.month === month && r.department === dept), `停止時間: ${month} / ${dept}`));
+    }
+    function renderLineChart(rows) {
+      const topN = Number(els.topN.value || 12);
+      const lineTotals = new Map();
+      rows.forEach(row => lineTotals.set(row.lineName, (lineTotals.get(row.lineName) || 0) + metricValue(row)));
+      const lines = Array.from(lineTotals.entries()).sort((a, b) => b[1] - a[1]).slice(0, topN).map(([line]) => line);
+      const departments = Array.from(new Set(rows.map(r => r.department))).sort((a, b) => a.localeCompare(b, 'ja'));
+      const datasets = departments.map((dept, idx) => ({
+        label: dept,
+        data: lines.map(line => rows.filter(r => r.lineName === line && r.department === dept).reduce((sum, r) => sum + metricValue(r), 0)),
+        color: palette(idx)
+      }));
+      makeSvgChart('lineChart', lines, datasets, metricUnit(), (line, dept) => renderDetails(rows.filter(r => r.lineName === line && r.department === dept), `ラインごとの異常${metricUnit() === '分' ? '停止時間' : '件数'}: ${line} / ${dept}`));
     }
     function renderSerialAxisBreakdown(rows, field, chartId, title) {
       const topN = Number(els.topN.value || 12);
