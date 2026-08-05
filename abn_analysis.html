@@ -146,6 +146,10 @@
 
     function q(id) { return document.getElementById(id); }
     function selectedValues(select) { return Array.from(select.selectedOptions).map(o => o.value).filter(Boolean); }
+    function applySingleFilter(select, value) {
+      Array.from(select.options).forEach(option => option.selected = option.value === value);
+      renderAll();
+    }
     function toMonth(value) { const raw = String(value || '').trim(); return /^\d{4}-\d{2}/.test(raw) ? raw.slice(0, 7) : '日付なし'; }
     function calcStopMinutes(item) {
       const ot = item.occurrenceTime || '', rt = item.restartTime || '';
@@ -235,7 +239,7 @@
         data: lines.map(line => rows.filter(r => r.lineName === line && r.department === dept).reduce((sum, r) => sum + metricValue(r), 0)),
         color: palette(idx)
       }));
-      makeSvgChart('lineChart', lines, datasets, metricUnit(), (line, dept) => renderDetails(rows.filter(r => r.lineName === line && r.department === dept), `ラインごとの異常${metricUnit() === '分' ? '停止時間' : '件数'}: ${line} / ${dept}`));
+      makeSvgChart('lineChart', lines, datasets, metricUnit(), line => applySingleFilter(els.lineFilter, line));
     }
     function renderSerialAxisBreakdown(rows, field, chartId, title) {
       const topN = Number(els.topN.value || 12);
@@ -248,7 +252,7 @@
         data: serials.map(serial => rows.filter(r => r.serialNo === serial && r[field] === group).reduce((sum, r) => sum + metricValue(r), 0)),
         color: palette(idx)
       }));
-      makeSvgChart(chartId, serials, datasets, metricUnit(), (serial, group) => renderDetails(rows.filter(r => r.serialNo === serial && r[field] === group), `${title}: 整理No ${serial} / ${group}`));
+      makeSvgChart(chartId, serials, datasets, metricUnit(), serial => applySingleFilter(els.serialFilter, serial));
     }
     function makeSvgChart(chartId, labels, datasets, unit, onClick) {
       const wrap = q(chartId);
