@@ -20,7 +20,7 @@
     .auth-card h2{margin:0 0 14px;color:#0f172a;font-size:1.15rem}
     .auth-card input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:6px;margin:6px 0 10px;font-size:1rem}
     .error{color:#b91c1c;font-size:.9rem;margin-top:8px;min-height:20px}
-    .filters{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;display:grid;grid-template-columns:repeat(7,minmax(132px,1fr));gap:12px;align-items:end;margin-bottom:16px}
+    .filters{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:14px;display:grid;grid-template-columns:repeat(9,minmax(132px,1fr));gap:12px;align-items:end;margin-bottom:16px}
     .field label{display:block;font-size:.78rem;font-weight:800;color:#475569;margin-bottom:5px}
     .field input,.field select{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.95rem}
     .field select[multiple]{height:118px;padding:6px}
@@ -76,6 +76,8 @@
         <div class="field"><label>開始月</label><input type="month" id="monthFrom"></div>
         <div class="field"><label>終了月</label><input type="month" id="monthTo"></div>
         <div class="field"><label>部署（複数選択可）</label><select id="departmentFilter" multiple size="5"></select></div>
+        <div class="field"><label>ライン（複数選択可）</label><select id="lineFilter" multiple size="5"></select></div>
+        <div class="field"><label>整理No（複数選択可）</label><select id="serialFilter" multiple size="5"></select></div>
         <div class="field"><label>保全単位フィルター</label><select id="maintenanceFilter"><option value="all">すべて</option><option value="mold">金型トラブル（保全単位あり）</option><option value="nonMold">金型以外（保全単位なし）</option></select></div>
         <div class="field"><label>内訳グラフの縦軸</label><select id="breakdownMetric"><option value="count">件数</option><option value="stop">停止時間</option></select></div>
         <div class="field"><label>表示する整理No数</label><select id="topN"><option value="8">上位8件</option><option value="12" selected>上位12件</option><option value="20">上位20件</option><option value="9999">すべて</option></select></div>
@@ -109,14 +111,14 @@
 
     const els = {
       authGate: q('authGate'), appRoot: q('appRoot'), userChip: q('userChip'), authMsg: q('authMsg'),
-      monthFrom: q('monthFrom'), monthTo: q('monthTo'), departmentFilter: q('departmentFilter'), maintenanceFilter: q('maintenanceFilter'),
+      monthFrom: q('monthFrom'), monthTo: q('monthTo'), departmentFilter: q('departmentFilter'), lineFilter: q('lineFilter'), serialFilter: q('serialFilter'), maintenanceFilter: q('maintenanceFilter'),
       breakdownMetric: q('breakdownMetric'), topN: q('topN'), detailTitle: q('detailTitle'), detailTable: q('detailTable')
     };
 
     q('btnOpenInput').addEventListener('click', () => location.href = 'abnreport.html');
     q('btnSignOut').addEventListener('click', () => signOut(auth));
     q('btnRefresh').addEventListener('click', loadData);
-    [els.monthFrom, els.monthTo, els.departmentFilter, els.maintenanceFilter, els.breakdownMetric, els.topN].forEach(el => el.addEventListener('change', renderAll));
+    [els.monthFrom, els.monthTo, els.departmentFilter, els.lineFilter, els.serialFilter, els.maintenanceFilter, els.breakdownMetric, els.topN].forEach(el => el.addEventListener('change', renderAll));
     q('btnLogin').addEventListener('click', async () => {
       els.authMsg.textContent = '';
       try {
@@ -176,14 +178,23 @@
       const months = Array.from(new Set(allRows.map(r => r.month).filter(m => m !== '日付なし'))).sort();
       if (months.length && !els.monthFrom.value) els.monthFrom.value = months[0];
       if (months.length && !els.monthTo.value) els.monthTo.value = months[months.length - 1];
-      const selected = selectedValues(els.departmentFilter);
+      const selectedDepartments = selectedValues(els.departmentFilter);
+      const selectedLines = selectedValues(els.lineFilter);
+      const selectedSerials = selectedValues(els.serialFilter);
       const departments = Array.from(new Set(allRows.map(r => r.department))).sort((a, b) => a.localeCompare(b, 'ja'));
-      els.departmentFilter.innerHTML = departments.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
-      Array.from(els.departmentFilter.options).forEach(option => option.selected = selected.length ? selected.includes(option.value) : true);
+      const lines = Array.from(new Set(allRows.map(r => r.lineName))).sort((a, b) => a.localeCompare(b, 'ja'));
+      const serials = Array.from(new Set(allRows.map(r => r.serialNo))).sort((a, b) => a.localeCompare(b, 'ja'));
+      populateMultiFilter(els.departmentFilter, departments, selectedDepartments);
+      populateMultiFilter(els.lineFilter, lines, selectedLines);
+      populateMultiFilter(els.serialFilter, serials, selectedSerials);
+    }
+    function populateMultiFilter(select, values, selected) {
+      select.innerHTML = values.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+      Array.from(select.options).forEach(option => option.selected = selected.length ? selected.includes(option.value) : true);
     }
     function getFilteredRows() {
-      const from = els.monthFrom.value || '', to = els.monthTo.value || '', departments = selectedValues(els.departmentFilter), trouble = els.maintenanceFilter.value;
-      return allRows.filter(row => (!from || row.month === '日付なし' || row.month >= from) && (!to || row.month === '日付なし' || row.month <= to) && (!departments.length || departments.includes(row.department)) && (trouble === 'all' || row.troubleType === trouble));
+      const from = els.monthFrom.value || '', to = els.monthTo.value || '', departments = selectedValues(els.departmentFilter), lines = selectedValues(els.lineFilter), serials = selectedValues(els.serialFilter), trouble = els.maintenanceFilter.value;
+      return allRows.filter(row => (!from || row.month === '日付なし' || row.month >= from) && (!to || row.month === '日付なし' || row.month <= to) && (!departments.length || departments.includes(row.department)) && (!lines.length || lines.includes(row.lineName)) && (!serials.length || serials.includes(row.serialNo)) && (trouble === 'all' || row.troubleType === trouble));
     }
     function renderAll() {
       const rows = getFilteredRows();
