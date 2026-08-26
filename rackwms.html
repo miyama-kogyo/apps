@@ -36,6 +36,106 @@ button, input, select, textarea {
   font-size: inherit;
 }
 
+/* ===== 端末認証オーバーレイ ===== */
+#device-auth-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0a0d14;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  padding: 24px;
+}
+#device-auth-overlay.hidden { display: none; }
+
+.auth-card {
+  background: #181c25;
+  border: 1px solid #2a3040;
+  border-radius: 16px;
+  padding: 32px 28px;
+  width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.auth-logo {
+  text-align: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 22px; font-weight: 700;
+  color: #f5a623; letter-spacing: 3px;
+}
+.auth-logo span { display: block; font-size: 11px; color: #6b7a8d; letter-spacing: 1px; margin-top: 2px; font-family: 'Noto Sans JP', sans-serif; font-weight: 400; }
+.auth-badge {
+  background: rgba(231,76,60,0.1);
+  border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13px; color: #e74c3c; text-align: center; line-height: 1.6;
+}
+.auth-device-id-box {
+  background: #0f1117;
+  border: 1px solid #2a3040;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 11px; color: #6b7a8d; text-align: center;
+}
+.auth-device-id-box strong {
+  display: block;
+  font-size: 13px; color: #e8ecf0; letter-spacing: 1px; margin-top: 4px;
+  word-break: break-all; font-family: monospace;
+}
+.auth-divider {
+  height: 1px; background: #2a3040; margin: 4px 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: #2a3040;
+}
+.auth-divider-text { font-size: 11px; color: #3a4455; white-space: nowrap; }
+
+.auth-admin-section { display: flex; flex-direction: column; gap: 10px; }
+.auth-label { font-size: 11px; color: #6b7a8d; font-weight: 700; letter-spacing: 0.5px; }
+.auth-input {
+  width: 100%;
+  background: #0f1117; border: 1px solid #2a3040; border-radius: 8px;
+  padding: 10px 12px; color: #e8ecf0; font-size: 14px;
+  outline: none; transition: border-color 0.2s;
+}
+.auth-input:focus { border-color: #f5a623; }
+.auth-btn {
+  width: 100%; padding: 12px;
+  border-radius: 8px; border: none; cursor: pointer;
+  font-size: 14px; font-weight: 700; font-family: 'Noto Sans JP', sans-serif;
+  transition: all 0.2s; letter-spacing: 0.5px;
+}
+.auth-btn-primary { background: #f5a623; color: #0f1117; }
+.auth-btn-primary:active { opacity: 0.8; }
+.auth-btn-danger  { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+.auth-btn-danger:active { background: rgba(231,76,60,0.25); }
+.auth-btn-ghost   { background: transparent; color: #6b7a8d; border: 1px solid #2a3040; }
+.auth-btn-ghost:active { background: rgba(255,255,255,0.04); }
+.auth-error-msg   { font-size: 12px; color: #e74c3c; text-align: center; min-height: 16px; }
+.auth-success-msg { font-size: 12px; color: #2ecc71; text-align: center; min-height: 16px; }
+
+.admin-panel { display: flex; flex-direction: column; gap: 14px; }
+.admin-panel-title { font-size: 13px; font-weight: 700; color: #f5a623; }
+.device-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+.device-item {
+  display: flex; align-items: center; gap: 10px;
+  background: #0f1117; border: 1px solid #2a3040; border-radius: 8px;
+  padding: 10px 12px;
+}
+.device-item-info { flex: 1; min-width: 0; }
+.device-item-label { font-size: 13px; color: #e8ecf0; font-weight: 700; }
+.device-item-id { font-size: 10px; color: #6b7a8d; font-family: monospace; word-break: break-all; }
+.device-item-me { font-size: 10px; color: #2ecc71; }
+.device-del-btn {
+  background: transparent; border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 6px; padding: 4px 10px;
+  color: #e74c3c; font-size: 12px; cursor: pointer; flex-shrink: 0;
+}
+.device-del-btn:active { background: rgba(231,76,60,0.15); }
+.auth-row { display: flex; gap: 8px; }
+.auth-row .auth-input { flex: 1; }
+.auth-row .auth-btn  { flex-shrink: 0; width: auto; padding: 10px 16px; }
+.auth-loading { text-align: center; font-size: 13px; color: #6b7a8d; padding: 20px 0; }
+
 body {
   height: 100%;
   height: 100dvh;
@@ -2973,6 +3073,65 @@ input.inv-qty:focus { border-color: var(--accent) !important; }
   tabindex="-1" />
 
 <button class="tab-hide-btn" id="tab-hide-btn" onclick="toggleTabBar()" title="メニュー表示切替">☰</button>
+
+<!-- ===== 端末認証オーバーレイ ===== -->
+<div id="device-auth-overlay">
+  <div class="auth-card" id="auth-card-loading">
+    <div class="auth-logo">RACK WMS<span>ミヤマ工業株式会社</span></div>
+    <div class="auth-loading">🔐 端末認証を確認しています...</div>
+  </div>
+
+  <div class="auth-card" id="auth-card-blocked" style="display:none;">
+    <div class="auth-logo">RACK WMS<span>ミヤマ工業株式会社</span></div>
+    <div class="auth-badge">⛔ この端末は利用が許可されていません<br>管理者に端末IDを連絡して承認を依頼してください</div>
+    <div class="auth-device-id-box">
+      あなたの端末ID
+      <strong id="auth-my-device-id">-</strong>
+    </div>
+    <div class="auth-divider"><span class="auth-divider-text">管理者の方はここからログイン</span></div>
+    <div class="auth-admin-section" id="auth-login-form">
+      <div class="auth-label">管理者パスワード</div>
+      <input class="auth-input" type="password" id="auth-pass-input" placeholder="パスワードを入力">
+      <div class="auth-error-msg" id="auth-pass-error"></div>
+      <button class="auth-btn auth-btn-primary" onclick="authAdminLogin()">🔑 管理者ログイン</button>
+    </div>
+
+    <div class="admin-panel" id="auth-admin-panel" style="display:none;">
+      <div class="admin-panel-title">🛡 管理者モード - 端末管理</div>
+
+      <div>
+        <div class="auth-label" style="margin-bottom:6px;">登録済み端末</div>
+        <div class="device-list" id="auth-device-list">
+          <div class="auth-loading">読み込み中...</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="auth-label" style="margin-bottom:6px;">端末を追加承認</div>
+        <div class="auth-row">
+          <input class="auth-input" type="text" id="auth-new-device-id" placeholder="端末ID">
+          <button class="auth-btn auth-btn-primary" style="white-space:nowrap;" onclick="authAddDevice()">追加</button>
+        </div>
+        <div style="margin-top:6px;">
+          <input class="auth-input" type="text" id="auth-new-device-label" placeholder="端末名（例: 入荷PC、倉庫タブレット）">
+        </div>
+        <div class="auth-success-msg" id="auth-add-msg"></div>
+      </div>
+
+      <div>
+        <div class="auth-label" style="margin-bottom:6px;">管理者パスワード変更</div>
+        <div class="auth-row">
+          <input class="auth-input" type="password" id="auth-new-pass" placeholder="新しいパスワード">
+          <button class="auth-btn auth-btn-ghost" style="white-space:nowrap;" onclick="authChangePass()">変更</button>
+        </div>
+        <div class="auth-success-msg" id="auth-pass-change-msg"></div>
+      </div>
+
+      <button class="auth-btn auth-btn-ghost" onclick="authApproveMyDevice()">✅ この端末を承認して続行</button>
+      <button class="auth-btn auth-btn-ghost" onclick="authAdminLogout()" style="font-size:12px;">ログアウト</button>
+    </div>
+  </div>
+</div>
 
 <div class="app-wrapper">
 
@@ -6372,6 +6531,185 @@ document.getElementById('new-shelf').addEventListener('keydown', e => { if(e.key
   }catch(e){
     console.warn(e);
     setStatus('未接続', '#e74c3c');
+  }
+
+  /* =====================================================
+     端末認証 - Device Auth
+     ===================================================== */
+  const DEV_COL = 'allowedDevices';
+
+  function getOrCreateDeviceId(){
+    let id = localStorage.getItem('wms_device_id');
+    if(!id){
+      id = 'D-' + crypto.randomUUID().replace(/-/g,'').substring(0,16).toUpperCase();
+      localStorage.setItem('wms_device_id', id);
+    }
+    return id;
+  }
+
+  const MY_DEVICE_ID = getOrCreateDeviceId();
+  document.getElementById('auth-my-device-id').textContent = MY_DEVICE_ID;
+
+  async function fetchAdminPass(){
+    try{
+      const snap = await getDoc(doc(db, 'sysConfig', 'deviceAuth'));
+      if(snap.exists() && snap.data().adminPass) return snap.data().adminPass;
+    }catch(e){}
+    const defaultPass = 'MIYAMA2024';
+    try{
+      await setDoc(doc(db, 'sysConfig', 'deviceAuth'), { adminPass: defaultPass });
+    }catch(e){}
+    return defaultPass;
+  }
+
+  async function checkDeviceAuth(){
+    try{
+      const snap = await getDoc(doc(db, DEV_COL, MY_DEVICE_ID));
+      return snap.exists();
+    }catch(e){
+      return false;
+    }
+  }
+
+  function unlockApp(){
+    document.getElementById('device-auth-overlay').classList.add('hidden');
+  }
+
+  function showBlockScreen(){
+    document.getElementById('auth-card-loading').style.display = 'none';
+    document.getElementById('auth-card-blocked').style.display = '';
+  }
+
+  window.authAdminLogin = async function(){
+    const input = document.getElementById('auth-pass-input').value.trim();
+    const errEl = document.getElementById('auth-pass-error');
+    if(!input){ errEl.textContent = 'パスワードを入力してください'; return; }
+    errEl.textContent = '確認中...';
+    const correct = await fetchAdminPass();
+    if(input !== correct){
+      errEl.textContent = 'パスワードが違います';
+      document.getElementById('auth-pass-input').value = '';
+      return;
+    }
+    errEl.textContent = '';
+    document.getElementById('auth-login-form').style.display = 'none';
+    document.getElementById('auth-admin-panel').style.display = '';
+    document.getElementById('auth-new-device-id').value = MY_DEVICE_ID;
+    authLoadDeviceList();
+  };
+
+  window.authAdminLogout = function(){
+    document.getElementById('auth-pass-input').value = '';
+    document.getElementById('auth-login-form').style.display = '';
+    document.getElementById('auth-admin-panel').style.display = 'none';
+  };
+
+  async function authLoadDeviceList(){
+    const listEl = document.getElementById('auth-device-list');
+    listEl.innerHTML = '<div class="auth-loading">読み込み中...</div>';
+    try{
+      const snap = await getDocs(collection(db, DEV_COL));
+      const devices = snap.docs.map(d => d.data());
+      if(!devices.length){
+        listEl.innerHTML = '<div class="auth-loading" style="color:#6b7a8d;">登録済み端末はありません</div>';
+        return;
+      }
+      listEl.innerHTML = devices.map(d => `
+        <div class="device-item">
+          <div class="device-item-info">
+            <div class="device-item-label">${escapeHtml(d.label||'（名前なし）')}</div>
+            <div class="device-item-id">${escapeHtml(d.deviceId)}</div>
+            ${d.deviceId === MY_DEVICE_ID ? '<div class="device-item-me">← この端末</div>' : ''}
+          </div>
+          <button class="device-del-btn" onclick="authRemoveDevice('${escapeHtml(d.deviceId)}')">削除</button>
+        </div>
+      `).join('');
+    }catch(e){
+      listEl.innerHTML = '<div class="auth-loading" style="color:#e74c3c;">読み込みエラー</div>';
+    }
+  }
+
+  window.authAddDevice = async function(){
+    const devId = document.getElementById('auth-new-device-id').value.trim().toUpperCase();
+    const label = document.getElementById('auth-new-device-label').value.trim();
+    const msgEl = document.getElementById('auth-add-msg');
+    if(!devId){ msgEl.style.color='#e74c3c'; msgEl.textContent='端末IDを入力してください'; return; }
+    msgEl.textContent = '登録中...';
+    msgEl.style.color = '#6b7a8d';
+    try{
+      await setDoc(doc(db, DEV_COL, devId), {
+        deviceId: devId,
+        label: label || '（名前なし）',
+        approvedAt: serverTimestamp()
+      });
+      msgEl.style.color = '#2ecc71';
+      msgEl.textContent = `✅ ${devId} を登録しました`;
+      document.getElementById('auth-new-device-id').value = '';
+      document.getElementById('auth-new-device-label').value = '';
+      authLoadDeviceList();
+    }catch(e){
+      msgEl.style.color = '#e74c3c';
+      msgEl.textContent = '登録に失敗しました';
+    }
+  };
+
+  window.authRemoveDevice = async function(devId){
+    if(!confirm(`端末 ${devId} の承認を取り消しますか？`)) return;
+    try{
+      await deleteDoc(doc(db, DEV_COL, devId));
+      authLoadDeviceList();
+    }catch(e){
+      alert('削除に失敗しました');
+    }
+  };
+
+  window.authApproveMyDevice = async function(){
+    const label = document.getElementById('auth-new-device-label').value.trim() ||
+                  document.getElementById('auth-new-device-id').value.trim() || '（名前なし）';
+    try{
+      await setDoc(doc(db, DEV_COL, MY_DEVICE_ID), {
+        deviceId: MY_DEVICE_ID,
+        label,
+        approvedAt: serverTimestamp()
+      });
+      unlockApp();
+    }catch(e){
+      alert('承認に失敗しました: ' + e.message);
+    }
+  };
+
+  window.authChangePass = async function(){
+    const newPass = document.getElementById('auth-new-pass').value.trim();
+    const msgEl = document.getElementById('auth-pass-change-msg');
+    if(!newPass || newPass.length < 6){
+      msgEl.style.color='#e74c3c';
+      msgEl.textContent='6文字以上で入力してください';
+      return;
+    }
+    try{
+      await setDoc(doc(db, 'sysConfig', 'deviceAuth'), { adminPass: newPass }, { merge: true });
+      msgEl.style.color='#2ecc71';
+      msgEl.textContent='✅ パスワードを変更しました';
+      document.getElementById('auth-new-pass').value = '';
+    }catch(e){
+      msgEl.style.color='#e74c3c';
+      msgEl.textContent='変更に失敗しました';
+    }
+  };
+
+  function escapeHtml(str){
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  document.getElementById('auth-pass-input').addEventListener('keydown', e => {
+    if(e.key === 'Enter') window.authAdminLogin();
+  });
+
+  const isAllowed = await checkDeviceAuth();
+  if(isAllowed){
+    unlockApp();
+  } else {
+    showBlockScreen();
   }
 
   const INV  = 'shelfInventory';
