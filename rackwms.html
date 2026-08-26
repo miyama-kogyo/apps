@@ -2377,7 +2377,10 @@ input.inv-qty:focus { border-color: var(--accent) !important; }
   font-size: 10px;
   color: var(--muted) !important;
   -webkit-text-fill-color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.45;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
 }
 .inv-session-history-actions { display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
 .inv-session-history-btn {
@@ -2397,6 +2400,51 @@ input.inv-qty:focus { border-color: var(--accent) !important; }
   color: var(--green) !important;
   -webkit-text-fill-color: var(--green);
   background: rgba(46,204,113,0.1) !important;
+}
+@media (max-width: 520px) {
+  #inv-session-history {
+    max-height: min(38dvh, 320px);
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .inv-session-history-list { gap: 5px; }
+  .inv-session-date-heading {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--card) !important;
+    font-size: 10px;
+    margin: 2px 0 -1px;
+    padding: 3px 0;
+  }
+  .inv-session-history-item {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 7px 8px;
+  }
+  .inv-session-history-id {
+    font-size: 13px;
+    letter-spacing: .3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .inv-session-history-meta {
+    font-size: 9px;
+    line-height: 1.35;
+    gap: 2px 8px;
+  }
+  .inv-session-history-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+    gap: 4px;
+  }
+  .inv-session-history-btn {
+    min-height: 28px;
+    padding: 4px 5px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
 }
 .inv-sync-indicator {
   font-size: 9px;
@@ -6130,7 +6178,7 @@ async function invRenderSessionHistory(){
       const incomplete = total === 0 || done < total;
       const canResume = s.status !== 'active' && incomplete;
       const cls = isCurrent ? ' active' : '';
-      const dur = s.durationMs ? ` / 所要 ${invFmtElapsed(s.durationMs)}` : '';
+      const dur = s.durationMs ? `<span>所要 ${invFmtElapsed(s.durationMs)}</span>` : '';
       const resumeBtn = canResume
         ? `<button class="inv-session-history-btn resume" onclick="invResumeSession('${escJsSingle(s.sessionId)}')">再開</button>`
         : '';
@@ -6140,8 +6188,11 @@ async function invRenderSessionHistory(){
         <div class="inv-session-history-main">
           <div class="inv-session-history-id">${escHtml(s.sessionId)}</div>
           <div class="inv-session-history-meta">
-            ${escHtml(statusLabel[s.status] || s.status || '-')}${dur}<br>
-            ${done} / ${total} 棚　差異 ${diff}　空き ${empty}
+            <span>${escHtml(statusLabel[s.status] || s.status || '-')}</span>
+            ${dur}
+            <span>${done} / ${total} 棚</span>
+            <span>差異 ${diff}</span>
+            <span>空き ${empty}</span>
           </div>
         </div>
         <div class="inv-session-history-actions">
