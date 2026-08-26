@@ -5615,6 +5615,14 @@ function invIsSessionIncomplete(session){
   return total === 0 || done < total;
 }
 
+function invFindTodaySession(sessions=invSessionsCache){
+  const today = invLocalDateKey();
+  return (sessions || [])
+    .map(s => ({ ...s, inventoryDate: invGetSessionDate(s) }))
+    .filter(s => s.inventoryDate === today)
+    .sort((a,b)=>(b.startedAtMs||0)-(a.startedAtMs||0))[0] || null;
+}
+
 async function invSaveSessionState(extra={}){
   if(!invSession) return;
   const merged = { ...invSession, ...extra };
@@ -5632,9 +5640,17 @@ async function invStartSession(){
     const todaySessions = sessions
       .filter(s => invGetSessionDate(s) === today)
       .sort((a,b)=>(b.startedAtMs||0)-(a.startedAtMs||0));
-    const resumable = todaySessions.find(s => s.status !== 'active' && invIsSessionIncomplete(s));
-    if(resumable && confirm(`本日 ${today} の未完了セッションがあります。\n${resumable.sessionId} を途中から再開しますか？`)){
-      await invResumeSession(resumable.sessionId);
+    const todaySession = todaySessions[0];
+    if(todaySession && todaySession.status !== 'active'){
+      await invResumeSession(todaySession.sessionId);
+      return;
+    }
+    if(todaySession && todaySession.status === 'active'){
+      invSession = { ...todaySession, inventoryDate: invGetSessionDate(todaySession) };
+      await invLoadResults();
+      renderInv();
+      invStartPolling();
+      invStartElapsedTimer();
       return;
     }
   }catch(e){ console.warn(e); }
@@ -5782,9 +5798,10 @@ function invUpdateBanner(){
     if(idleEl)   idleEl.style.display   = '';
     if(activeEl) activeEl.style.display = 'none';
     if(!invSession){
+      const todaySession = invFindTodaySession();
       if(title)    title.textContent = '📋 棚卸しセッション';
-      if(meta)     meta.textContent  = 'セッションなし — 開始ボタンで棚卸しを始めます';
-      if(btnStart) btnStart.textContent = '▶ 開始';
+      if(meta)     meta.textContent  = todaySession ? `本日のセッションあり：${todaySession.sessionId}` : 'セッションなし — 開始ボタンで棚卸しを始めます';
+      if(btnStart) btnStart.textContent = todaySession ? '▶ セッション再開' : '▶ 開始';
     } else {
       if(title)    title.textContent = `📋 ${invSession.sessionId}`;
       const durLabel = (() => {
@@ -5795,8 +5812,9 @@ function invUpdateBanner(){
         }
         return '';
       })();
-      if(meta)     meta.textContent  = `完了：${formatTime(invSession.startedAtMs)}　全${cachedShelves.length}棚${durLabel}`;
-      if(btnStart) btnStart.textContent = '▶ 新規開始';
+      const isToday = invGetSessionDate(invSession) === invLocalDateKey();
+      if(meta)     meta.textContent  = `${isToday ? '本日' : '完了'}：${formatTime(invSession.startedAtMs)}　全${cachedShelves.length}棚${durLabel}`;
+      if(btnStart) btnStart.textContent = invFindTodaySession() ? '▶ セッション再開' : '▶ 新規開始';
     }
   }
 }
