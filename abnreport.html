@@ -881,7 +881,7 @@
             <label>原因</label>
             <textarea id="cause" placeholder="原因を入力してください"></textarea>
           </div>
-            <div class="form-group">
+        <div class="form-group">
           <label>発見タイミング *</label>
           <select id="discoveryTiming" required>
             <option value="">選択</option>
@@ -890,6 +890,19 @@
             <option value="初物">初物</option>
             <option value="終物">終物</option>
             <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>発生タイミング *</label>
+          <select id="occurrenceTiming" required>
+            <option value="">選択</option>
+            <option value="頭出し中">頭出し中</option>
+            <option value="捨てショット中">捨てショット中</option>
+            <option value="生産中">生産中</option>
+            <option value="異常処置時">異常処置時</option>
+            <option value="異常復帰後">異常復帰後</option>
+            <option value="材料エンド">材料エンド</option>
+            <option value="不明">不明</option>
           </select>
         </div>
         <div class="form-group" id="previousCheckGroup" style="display:none;">
@@ -1415,7 +1428,7 @@
           <summary style="cursor:pointer;font-weight:bold;color:#667eea;">対応ヘッダ（エクスポートと同じ）</summary>
           <div style="font-size:.9rem;color:#333;margin-top:8px;line-height:1.6;">
             必須: 整理No, 部署, 発生日, 異常内容, 現場対応<br>
-            任意: ライン名, 発生時刻, 再開時刻, 遡り, 品質対応, 処置者, 対応区分, 対応部署_処置者, 発見タイミング, 前回終物確認, 命数有無, 命数到達, 保全単位, 処置方法, 再発新規, 対策状況, 暫定, 異常分類, 原因分類, 状態, _id, 変化点分類, 変化点内容
+            任意: ライン名, 発生時刻, 再開時刻, 遡り, 品質対応, 処置者, 対応区分, 対応部署_処置者, 発見タイミング, 発生タイミング, 前回終物確認, 命数有無, 命数到達, 保全単位, 処置方法, 再発新規, 対策状況, 暫定, 異常分類, 原因分類, 状態, _id, 変化点分類, 変化点内容
           </div>
         </details>
 
@@ -1477,6 +1490,7 @@ window.openSharePreview = function(id){
 部署: ${item.department || ''}
 ライン: ${item.lineName || ''}
 発生日: ${item.occurrenceDate || ''} ${item.occurrenceTime || ''}
+発生タイミング: ${item.occurrenceTiming || '（未入力）'}
 
 【内容】
 異常: ${item.anomalyContent || ''}
@@ -2935,6 +2949,12 @@ async function applyFilter(){
                   <div class="card-meta-value">${item.handler}</div>
                 </div>
               ` : ''}
+              ${item.occurrenceTiming ? `
+                <div class="card-meta-item">
+                  <div class="card-meta-label">発生タイミング</div>
+                  <div class="card-meta-value">${item.occurrenceTiming}</div>
+                </div>
+              ` : ''}
             </div>
           </div>
         `;
@@ -3068,11 +3088,11 @@ ${item.traceback ? `
     } else {
       tableWrap.innerHTML = `
         <div style="overflow-x:auto;">
-          <table style="min-width:2400px;">
+          <table style="min-width:2520px;">
             <thead><tr>
               <th>整理No</th><th>部署</th><th>ライン</th><th>発生日</th><th>発生時刻</th>
               <th>再開時刻</th><th>停止時間(分)</th><th>異常内容</th><th>処置内容</th><th>遡り</th><th>品質対応</th>
-              <th>処置者</th><th>対応区分</th><th>対応部署_処置者</th><th>発見タイミング</th><th>前回終物確認</th>
+              <th>処置者</th><th>対応区分</th><th>対応部署_処置者</th><th>発見タイミング</th><th>発生タイミング</th><th>前回終物確認</th>
               <th>命数有無</th><th>命数到達</th><th>保全単位</th><th>処置方法</th><th>再発新規</th><th>対策状況</th>
               <th>暫定</th><th>異常分類</th><th>原因分類</th><th>変化点分類</th><th>変化点内容</th><th>写真</th><th>状態</th><th>操作</th>
             </tr></thead>
@@ -3099,6 +3119,7 @@ ${item.traceback ? `
                     <td>${it.techRequest==='要請'?'技術・生技対応':it.techRequest==='完結'?'完了':'-'}</td>
                     <td>${it.techHandler||'-'}</td>
                     <td>${it.discoveryTiming||'-'}</td>
+                    <td>${it.occurrenceTiming||'-'}</td>
                     <td>${it.previousCheck||'-'}</td>
                     <td>${it.lifespan||'-'}</td>
                     <td>${it.lifespanReached||'-'}</td>
@@ -4630,6 +4651,7 @@ const base = {
   maintenanceUnit: '',
   rootCauseAction: '',
   discoveryTiming: document.getElementById('discoveryTiming').value || '',
+  occurrenceTiming: document.getElementById('occurrenceTiming').value || '',
   recurrenceType: mRec,
   measureStatus: (mRec === '再発') ? mMs : '',
   previousCheck: '',
@@ -5206,7 +5228,7 @@ document.getElementById('actionTaken').addEventListener('blur', () => {
   // CSV出力
   document.getElementById('btnExport').addEventListener('click', () => {
     if (!anomalyCache.length){ alert('エクスポートするデータがありません'); return; }
-    const headers = ['整理No','部署','ライン名','発生日','発生時刻','再開時刻','停止時間(分)','異常内容','現場対応','遡り','処置者','対応区分','対応部署_処置者','発見タイミング','前回終物確認','命数有無','命数到達','保全単位','処置方法','再発新規','対策状況','暫定','異常分類','原因分類','変化点分類','変化点内容','状態','_id'];
+    const headers = ['整理No','部署','ライン名','発生日','発生時刻','再開時刻','停止時間(分)','異常内容','現場対応','遡り','処置者','対応区分','対応部署_処置者','発見タイミング','発生タイミング','前回終物確認','命数有無','命数到達','保全単位','処置方法','再発新規','対策状況','暫定','異常分類','原因分類','変化点分類','変化点内容','状態','_id'];
     const rows = anomalyCache.map(item=>{
       const stopMin = calcStopMinutes(item);
       return [
@@ -5214,7 +5236,7 @@ document.getElementById('actionTaken').addEventListener('blur', () => {
         (stopMin!==null?stopMin:''),
         item.anomalyContent||'',item.actionTaken||'',item.traceback||'',item.handler||'',
         item.techRequest==='要請'?'技術・生技対応':item.techRequest==='完結'?'完了':'',
-        item.techHandler||'',item.discoveryTiming||'',item.previousCheck||'',item.lifespan||'',item.lifespanReached||'',
+        item.techHandler||'',item.discoveryTiming||'',item.occurrenceTiming||'',item.previousCheck||'',item.lifespan||'',item.lifespanReached||'',
         item.maintenanceUnit||'',item.rootCauseAction||'',item.recurrenceType||'',item.measureStatus||'',item.affirmation||'',
         item.anomalyCategory||'',item.causeCategory||'',item.changePointCategory||'',item.changePointContent||'',
         item.status==='complete'?'完了':'対応部署入力待ち', item._id
@@ -5650,6 +5672,7 @@ document.addEventListener('click', async (e)=>{
           <div><strong>発生日:</strong> ${item.occurrenceDate || '-'} ${item.occurrenceTime || ''}</div>
           <div><strong>部署:</strong> ${item.department || '-'}</div>
           <div><strong>ライン:</strong> ${item.lineName || '-'}</div>
+          <div><strong>発生タイミング:</strong> ${item.occurrenceTiming || '-'}</div>
           <div><strong>異常分類:</strong> ${item.anomalyCategory || '-'}</div>
           <div><strong>原因分類:</strong> ${item.causeCategory || '-'}</div>
         </div>
@@ -5737,6 +5760,7 @@ function saveEditTabData() {
       traceback:           document.getElementById('edit_traceback')?.value           ?? null,
       lotNo:               document.getElementById('edit_lotNo')?.value               ?? null,
       qualityResponse:     document.getElementById('edit_qualityResponse')?.value     ?? null,
+      occurrenceTiming:    document.getElementById('edit_occurrenceTiming')?.value    ?? null,
       recurrenceType:      document.getElementById('edit_recurrenceType')?.value      ?? null,
       changePointCategory: document.getElementById('edit_changePointCategory')?.value ?? null,
       changePointContent:  document.getElementById('edit_changePointContent')?.value  ?? null,
@@ -5796,6 +5820,19 @@ function ep(tab, field, itemValue) {
         <div class="form-group"><label>遡り</label><input type="text" id="edit_traceback" value="${item.traceback || ''}"></div>
         <div class="form-group"><label>LotNo</label><input type="text" id="edit_lotNo" value="${item.lotNo || ''}"></div>
         <div class="form-group"><label>品質対応</label><textarea id="edit_qualityResponse">${item.qualityResponse || ''}</textarea></div>
+        <div class="form-group">
+          <label>発生タイミング *</label>
+          <select id="edit_occurrenceTiming" required>
+            <option value="">選択</option>
+            <option value="頭出し中" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '頭出し中' ? 'selected' : ''}>頭出し中</option>
+            <option value="捨てショット中" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '捨てショット中' ? 'selected' : ''}>捨てショット中</option>
+            <option value="生産中" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '生産中' ? 'selected' : ''}>生産中</option>
+            <option value="異常処置時" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '異常処置時' ? 'selected' : ''}>異常処置時</option>
+            <option value="異常復帰後" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '異常復帰後' ? 'selected' : ''}>異常復帰後</option>
+            <option value="材料エンド" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '材料エンド' ? 'selected' : ''}>材料エンド</option>
+            <option value="不明" ${ep('mfg','occurrenceTiming', item.occurrenceTiming) === '不明' ? 'selected' : ''}>不明</option>
+          </select>
+        </div>
         <div class="form-group">
           <label>再発/新規 *</label>
           <select id="edit_recurrenceType" required>
@@ -5959,6 +5996,7 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
       updates.traceback = document.getElementById('edit_traceback')?.value || '';
       updates.lotNo = document.getElementById('edit_lotNo')?.value || '';
       updates.qualityResponse = document.getElementById('edit_qualityResponse')?.value || '';
+      updates.occurrenceTiming = document.getElementById('edit_occurrenceTiming')?.value || '';
       updates.recurrenceType = document.getElementById('edit_recurrenceType')?.value || '';
       updates.changePointCategory = document.getElementById('edit_changePointCategory')?.value || '';
       updates.changePointContent = document.getElementById('edit_changePointContent')?.value || '';
@@ -5996,6 +6034,12 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
 if (!updates.recurrenceType) {
   alert('再発/新規を選択してください');
   document.getElementById('edit_recurrenceType')?.focus();
+  return;
+}
+
+if (editCurrentTab === 'mfg' && !updates.occurrenceTiming) {
+  alert('発生タイミングを選択してください');
+  document.getElementById('edit_occurrenceTiming')?.focus();
   return;
 }
 
