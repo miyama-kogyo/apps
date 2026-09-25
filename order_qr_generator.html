@@ -448,8 +448,8 @@
     const metaCanvas=document.createElement('canvas');metaCanvas.width=Math.round(canvas.width*.36)*3;metaCanvas.height=Math.round(canvas.height*.08)*3;
     metaCanvas.getContext('2d').drawImage(canvas,Math.round(canvas.width*.30),Math.round(canvas.height*.085),Math.round(canvas.width*.36),Math.round(canvas.height*.08),0,0,metaCanvas.width,metaCanvas.height);
     const metaResult=await Tesseract.recognize(metaCanvas,'eng',{tessedit_pageseg_mode:'6'});const metaText=String(metaResult.data.text||'');
-    const date=metaText.match(/(20\d{2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,2})/);const fileDate=String(fileName).match(/(\d{1,2})月(\d{1,2})日/);const year=(metaText.match(/\b(20\d{2})\b/)||[])[1]||String(new Date().getFullYear());const bin=metaText.match(/(?:^|\s)(\d{1,2})\s+20\d{2}\s*\//m);
-    const meta={c:'MIYAMA-EAST',b:bin?bin[1]:'1'};if(fileDate)meta.d=year+fileDate[1].padStart(2,'0')+fileDate[2].padStart(2,'0');else if(date)meta.d=date[1]+date[2].padStart(2,'0')+date[3].padStart(2,'0');
+    const date=metaText.match(/(20\d{2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,2})/);const fileDate=String(fileName).match(/(\d{1,2})月(\d{1,2})日/);const year=(metaText.match(/\b(20\d{2})\b/)||[])[1]||String(new Date().getFullYear());
+    const meta={c:'MIYAMA-EAST',b:'1'};if(fileDate)meta.d=year+fileDate[1].padStart(2,'0')+fileDate[2].padStart(2,'0');else if(date)meta.d=date[1]+date[2].padStart(2,'0')+date[3].padStart(2,'0');
     return {lines,meta,text:`${metaText}\n${text}`};
   }
 
