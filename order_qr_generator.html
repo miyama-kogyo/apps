@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>明細QR発行</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root { --ink:#18212c; --muted:#64748b; --line:#d6dee8; --panel:#fff; --base:#eef3f8; --blue:#0876c9; --green:#167a46; --red:#bd3333; --amber:#a45a05; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--base); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif; }
+    header { color:#fff; background:#12314c; border-bottom:4px solid #1590d3; }
+    .head-inner { width:min(1420px,calc(100% - 40px)); margin:auto; min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    h1 { margin:0; font-size:24px; letter-spacing:0; } .subtitle { margin-top:4px; font-size:13px; color:#b9d5e8; }
+    .sync { border:1px solid #5b7890; border-radius:5px; padding:7px 10px; font-size:12px; white-space:nowrap; } .sync.ok { color:#bdedcf; border-color:#45956a; } .sync.off { color:#ffd397; border-color:#a77c45; }
+    main { width:min(1420px,calc(100% - 40px)); margin:20px auto 46px; display:grid; grid-template-columns:minmax(0,1.65fr) minmax(340px,.9fr); gap:20px; align-items:start; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 1px 2px rgba(15,23,42,.08); padding:18px; }
+    .card h2 { margin:0 0 14px; font-size:17px; } .card h3 { margin:18px 0 9px; font-size:14px; }
+    .field-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:11px; } .field { display:flex; flex-direction:column; gap:5px; } .field.wide { grid-column:span 2; }
+    label { font-size:12px; font-weight:700; color:#40536a; } input, select { width:100%; min-height:38px; padding:8px 9px; color:var(--ink); background:#fff; border:1px solid #b9c7d6; border-radius:5px; font-size:14px; } input:focus, select:focus { outline:2px solid #93c5fd; border-color:#3184c7; }
+    button { min-height:38px; padding:8px 13px; border:1px solid #aab9c8; background:#f8fafc; color:#213248; border-radius:5px; cursor:pointer; font-weight:750; font-size:13px; } button:hover { filter:brightness(.97); } button.primary { color:#fff; background:var(--blue); border-color:#0868ae; } button.success { color:#fff; background:var(--green); border-color:#105f35; } button.danger { color:#b42323; border-color:#ecb7b7; background:#fff5f5; } button.icon { min-height:31px; padding:4px 8px; }
+    .toolbar { display:flex; align-items:end; justify-content:space-between; gap:12px; margin-bottom:12px; } .toolbar-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .hint { margin:8px 0 0; color:var(--muted); font-size:12px; line-height:1.55; } .notice { display:none; margin:10px 0; padding:10px 12px; border-radius:5px; font-size:13px; line-height:1.5; } .notice.show{display:block}.notice.warn{background:#fff8e8;border:1px solid #e7bd71;color:#81510d}.notice.ok{background:#effcf4;border:1px solid #8bcca6;color:#17653b}.notice.error{background:#fff1f1;border:1px solid #e4a2a2;color:#972d2d}
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:6px; } table { width:100%; border-collapse:collapse; min-width:710px; } th { padding:9px; color:#40536a; background:#f4f7fa; border-bottom:1px solid var(--line); text-align:left; font-size:12px; } td { padding:7px; border-bottom:1px solid #e6ebf0; } tr:last-child td { border-bottom:0; } td input { min-height:33px; padding:6px; font-size:13px; } td .calc { font-weight:800; text-align:center; white-space:nowrap; } tr.issue { background:#fff8ed; }
+    table.multi-page { min-width:850px; } th.page-col, td.page-col { min-width:88px; white-space:nowrap; } td.page-col select { min-width:74px; } td .icon { white-space:nowrap; }
+    .qr-result { display:none; } .qr-result.show { display:block; } #qrCanvas { display:block; width:min(100%,420px); margin:12px auto; padding:12px; background:#fff; border:1px solid var(--line); } #qrCanvas canvas, #qrCanvas img { display:block; width:100%!important; height:auto!important; }
+    .qr-meta { padding:11px; border:1px solid #c8d8e5; border-radius:5px; background:#f5faff; font-size:13px; line-height:1.65; } .code { max-height:128px; overflow:auto; padding:9px; border-radius:5px; background:#172432; color:#d8ecfc; font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; word-break:break-all; }
+    .master-row { display:grid; grid-template-columns:minmax(0,1fr) 94px 36px; gap:7px; align-items:center; padding:7px 0; border-bottom:1px solid #e8edf2; } .master-row:last-child{border-bottom:0}.master-part{font:13px ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700}.master-qty{text-align:right;font-size:13px;font-weight:800}.master-empty{padding:12px 0;text-align:center;color:#94a3b8;font-size:13px}
+    .file-row { display:flex; align-items:end; gap:9px; margin-top:13px; } .file-row input{min-width:0}.file-row button{white-space:nowrap}
+    .simple-issue { width:min(720px,calc(100% - 40px)); margin:70px auto; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 7px rgba(15,23,42,.09); padding:32px; text-align:center; }
+    .simple-issue h2 { margin:0; font-size:24px; } .simple-issue p { margin:10px 0 26px; color:var(--muted); font-size:14px; }
+    .simple-file { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:12px; border:1px solid #b9c7d6; border-radius:6px; text-align:left; }
+    .simple-file-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#526274; font-size:14px; } .simple-file-name.ready { color:#18212c; font-weight:700; }
+    .simple-issue .issue-button { width:100%; min-height:56px; margin-top:16px; font-size:17px; } .simple-issue .issue-button:disabled { cursor:not-allowed; opacity:.5; }
+    .simple-issue .notice { text-align:left; }
+    main { display:none!important; }
+    body.edit-mode main { display:grid!important; }
+    body.edit-mode .simple-issue { margin-bottom:20px; }
+    .simple-issue .edit-button { display:none; width:100%; margin-top:10px; }
+    .simple-issue .edit-button.show { display:block; }
+    body.admin-mode .simple-issue { display:none; }
+    body.admin-mode main { display:block!important; width:min(960px,calc(100% - 40px)); margin:24px auto 46px; }
+    body.admin-mode main .editor, body.admin-mode main .qr-result { display:none!important; }
+    body.admin-mode main aside { display:block; width:100%; }
+    @media (max-width:960px){.head-inner{width:calc(100% - 24px)}.simple-issue{width:calc(100% - 24px);margin:28px auto;padding:22px}.simple-file{grid-template-columns:1fr}.simple-file button{width:100%}body.edit-mode main{grid-template-columns:1fr}}
+    #printSheet { display:none; }
+    @media print { @page { size:A4 portrait; margin:12mm; } @page originalOrderPortrait { size:A4 portrait; margin:10mm; } @page originalOrderLandscape { size:A4 landscape; margin:10mm; } body{background:#fff;color:#111}.no-print,header,main,.simple-issue{display:none!important}#printSheet{display:block;width:100%;font-family:"Noto Sans JP",sans-serif}.print-title{display:flex;justify-content:space-between;align-items:end;border-bottom:2px solid #111;padding-bottom:7px}.print-title h1{font-size:25px;color:#111}.print-title .print-issued{font-size:11px}.print-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;margin:13px 0;border:1px solid #111;padding:9px 11px}.print-meta div{font-size:12px}.print-meta b{display:block;font-size:10px;color:#444;margin-bottom:2px}.print-body{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:15px;align-items:start}.print-table{width:100%;min-width:0;border-collapse:collapse}.print-table th,.print-table td{border:1px solid #111;padding:5px 6px;font-size:10px}.print-table th{background:#eee;text-align:center}.print-table td.num{text-align:right}.print-qr{border:1px solid #111;padding:5px;text-align:center}.print-qr img{display:block;width:58px;height:58px;margin:0 auto 4px}.print-qr b{font-size:9px}.print-foot{margin-top:12px;border-top:1px solid #111;padding-top:6px;font-size:9px;color:#444}.print-original-page{position:relative;break-before:auto;page-break-before:auto}.print-original-page.portrait{page:originalOrderPortrait}.print-original-page.landscape{page:originalOrderLandscape}.print-original-page + .print-original-page{break-before:page;page-break-before:always}.print-original-page h2{display:none}.print-original-page .print-original-source{display:block;width:100%;object-fit:contain;object-position:top center}.print-original-page.portrait .print-original-source{max-height:270mm}.print-original-page.landscape .print-original-source{max-height:188mm}.print-original-qr{position:absolute;right:8mm;bottom:32mm;width:58px;padding:3px;background:#fff;border:1px solid #111;text-align:center}.print-original-qr img{display:block;width:50px;height:50px;margin:0 auto}.print-original-qr b{display:block;font-size:7px;margin-top:2px} }
+  </style>
+</head>
+<body>
+  <header><div class="head-inner"><div><h1 id="pageTitle">明細QR発行</h1><div class="subtitle" id="pageSubtitle">注文書PDFから明細QRを発行して、そのまま印刷</div></div><div style="display:flex;align-items:center;gap:9px"><a id="viewSwitch" href="?view=admin" style="color:#fff;border:1px solid #5b7890;border-radius:5px;padding:7px 10px;font-size:12px;text-decoration:none">管理画面</a><div class="sync off" id="syncStatus">Firebase接続中...</div></div></div></header>
+  <section class="simple-issue no-print">
+    <h2>注文書PDFを選択</h2><p>入数マスターに基づき明細QRを発行し、原本の同じページにQRを載せて印刷します。</p>
+    <div class="simple-file"><div id="selectedPdfName" class="simple-file-name">PDFファイルを選択してください</div><button type="button" class="primary" onclick="document.getElementById('pdfFile').click()">ファイルを選択</button></div>
+    <button id="issuePdfButton" type="button" class="success issue-button" onclick="importPdf()" disabled>明細QRを発行して印刷</button>
+    <div class="notice" id="simpleImportNotice"></div>
+    <button id="editDetailsButton" type="button" class="edit-button" onclick="showEditor()">明細を確認・修正</button>
+  </section>
+  <main>
+    <section class="editor">
+      <div class="card">
+        <div class="toolbar"><h2>注文情報</h2><div class="toolbar-actions no-print"><button onclick="resetOrderForm()">初期化</button><button class="success" onclick="generateQr()">明細QRを発行</button></div></div>
+        <div class="field-grid">
+          <div class="field"><label>マスター対象会社</label><input id="companyKey" value="miyama" autocomplete="off" onchange="changeCompany()"></div>
+          <div class="field"><label>顧客コード</label><input id="customerId" placeholder="例: 40905"></div>
+          <div class="field"><label>注文No.</label><input id="orderNo" placeholder="例: R004355444"></div>
+          <div class="field"><label>納入日</label><input id="deliveryDate" type="date"></div>
+          <div class="field"><label>便</label><input id="deliveryBin" placeholder="例: 1"></div>
+          <div class="field"><label>納入先コード</label><input id="destinationCode" placeholder="任意"></div>
+          <div class="field"><label>受入</label><input id="receivingCode" placeholder="任意"></div>
+        </div>
+        <div class="file-row no-print"><div class="field" style="flex:1"><label>注文書PDFから明細候補を取り込む</label><input id="pdfFile" type="file" accept="application/pdf" onchange="handlePdfSelection()"></div><button class="primary" onclick="importPdf()">PDF取込</button></div>
+        <div class="notice" id="importNotice"></div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div class="toolbar"><div><h2>明細</h2><p class="hint">注文数量と入数から必要箱数を計算します。品番・数量・入数を必ず確認してください。</p></div><div class="toolbar-actions no-print"><select id="newLinePage" aria-label="追加先ページ" style="display:none;width:110px"></select><button onclick="addLine()">行を追加</button><button class="danger" onclick="clearLines()">全行削除</button></div></div>
+        <div class="notice" id="lineNotice"></div>
+        <div class="table-wrap"><table><thead><tr id="lineHead"><th style="width:45%">品番</th><th>背番号</th><th>注文数</th><th>入数</th><th>必要箱数</th><th class="no-print"></th></tr></thead><tbody id="lineBody"></tbody></table></div>
+      </div>
+    </section>
+    <aside>
+      <div class="card master-card">
+        <h2>品番別 入数マスター</h2><p class="hint">このPCで管理し、Firebaseへ同期します。同じ品番を登録すると入数を更新します。</p>
+        <div class="file-row"><div class="field" style="flex:1"><label>品番</label><input id="masterPart" placeholder="例: 10101-02301"></div><div class="field" style="width:106px"><label>入数</label><input id="masterQty" type="number" min="1" step="1"></div><button class="success" onclick="saveMasterEntry()">登録</button></div>
+        <div id="masterList" style="margin-top:14px"></div>
+      </div>
+      <div class="card qr-result" id="qrResult" style="margin-top:20px">
+        <h2>発行する明細QR</h2><select id="qrPageSelect" aria-label="表示するQRのページ" onchange="showGeneratedPage()" style="display:none;margin-bottom:10px"></select><div class="qr-meta" id="qrSummary"></div><div id="qrCanvas"></div><div class="code" id="qrText"></div><div class="toolbar-actions no-print" style="justify-content:center;margin-top:12px"><button onclick="printOrderSheet()">再印刷</button><button onclick="copyQrText()">文字列をコピー</button></div>
+      </div>
+    </aside>
+  </main>
+  <section id="printSheet"></section>
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const FIREBASE_CONFIG = { apiKey:'AIzaSyAOMRoojKv9Hnh3OjVGwYV_k1LBTGOKepY', authDomain:'miyamaunitec-fb87a.firebaseapp.com', databaseURL:'https://miyamaunitec-fb87a-default-rtdb.asia-southeast1.firebasedatabase.app', projectId:'miyamaunitec-fb87a' };
+  const state = { master: [], lines: [], originalPages: [], generatedPages: [], importedFormMeta: null };
+  let database = null;
+
+  function esc(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+  function partKey(value) { return String(value ?? '').normalize('NFKC').toUpperCase().replace(/[^0-9A-Z]/g, ''); }
+  function cleanPart(value) { return String(value ?? '').normalize('NFKC').toUpperCase().replace(/\s+/g, ''); }
+  function companyKey() { return String(document.getElementById('companyKey').value || 'miyama').trim().replace(/[.#$\[\]/]/g, '_') || 'miyama'; }
+  function storageKey() { return 'order_qr_generator_pack_master_' + companyKey(); }
+  function masterPath() { return 'qr_match_companies/order_qr_generator/pack_masters/' + companyKey(); }
+  function setStatus(kind, text) { const e=document.getElementById('syncStatus'); e.textContent=text; e.className='sync '+kind; }
+  function showNotice(id, kind, text) { const e=document.getElementById(id); e.className='notice show '+kind; e.textContent=text; if(id==='importNotice'||(id==='lineNotice'&&kind!=='ok')){const simple=document.getElementById('simpleImportNotice');simple.className='notice show '+kind;simple.textContent=text;}if(id==='lineNotice'&&kind!=='ok')document.getElementById('editDetailsButton').classList.add('show'); }
+  function clearNotice(id) { document.getElementById(id).className='notice'; if(id==='importNotice')document.getElementById('simpleImportNotice').className='notice'; }
+  function showEditor() { document.body.classList.add('edit-mode');document.querySelector('main').scrollIntoView({behavior:'smooth',block:'start'}); }
+  function handlePdfSelection() { const file=document.getElementById('pdfFile').files[0];const name=document.getElementById('selectedPdfName');const issue=document.getElementById('issuePdfButton');name.textContent=file ? file.name : 'PDFファイルを選択してください';name.className='simple-file-name'+(file?' ready':'');issue.disabled=!file;state.importedFormMeta=null;invalidateGeneratedQr();document.body.classList.remove('edit-mode');document.getElementById('editDetailsButton').classList.remove('show');clearNotice('importNotice'); }
+
+  function normalizeMaster(raw) {
+    const values = Array.isArray(raw) ? raw : Object.values(raw || {}); const map=new Map();
+    values.forEach(item => { const partNumber=cleanPart(item && item.partNumber); const packQty=Math.floor(Number(item && item.packQty)); if(partNumber && packQty>0) map.set(partKey(partNumber),{partNumber,packQty}); });
+    return [...map.values()].sort((a,b)=>a.partNumber.localeCompare(b.partNumber));
+  }
+  function saveMasterLocal() { localStorage.setItem(storageKey(), JSON.stringify(state.master)); }
+  function getPackQty(part) { const entry=state.master.find(item=>partKey(item.partNumber)===partKey(part)); return entry ? entry.packQty : 0; }
+  function renderMaster() { const list=document.getElementById('masterList'); if(!state.master.length){list.innerHTML='<div class="master-empty">登録なし</div>';return;} list.innerHTML=state.master.map(item=>`<div class="master-row"><div class="master-part">${esc(item.partNumber)}</div><div class="master-qty">${item.packQty} 入/箱</div><button class="icon danger" onclick="removeMasterEntry('${esc(partKey(item.partNumber))}')">削除</button></div>`).join(''); renderLines(); }
+  function persistMaster() { state.master=normalizeMaster(state.master); saveMasterLocal(); renderMaster(); if(database) database.ref(masterPath()).set(state.master).then(()=>setStatus('ok','Firebase同期済み')).catch(()=>setStatus('off','ローカル保存')); }
+  function saveMasterEntry() { const part=cleanPart(document.getElementById('masterPart').value); const qty=Math.floor(Number(document.getElementById('masterQty').value)); if(!part||!qty||qty<1){alert('品番と1以上の入数を入力してください');return;} const key=partKey(part); const found=state.master.find(item=>partKey(item.partNumber)===key); if(found){found.partNumber=part;found.packQty=qty;}else state.master.push({partNumber:part,packQty:qty}); document.getElementById('masterPart').value='';document.getElementById('masterQty').value='';persistMaster(); }
+  function removeMasterEntry(key) { const item=state.master.find(v=>partKey(v.partNumber)===key); if(!item||!confirm(`「${item.partNumber}」を削除しますか？`))return; state.master=state.master.filter(v=>partKey(v.partNumber)!==key);persistMaster(); }
+  function changeCompany() { state.master=normalizeMaster(JSON.parse(localStorage.getItem(storageKey())||'[]')); renderMaster(); if(database) loadMasterFromFirebase(); }
+  function loadMasterFromFirebase() { database.ref(masterPath()).once('value').then(snap=>{if(snap.exists()){state.master=normalizeMaster(snap.val());saveMasterLocal();renderMaster();setStatus('ok','Firebase同期済み');}else{persistMaster();}}).catch(()=>setStatus('off','ローカル保存')); }
+
+  function invalidateGeneratedQr() { state.generatedPages=[];document.getElementById('qrResult').classList.remove('show');document.getElementById('printSheet').innerHTML=''; }
+  function addLine(line={}) { const selected=document.getElementById('newLinePage');const pageIndex=line.pageIndex??Number(selected.value||0);state.lines.push({ partNumber:cleanPart(line.partNumber), backNo:String(line.backNo||''), totalQty:Number(line.totalQty)||'', packQty:Number(line.packQty)||getPackQty(line.partNumber)||'', pageIndex }); invalidateGeneratedQr();renderLines(); }
+  function clearLines() { if(state.lines.length && !confirm('明細をすべて削除しますか？'))return; state.lines=[];invalidateGeneratedQr();renderLines();clearNotice('lineNotice'); }
+  function updateLine(index, field, value) { const line=state.lines[index]; line[field]=field==='partNumber'?cleanPart(value):(field==='backNo'?value:(Number(value)||'')); if(field==='partNumber' && !line.packQty) line.packQty=getPackQty(line.partNumber)||''; invalidateGeneratedQr();renderLines(); }
+  function removeLine(index) { state.lines.splice(index,1);invalidateGeneratedQr();renderLines(); }
+  function renderLines() {
+    const body=document.getElementById('lineBody');const multi=state.originalPages.length>1;
+    const pageSelect=document.getElementById('newLinePage');const selected=pageSelect.value;
+    pageSelect.style.display=multi?'':'none';
+    pageSelect.innerHTML=multi?state.originalPages.map((_,index)=>`<option value="${index}">${index+1}ページ</option>`).join(''):'';
+    if(multi&&selected)pageSelect.value=selected;
+    document.getElementById('lineHead').closest('table').classList.toggle('multi-page',multi);
+    document.getElementById('lineHead').innerHTML=`${multi?'<th class="page-col">ページ</th>':''}<th style="width:45%">品番</th><th>背番号</th><th>注文数</th><th>入数</th><th>必要箱数</th><th class="no-print"></th>`;
+    if(!state.lines.length){body.innerHTML=`<tr><td colspan="${multi?7:6}" style="text-align:center;color:#94a3b8;padding:20px">明細を追加するか、注文書PDFを取り込んでください。</td></tr>`;return;}
+    body.innerHTML=state.lines.map((line,index)=>{
+      const total=Math.floor(Number(line.totalQty)||0);const pack=Math.floor(Number(line.packQty)||0);
+      const boxes=total&&pack?Math.ceil(total/pack):0;const issue=!line.partNumber||!total||!pack||total%pack!==0;
+      const pages=multi?`<td class="page-col"><select aria-label="${index+1}行目のページ" onchange="updateLine(${index},'pageIndex',this.value)">${state.originalPages.map((_,pageIndex)=>`<option value="${pageIndex}" ${Number(line.pageIndex||0)===pageIndex?'selected':''}>${pageIndex+1}</option>`).join('')}</select></td>`:'';
+      return `<tr class="${issue?'issue':''}">${pages}<td><input value="${esc(line.partNumber)}" onchange="updateLine(${index},'partNumber',this.value)"></td><td><input value="${esc(line.backNo)}" onchange="updateLine(${index},'backNo',this.value)"></td><td><input type="number" min="1" value="${esc(line.totalQty)}" onchange="updateLine(${index},'totalQty',this.value)"></td><td><input type="number" min="1" value="${esc(line.packQty)}" onchange="updateLine(${index},'packQty',this.value)"></td><td class="calc">${boxes||'-'}</td><td class="no-print"><button class="icon danger" onclick="removeLine(${index})">削除</button></td></tr>`;
+    }).join('');
+  }
+
+  function getFormMeta() { return { c:String(document.getElementById('customerId').value||'').trim(), o:String(document.getElementById('orderNo').value||'').trim(), d:String(document.getElementById('deliveryDate').value||'').replaceAll('-',''), b:String(document.getElementById('deliveryBin').value||'').trim(), x:String(document.getElementById('destinationCode').value||'').trim(), r:String(document.getElementById('receivingCode').value||'').trim() }; }
+  function encodePayload(data) { const bytes=new TextEncoder().encode(JSON.stringify(data)); let binary='';bytes.forEach(byte=>binary+=String.fromCharCode(byte));return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function updatePrintSheet() {
+    const first=state.generatedPages[0];if(!first)return false;
+    const rows = first.lines.map((row, index) => `<tr><td>${index + 1}</td><td>${esc(row[0])}</td><td>${esc(row[3] || '-')}</td><td class="num">${Number(row[2]).toLocaleString()}</td><td class="num">${Number(row[1]).toLocaleString()}</td><td class="num">${Math.ceil(row[2] / row[1])}</td></tr>`).join('');
+    const originalPages = state.originalPages.map((page, index) => {
+      const source=typeof page==='string'?page:page.src;
+      const orientation=typeof page==='string'?'landscape':page.orientation;
+      const pageHeight=orientation==='portrait'?'270mm':'188mm';
+      const qr=page.skipQr?'':`<div class="print-original-qr" style="top:auto!important;right:8mm!important;bottom:32mm!important"><img src="${state.generatedPages[index].image}" alt="${index+1}ページの明細QR"><b>明細QR</b></div>`;
+      return `<div class="print-original-page ${orientation}" style="position:relative;min-height:${pageHeight}"><h2>注文書原本 ${index + 1} / ${state.originalPages.length}</h2><img class="print-original-source" src="${source}" alt="注文書原本 ${index + 1}">${qr}</div>`;
+    }).join('');
+    const fallbackSheet = `
+      <div class="print-title"><div><h1>注文書</h1><div style="font-size:11px;margin-top:3px;">明細QR付き</div></div><div class="print-issued">発行日 ${new Date().toLocaleDateString('ja-JP')}</div></div>
+      <div class="print-meta">
+        <div><b>発行元</b>${esc(companyKey())}</div><div><b>顧客コード</b>${esc(first.meta.c || '-')}</div><div><b>注文No.</b>${esc(first.meta.o || '-')}</div>
+        <div><b>納入日</b>${esc(first.meta.d || '-')}</div><div><b>便</b>${esc(first.meta.b || '-')}</div><div><b>納入先 / 受入</b>${esc(first.meta.x || '-')} / ${esc(first.meta.r || '-')}</div>
+      </div>
+      <div class="print-body"><table class="print-table"><thead><tr><th>No.</th><th>品番</th><th>背番号</th><th>注文数</th><th>入数</th><th>必要箱数</th></tr></thead><tbody>${rows}</tbody></table><div class="print-qr"><img src="${first.image}" alt="明細QR"><b>明細QR</b><div style="font-size:10px;margin-top:3px;">${first.lines.length}品番 / ${first.boxes}箱</div></div></div>
+      <div class="print-foot">このQRはミヤマ工業 明細照合アプリ用です。照合開始時に明細QRとして読み取ってください。</div>`;
+    document.getElementById('printSheet').innerHTML = originalPages || fallbackSheet;
+    return true;
+  }
+
+  async function printOrderSheet() {
+    if(!state.generatedPages.length){alert('先に明細QRを発行してください');return;}
+    const images = [...document.querySelectorAll('#printSheet img')];
+    await Promise.all(images.map(image => {
+      if (image.complete && image.naturalWidth) return image.decode ? image.decode().catch(() => {}) : Promise.resolve();
+      return new Promise(resolve => { image.onload = image.onerror = resolve; });
+    }));
+    window.print();
+  }
+
+  function showGeneratedPage() {
+    const index=Number(document.getElementById('qrPageSelect').value)||0;const page=state.generatedPages[index];if(!page)return;
+    const targets=state.generatedPages.map((_,pageIndex)=>pageIndex).filter(pageIndex=>!state.originalPages[pageIndex]?.skipQr);const position=targets.indexOf(index);
+    document.getElementById('qrSummary').innerHTML=`<b>${targets.length>1?`${position+1}/${targets.length}ページ / `:''}明細 ${page.lines.length}品番 / ${page.boxes}箱</b><br>顧客: ${esc(page.meta.c||'-')}　納入日: ${esc(page.meta.d||'-')}　便: ${esc(page.meta.b||'-')}`;
+    document.getElementById('qrCanvas').innerHTML=`<img src="${page.image}" alt="${index+1}ページの明細QR">`;
+    document.getElementById('qrText').textContent=page.code;
+  }
+
+  function generateQr() {
+    clearNotice('lineNotice');invalidateGeneratedQr();
+    const pageCount=Math.max(state.originalPages.length,1);const issues=[];const prepared=[];
+    const copiedOrder=pageCount>1&&state.originalPages.every((page,index)=>index===0||page.copyOf===0);
+    for(let pageIndex=0;pageIndex<pageCount;pageIndex++){
+      const sourcePage=state.originalPages[pageIndex]?.copyOf??pageIndex;
+      const pageLines=state.lines.map((line,index)=>({line,index})).filter(entry=>Number(entry.line.pageIndex||0)===sourcePage);
+      if(!pageLines.length){issues.push(`${pageIndex+1}ページ: 明細がありません`);continue;}
+      const valid=[];
+      pageLines.forEach(({line,index})=>{
+        const part=cleanPart(line.partNumber);const pack=Math.floor(Number(line.packQty));const total=Math.floor(Number(line.totalQty));
+        if(!part||!pack||!total){issues.push(`${pageIndex+1}ページ ${index+1}行目: 品番・注文数・入数を入力してください`);return;}
+        if(total%pack!==0)issues.push(`${pageIndex+1}ページ ${part}: 注文数 ${total} が入数 ${pack} で割り切れません`);
+        valid.push([part,pack,total,String(line.backNo||'').trim()]);
+      });
+      const formMeta=getFormMeta();
+      const overrides=Object.fromEntries(Object.entries(formMeta).filter(([key,value])=>value&&state.importedFormMeta&&value!==state.importedFormMeta[key]));
+      const meta={...formMeta,...(state.originalPages[pageIndex]?.meta||{}),...overrides};
+      const code='MQR1'+encodePayload({v:1,...meta,l:valid,...(pageCount>1&&!copiedOrder?{p:pageIndex+1,n:pageCount}:{})});
+      if(code.length>2200)issues.push(`${pageIndex+1}ページ: QRデータが大きすぎます。明細を分けて発行してください`);
+      prepared.push({meta,lines:valid,code,boxes:valid.reduce((sum,row)=>sum+Math.ceil(row[2]/row[1]),0)});
+    }
+    if(issues.length){showNotice('lineNotice','warn',issues.join(' / '));return;}
+    if(!window.QRCode){showNotice('lineNotice','error','QR描画ライブラリを読み込めませんでした。ネットワークを確認して再読み込みしてください。');return;}
+    const canvas=document.getElementById('qrCanvas');
+    for(const page of prepared){
+      canvas.innerHTML='';new QRCode(canvas,{text:page.code,width:620,height:620,correctLevel:QRCode.CorrectLevel.M});
+      const rendered=canvas.querySelector('canvas');
+      if(!rendered){showNotice('lineNotice','error','QR画像を作成できませんでした。再読み込みしてもう一度試してください。');return;}
+      page.image=rendered.toDataURL('image/png');
+    }
+    state.generatedPages=prepared;
+    const select=document.getElementById('qrPageSelect');const targetPages=prepared.map((_,index)=>index).filter(index=>!state.originalPages[index]?.skipQr);select.style.display=targetPages.length>1?'':'none';
+    select.innerHTML=targetPages.map(index=>`<option value="${index}">${index+1}ページのQR</option>`).join('');
+    select.value=String(targetPages[0]||0);showGeneratedPage();document.getElementById('qrResult').classList.add('show');
+    if(!updatePrintSheet()){showNotice('lineNotice','error','印刷用画像を作成できませんでした。');return;}
+    showNotice('lineNotice','ok',`${targetPages.length}ページに明細QRを発行しました。印刷画面を開きます。`);printOrderSheet();
+  }
+  function copyQrText() { const text=document.getElementById('qrText').textContent;if(!text)return;navigator.clipboard.writeText(text).then(()=>alert('表示中の明細QR文字列をコピーしました')); }
+  function resetOrderForm() { if(!confirm('注文情報と明細を初期化しますか？'))return;['customerId','orderNo','deliveryDate','deliveryBin','destinationCode','receivingCode','pdfFile'].forEach(id=>document.getElementById(id).value='');state.lines=[];state.originalPages=[];state.generatedPages=[];state.importedFormMeta=null;renderLines();document.getElementById('qrResult').classList.remove('show');document.getElementById('printSheet').innerHTML='';clearNotice('lineNotice');clearNotice('importNotice'); }
+
+  function extractPageMeta(words, firstPart, usedKyb, ocrText) {
+    const meta={};
+    const customerLabel = words.find(word => word.text.includes('取引先コード'));
+    if (customerLabel) {
+      const customer = words.filter(word => /^\d{5}$/.test(word.text) && Math.abs(word.y - customerLabel.y) < 35)
+        .sort((a, b) => Math.abs(a.y - customerLabel.y) - Math.abs(b.y - customerLabel.y))[0];
+      if (customer) meta.c=customer.text;
+    }
+    const rowWords=firstPart?words.filter(word => Math.abs(word.y - firstPart.y) < 12).sort((a,b)=>a.x-b.x):[];
+    const date = rowWords.find(word => /^20\d{6}$/.test(word.text));
+    if (date) meta.d=date.text;
+    const orderText = rowWords.filter(word => word.x > 520 && word.x < 630).map(word => word.text).join('');
+    const order = orderText.match(/[A-Z]\d{8,}/);
+    if (order) meta.o=order[0];
+    if(firstPart){
+      const destination=words.filter(word=>word.x>450&&word.x<570&&word.y>firstPart.y+15&&word.y<firstPart.y+40)
+        .map(word=>word.text).join(' ').match(/(\d{8})\s+(\d{3})/);
+      if(destination){meta.x=destination[1];meta.r=destination[2];}
+    }
+    if(usedKyb){
+      const customer=words.map(word=>normalizeImportToken(word.text)).find(text=>/^\d{4}-\d$/.test(text));
+      if(customer)meta.c=customer.replace('-','');
+      const footer=words.filter(word=>word.y>90&&word.y<130);
+      const pick=(min,max,pattern)=>footer.find(word=>word.x>=min&&word.x<max&&pattern.test(normalizeImportToken(word.text)));
+      const year=pick(90,135,/^20\d{2}$/),month=pick(135,165,/^\d{1,2}$/),day=pick(165,185,/^\d{1,2}$/);
+      if(year&&month&&day)meta.d=year.text+String(Number(month.text)).padStart(2,'0')+String(Number(day.text)).padStart(2,'0');
+      const bin=pick(180,205,/\d/);
+      if(bin){const value=normalizeImportToken(bin.text).match(/\d+/);if(value)meta.b=value[0];}
+    }
+    if(ocrText){
+      const customer=ocrText.match(/\b\d{5}\b/);if(customer&&!meta.c)meta.c=customer[0];
+      const order=ocrText.match(/\b[RN][0O]{1,2}\d{7,}\b/i);if(order&&!meta.o)meta.o=order[0].toUpperCase().replace(/O/g,'0');
+      const date=ocrText.match(/\b20\d{6}\b/);if(date&&!meta.d)meta.d=date[0];
+    }
+    return meta;
+  }
+
+  function fillFormMeta(meta) {
+    const fields={c:'customerId',o:'orderNo',d:'deliveryDate',b:'deliveryBin',x:'destinationCode',r:'receivingCode'};
+    Object.entries(fields).forEach(([key,id])=>{
+      const input=document.getElementById(id);if(!input||input.value||!meta[key])return;
+      input.value=key==='d'?`${meta.d.slice(0,4)}-${meta.d.slice(4,6)}-${meta.d.slice(6,8)}`:meta[key];
+    });
+  }
+
+  function normalizeImportToken(value) {
+    return String(value || '').normalize('NFKC').toUpperCase()
+      .replace(/[‐‑‒–—―−]/g, '-')
+      .replace(/[^0-9A-Z,.-]/g, '');
+  }
+
+  function findOrderLines(words) {
+    const token=word=>normalizeImportToken(word.text);
+    const nearby=(base,pattern,side='any')=>words.filter(word=>Math.abs(word.y-base.y)<22&&(side==='any'||(side==='right'&&word.x>base.x)||(side==='left'&&word.x<base.x))&&pattern.test(token(word)));
+    const found=[];const seen=new Set();
+    words.filter(word=>/^[0-9A-Z]{5}-[0-9A-Z]{5}$/.test(token(word))).forEach(part=>{
+      const eas=nearby(part,/^EA$/i,'right').sort((a,b)=>Math.abs(a.y-part.y)-Math.abs(b.y-part.y)||a.x-b.x);
+      const ea=eas[0];if(!ea)return;
+      const quantities=words.filter(word=>Math.abs(word.y-ea.y)<14&&word.x<ea.x&&/^(?:\d{1,3}(?:,\d{3})*|\d+)$/.test(token(word))).sort((a,b)=>b.x-a.x);
+      const quantity=quantities[0];if(!quantity)return;
+      const partNumber=token(part), quantityText=token(quantity);
+      const key=partNumber+'|'+quantityText;if(seen.has(key))return;seen.add(key);
+      found.push({partNumber,totalQty:Number(quantityText.replace(/,/g,'')),backNo:'',anchor:part});
+    });
+    return found;
+  }
+
+  function findKybOrderLines(words) {
+    const found=[];const seen=new Set();
+    words.forEach(part=>{
+      const match=normalizeImportToken(part.text).match(/[0-9A-Z]{5}-[0-9A-Z]{5}/);
+      if(!match)return;
+      const row=words.filter(word=>Math.abs(word.y-part.y)<8).sort((a,b)=>a.x-b.x);
+      // KYB rows provide the kanban count and total quantity in adjacent columns.
+      const count=row.filter(word=>word.x>=400&&word.x<430&&/^\d+$/.test(normalizeImportToken(word.text)))
+        .sort((a,b)=>b.x-a.x)[0];
+      const quantity=row.filter(word=>word.x>=430&&word.x<500&&/^\d+(?:,\d{3})*$/.test(normalizeImportToken(word.text)))
+        .sort((a,b)=>b.x-a.x)[0];
+      if(!quantity)return;
+      const partNumber=match[0];const totalQty=Number(normalizeImportToken(quantity.text).replace(/,/g,''));
+      const kanbanCount=count?Number(normalizeImportToken(count.text)):0;
+      const packQty=kanbanCount>0&&totalQty%kanbanCount===0?totalQty/kanbanCount:0;
+      const key=`${partNumber}|${totalQty}`;
+      if(!totalQty||seen.has(key))return;
+      seen.add(key);found.push({partNumber,totalQty,packQty,kanbanCount,backNo:'',anchor:part});
+    });
+    return found;
+  }
+
+  function ocrPartKey(value) {
+    return normalizeImportToken(value).replace(/[^0-9A-Z]/g, '')
+      .replace(/O/g, '0').replace(/[IL]/g, '1').replace(/Z/g, '2')
+      .replace(/S/g, '5').replace(/G/g, '6').replace(/B/g, '8')
+      .replace(/T/g, '1').replace(/R/g, '0');
+  }
+
+  function editDistance(left, right) {
+    const row=Array.from({length:right.length+1},(_,index)=>index);
+    for(let i=1;i<=left.length;i++){
+      let previous=row[0];row[0]=i;
+      for(let j=1;j<=right.length;j++){
+        const current=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,previous+(left[i-1]===right[j-1]?0:1));previous=current;
+      }
+    }
+    return row[right.length];
+  }
+
+  function resolveOcrPart(token) {
+    const normalized=normalizeImportToken(token);
+    if(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/.test(normalized)) return normalized;
+    const source=ocrPartKey(normalized);
+    const candidates=(state.master||[]).map(item=>cleanPart(item.partNumber)).filter(Boolean);
+    let best='';let distance=Infinity;
+    candidates.forEach(part=>{
+      const key=ocrPartKey(part);const current=editDistance(source,key);
+      if(current<distance){best=part;distance=current;}
+    });
+    return best && distance<=3 && Math.abs(source.length-ocrPartKey(best).length)<=2 ? best : '';
+  }
+
+  function ocrQuantityFromLine(line, partIndex) {
+    const tail=line.slice(Math.max(0,partIndex));
+    const priceEnd=[...tail.matchAll(/\d+\.\d+/g)].pop();
+    const afterPrice=priceEnd ? tail.slice(priceEnd.index+priceEnd[0].length) : tail;
+    const compact=afterPrice.replace(/[^0-9,]/g, '').replace(/,+/g, ',').replace(/^,|,$/g, '');
+    const digits=compact.replace(/,/g, '');
+    if(!digits || !/^\d+$/.test(digits)) return 0;
+    return Number(digits);
+  }
+
+  function findOrderLinesFromOcrText(text) {
+    const found=[];const seen=new Set();
+    String(text||'').split(/\r?\n/).forEach(line=>{
+      const tokenMatch=line.match(/[0-9A-Z]{5,7}-[0-9A-Z]{4,6}/i);
+      if(!tokenMatch)return;
+      const partNumber=resolveOcrPart(tokenMatch[0]);
+      const totalQty=ocrQuantityFromLine(line,tokenMatch.index||0);
+      const key=`${partNumber}|${totalQty}`;
+      if(!partNumber||!totalQty||seen.has(key))return;
+      seen.add(key);found.push({partNumber,totalQty,backNo:'',anchor:null});
+    });
+    return found;
+  }
+
+  async function extractStructuredOrderData(canvas) {
+    if(!window.Tesseract||canvas.width<=canvas.height)return {lines:[],text:''};
+    const rowCount=8;const rowHeight=Math.round(canvas.height*.052);const rowGap=Math.round(canvas.height*.018);
+    const sourceX=Math.round(canvas.width*.024);const sourceWidth=canvas.width-sourceX*2;
+    const sourceY=Math.round(canvas.height*.224);const sourceStep=Math.round(canvas.height*.07);
+    const headerWidth=Math.round(canvas.width*.4);const headerHeight=Math.round(canvas.height*.105);const headerGap=Math.round(canvas.height*.018);
+    const rows=document.createElement('canvas');rows.width=sourceWidth;rows.height=headerHeight+headerGap+(rowHeight+rowGap)*rowCount;
+    const context=rows.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,rows.width,rows.height);
+    context.drawImage(canvas,sourceX,Math.round(canvas.height*.06),headerWidth,headerHeight,0,0,headerWidth,headerHeight);
+    for(let index=0;index<rowCount;index++){
+      context.drawImage(canvas,sourceX,sourceY+sourceStep*index,sourceWidth,rowHeight,0,headerHeight+headerGap+(rowHeight+rowGap)*index,sourceWidth,rowHeight);
+    }
+    const rowResult=await Tesseract.recognize(rows,'eng',{tessedit_pageseg_mode:'6'});
+    const rowText=String(rowResult.data.text||'');const lines=[];const seen=new Set();
+    rowText.split(/\r?\n/).forEach(line=>{
+      const partMatch=normalizeImportToken(line).match(/[0-9A-Z]{5}-[0-9A-Z]{5}/);if(!partMatch)return;
+      const partNumber=partMatch[0];const normalized=line.replace(/,\s+/g,',');
+      const tail=normalized.slice(Math.max(0,normalized.toUpperCase().indexOf(partNumber)+partNumber.length));
+      const numbers=tail.match(/\d{1,3}(?:,\d{3})+|\d+/g)||[];const quantityText=numbers.at(-1)||'';
+      const totalQty=Number(quantityText.replace(/,/g,''));const key=`${partNumber}|${totalQty}`;
+      if(!totalQty||totalQty>100000000||seen.has(key))return;
+      seen.add(key);lines.push({partNumber,totalQty,backNo:'',anchor:null});
+    });
+    if(!lines.length)return {lines,text:rowText};
+    const sourceOrderWidth=Math.round(canvas.width*.11);const sourceOrderHeight=Math.round(canvas.height*.055);
+    const order=document.createElement('canvas');order.width=sourceOrderWidth*4;order.height=sourceOrderHeight*4;
+    const orderContext=order.getContext('2d');orderContext.imageSmoothingEnabled=false;
+    orderContext.drawImage(canvas,Math.round(canvas.width*.65),Math.round(canvas.height*.235),sourceOrderWidth,sourceOrderHeight,0,0,order.width,order.height);
+    const orderResult=await Tesseract.recognize(order,'eng',{tessedit_pageseg_mode:'7',tessedit_char_whitelist:'R0123456789'});
+    const orderDigits=String(orderResult.data.text||'').replace(/\D/g,'');
+    const orderText=/^\d{9}$/.test(orderDigits)?`R${orderDigits}`:String(orderResult.data.text||'');
+    return {lines,text:`${orderText}\n${rowText}`};
+  }
+
+  function looksLikeMiyamaEastForm(canvas) {
+    const context=canvas.getContext('2d');const x0=Math.round(canvas.width*.64),x1=Math.round(canvas.width*.81);
+    const y0=Math.round(canvas.height*.24),y1=Math.round(canvas.height*.68);let yellow=0,samples=0;
+    for(let y=y0;y<y1;y+=12)for(let x=x0;x<x1;x+=12){const pixel=context.getImageData(x,y,1,1).data;samples++;if(pixel[0]>210&&pixel[1]>210&&pixel[2]<90)yellow++;}
+    return samples>0&&yellow/samples>.35;
+  }
+
+  async function extractMiyamaEastData(canvas,fileName='') {
+    if(!window.Tesseract||!looksLikeMiyamaEastForm(canvas))return null;
+    const columns=[[.089,.146],[.146,.26],[.26,.431],[.431,.514],[.514,.57],[.57,.684]];
+    const rowStart=.211,rowStep=.02105,rowHeight=.0205,zoom=3,gap=24;
+    const widths=columns.map(([start,end])=>Math.round(canvas.width*(end-start))-6);
+    const rowPixels=Math.round(canvas.height*rowHeight);const rows=[];
+    for(let row=0;row<25;row++){
+      const y=Math.round(canvas.height*(rowStart+row*rowStep))+2;const height=rowPixels-4;
+      const partX=Math.round(canvas.width*columns[2][0])+3;const pixels=canvas.getContext('2d').getImageData(partX,y,widths[2],height).data;
+      let dark=0;for(let index=0;index<pixels.length;index+=4)if(pixels[index]<120&&pixels[index+1]<120&&pixels[index+2]<120)dark++;
+      if(dark>=35)rows.push({y,height});
+    }
+    if(!rows.length)return {lines:[],meta:{c:'MIYAMA-EAST',b:'1'},text:''};
+    const table=document.createElement('canvas');table.width=(widths.reduce((sum,width)=>sum+width,0)+gap*(columns.length-1))*zoom;table.height=rowPixels*rows.length*zoom;
+    const tableContext=table.getContext('2d');tableContext.fillStyle='#fff';tableContext.fillRect(0,0,table.width,table.height);tableContext.imageSmoothingEnabled=false;
+    rows.forEach((row,rowIndex)=>{let x=0;columns.forEach(([start],columnIndex)=>{const sourceX=Math.round(canvas.width*start)+3;const width=widths[columnIndex];tableContext.drawImage(canvas,sourceX,row.y,width,row.height,x*zoom,rowIndex*rowPixels*zoom,width*zoom,row.height*zoom);x+=width+gap;});});
+    const tableResult=await Tesseract.recognize(table,'eng',{tessedit_pageseg_mode:'6'});const text=String(tableResult.data.text||'');
+    const lines=[];const seen=new Set();
+    text.split(/\r?\n/).forEach(row=>{
+      const normalized=normalizeImportToken(row);const partMatch=normalized.match(/[0-9A-Z]{5}-[0-9A-Z]{4,5}(?:-[0-9A-Z])?/);if(!partMatch)return;
+      const partNumber=partMatch[0];const partIndex=row.toUpperCase().indexOf(partNumber);const tail=row.slice(Math.max(0,partIndex+partNumber.length));
+      const numbers=(tail.match(/\d{1,3}(?:,\d{3})+|\d+/g)||[]).map(value=>Number(value.replace(/,/g,'')));
+      if(numbers.length<2)return;const packQty=numbers[0],totalQty=numbers.at(-1);const kanbanCount=totalQty%packQty===0?totalQty/packQty:0;
+      if(!packQty||!kanbanCount||seen.has(partNumber))return;
+      const prefix=row.slice(0,Math.max(0,partIndex));const backNo=(prefix.match(/^\s*(\d+)/)||[])[1]||'';
+      seen.add(partNumber);lines.push({partNumber,totalQty,packQty,kanbanCount,backNo,anchor:null});
+    });
+    const metaCanvas=document.createElement('canvas');metaCanvas.width=Math.round(canvas.width*.36)*3;metaCanvas.height=Math.round(canvas.height*.08)*3;
+    metaCanvas.getContext('2d').drawImage(canvas,Math.round(canvas.width*.30),Math.round(canvas.height*.085),Math.round(canvas.width*.36),Math.round(canvas.height*.08),0,0,metaCanvas.width,metaCanvas.height);
+    const metaResult=await Tesseract.recognize(metaCanvas,'eng',{tessedit_pageseg_mode:'6'});const metaText=String(metaResult.data.text||'');
+    const date=metaText.match(/(20\d{2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,2})/);const fileDate=String(fileName).match(/(\d{1,2})月(\d{1,2})日/);const year=(metaText.match(/\b(20\d{2})\b/)||[])[1]||String(new Date().getFullYear());const bin=metaText.match(/(?:^|\s)(\d{1,2})\s+20\d{2}\s*\//m);
+    const meta={c:'MIYAMA-EAST',b:bin?bin[1]:'1'};if(fileDate)meta.d=year+fileDate[1].padStart(2,'0')+fileDate[2].padStart(2,'0');else if(date)meta.d=date[1]+date[2].padStart(2,'0')+date[3].padStart(2,'0');
+    return {lines,meta,text:`${metaText}\n${text}`};
+  }
+
+  async function extractOcrData(renderedPages,pageNumber=1,totalPages=renderedPages.length) {
+    if (!window.Tesseract) throw new Error('OCRライブラリを読み込めませんでした');
+    const words=[];const text=[];
+    for (let index=0;index<renderedPages.length;index++) {
+      showNotice('importNotice','warn',`スキャンPDFを解析中… ${pageNumber}/${totalPages}ページ`);
+      const result=await Tesseract.recognize(renderedPages[index].canvas,'eng',{
+        logger: message => {
+          if (message.status==='recognizing text' && Number.isFinite(message.progress)) {
+            showNotice('importNotice','warn',`スキャンPDFを文字認識中… ${Math.round(message.progress*100)}%`);
+          }
+        }
+      });
+      text.push(result.data.text||'');
+      const scale=renderedPages[index].scale;
+      (result.data.words||[]).forEach(word=>{
+        const text=normalizeImportToken(word.text);
+        if(text) words.push({text,x:(word.bbox.x0||0)/scale,y:(word.bbox.y0||0)/scale,ocr:true});
+      });
+    }
+    return {words,text:text.join('\n')};
+  }
+
+  async function importPdf() {
+    const file=document.getElementById('pdfFile').files[0];
+    if(!file){showNotice('importNotice','warn','注文書PDFを選択してください。');return;}
+    if(!window.pdfjsLib){showNotice('importNotice','error','PDF読込ライブラリを読み込めませんでした。ネットワークを確認してください。');return;}
+    try {
+      const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+      state.originalPages=[];state.generatedPages=[];state.lines=[];
+      document.getElementById('qrResult').classList.remove('show');document.getElementById('printSheet').innerHTML='';
+      const unreadable=[];let usedOcr=false;let usedKyb=false;let usedMiyamaEast=false;let copiedOrder=null;
+      for(let p=1;p<=pdf.numPages;p++){
+        showNotice('importNotice','warn',`PDFを解析中… ${p}/${pdf.numPages}ページ`);
+        const page=await pdf.getPage(p);const content=await page.getTextContent();
+        const words=[];
+        content.items.forEach(item=>{const text=String(item.str||'').trim();if(!text)return;const rotated=Math.abs(Number(item.transform[0])||0)<Math.abs(Number(item.transform[1])||0);const x=Number(item.transform[rotated?5:4])||0;const y=Number(item.transform[rotated?4:5])||0;words.push({text,x,y});});
+        const scale=1.8;const viewport=page.getViewport({scale});const originalCanvas=document.createElement('canvas');originalCanvas.width=Math.ceil(viewport.width);originalCanvas.height=Math.ceil(viewport.height);
+        const originalContext=originalCanvas.getContext('2d');originalContext.fillStyle='#ffffff';originalContext.fillRect(0,0,originalCanvas.width,originalCanvas.height);await page.render({canvasContext:originalContext,viewport,background:'#ffffff'}).promise;
+        const orientation=originalCanvas.height>originalCanvas.width?'portrait':'landscape';
+        if(copiedOrder&&looksLikeMiyamaEastForm(originalCanvas)){
+          state.originalPages.push({src:originalCanvas.toDataURL('image/png'),orientation,meta:{...copiedOrder.meta},copyOf:0,skipQr:true,format:'miyamaEast'});continue;
+        }
+        let found=findOrderLines(words);let pageKyb=false;let pageMiyamaEast=false;let ocrText='';let specialMeta={};
+        if(!found.length){found=findKybOrderLines(words);pageKyb=found.length>0;usedKyb=usedKyb||pageKyb;}
+        if(!found.length&&looksLikeMiyamaEastForm(originalCanvas)){
+          showNotice('importNotice','warn',`ミヤマ東日本の明細を解析中… ${p}/${pdf.numPages}ページ`);
+          const special=await extractMiyamaEastData(originalCanvas,file.name);found=special?.lines||[];ocrText=special?.text||'';specialMeta=special?.meta||{};pageMiyamaEast=found.length>0;usedMiyamaEast=usedMiyamaEast||pageMiyamaEast;usedOcr=usedOcr||pageMiyamaEast;
+        }
+        if(!found.length&&orientation==='landscape'&&!words.length){
+          showNotice('importNotice','warn',`注文書の明細行を高速解析中… ${p}/${pdf.numPages}ページ`);
+          const structured=await extractStructuredOrderData(originalCanvas);
+          if(structured.lines.length){found=structured.lines;ocrText=structured.text;usedOcr=true;}
+        }
+        if(!found.length){
+          const ocr=await extractOcrData([{canvas:originalCanvas,scale}],p,pdf.numPages);
+          ocrText=ocr.text;words.push(...ocr.words);found=findOrderLines(ocr.words);
+          if(!found.length)found=findOrderLinesFromOcrText(ocrText);
+          usedOcr=true;
+        }
+        const meta={...extractPageMeta(words,found[0]?.anchor,pageKyb,ocrText),...specialMeta};
+        state.originalPages.push({src:originalCanvas.toDataURL('image/png'),orientation,meta,...(pageMiyamaEast?{format:'miyamaEast'}:{})});
+        if(!found.length){unreadable.push(p);continue;}
+        found.forEach(line=>state.lines.push({partNumber:line.partNumber,totalQty:line.totalQty,backNo:line.backNo,packQty:(pageKyb||pageMiyamaEast)?(line.packQty||''):(getPackQty(line.partNumber)||''),pageIndex:p-1}));
+        if(pageMiyamaEast)copiedOrder={meta,lines:found};
+      }
+      fillFormMeta(state.originalPages[0]?.meta||{});state.importedFormMeta=getFormMeta();renderLines();
+      if(unreadable.length){showNotice('importNotice','warn',`${unreadable.join('、')}ページの明細を取得できませんでした。該当ページの明細を確認して入力してください。自動印刷は停止しました。`);document.getElementById('newLinePage').value=String(unreadable[0]-1);document.getElementById('editDetailsButton').classList.add('show');return;}
+      const missing=state.lines.filter(line=>!line.packQty).length;
+      if(missing){showNotice('importNotice','warn',`${pdf.numPages}ページ・${state.lines.length}品番を取り込みました。${missing}件の入数を確定できません。原本を確認して入力してください。自動印刷は停止しました。`);document.getElementById('editDetailsButton').classList.add('show');return;}
+      showNotice('importNotice','ok',`${pdf.numPages}ページ・${state.lines.length}品番を${usedMiyamaEast?'ミヤマ東日本明細として':usedOcr?'OCRを含めて':usedKyb?'KYB明細として':''}取り込みました。${usedMiyamaEast?'1ページ目に':'ページごとに'}QRを発行します。`);generateQr();
+    }catch(error){console.error(error);showNotice('importNotice','error',`PDFの読み込みに失敗しました。${error.message||''}`);}
+  }
+
+  function initFirebase() { try { if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);database=firebase.database();loadMasterFromFirebase(); }catch(error){console.warn(error);setStatus('off','ローカル保存');} }
+  document.addEventListener('DOMContentLoaded',()=>{const adminMode=new URLSearchParams(location.search).get('view')==='admin';if(adminMode){document.body.classList.add('admin-mode');document.getElementById('pageTitle').textContent='入数マスター管理';document.getElementById('pageSubtitle').textContent='明細QR発行に使用する品番ごとの入数を管理';document.getElementById('viewSwitch').href='order_qr_generator.html';document.getElementById('viewSwitch').textContent='発行画面へ';}['customerId','orderNo','deliveryDate','deliveryBin','destinationCode','receivingCode'].forEach(id=>document.getElementById(id).addEventListener('input',invalidateGeneratedQr));state.master=normalizeMaster(JSON.parse(localStorage.getItem(storageKey())||'[]'));renderMaster();renderLines();initFirebase();});
+</script>
+</body>
+</html>
