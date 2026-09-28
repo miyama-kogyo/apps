@@ -2386,6 +2386,22 @@ function renderPastChangePoints(list, boxId, contentId) {
   let allDataCacheTime = 0;
   const CACHE_TTL = 60000; // 1分
 
+  function findAnomalyById(id){
+    if (!id) return null;
+    return anomalyCache.find(item => item._id === id)
+      || filteredCache.find(item => item._id === id)
+      || allDataCache?.find(item => item._id === id)
+      || null;
+  }
+
+  function updateAnomalyCaches(id, updates){
+    [anomalyCache, filteredCache, allDataCache].forEach(cache => {
+      if (!Array.isArray(cache)) return;
+      const index = cache.findIndex(item => item._id === id);
+      if (index !== -1) cache[index] = { ...cache[index], ...updates };
+    });
+  }
+
   async function fetchAllData(){
     const now = Date.now();
     if (allDataCache && (now - allDataCacheTime) < CACHE_TTL) {
@@ -5789,7 +5805,7 @@ function ep(tab, field, itemValue) {
 }
   // 編集モーダルUI描画
   function renderEditModalUI() {
-    const item = anomalyCache.find(x => x._id === editingId);
+    const item = findAnomalyById(editingId);
     if (!item) return;
     
     const container = document.getElementById('editFormContent');
@@ -5972,7 +5988,7 @@ function ep(tab, field, itemValue) {
 document.getElementById('btnEditSave').addEventListener('click', async () => {
   if (!editingId) return;
   
-  const item = anomalyCache.find(x => x._id === editingId);
+  const item = findAnomalyById(editingId);
   if (!item) return;
   
   const btn = document.getElementById('btnEditSave');
@@ -6112,12 +6128,8 @@ if (editCurrentTab === 'tech') {
       }
     }
     
-    const idx = anomalyCache.findIndex(x => x._id === editingId);
-    if (idx !== -1) {
-      anomalyCache[idx] = { ...anomalyCache[idx], ...updates };
-      filteredCache = [...anomalyCache];
-      renderHistory();
-    }
+    updateAnomalyCaches(editingId, updates);
+    renderHistory();
     
     document.getElementById('editModal').classList.remove('active');
     editMfgPhotos = [];
