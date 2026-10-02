@@ -1,82 +1,102 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAuth() {
+    function isSignedIn() {
       return request.auth != null;
     }
-
-    function isAdmin() {
-      return isAuth() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin';
+    function emailPasswordUser() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password';
     }
-
-    // 自分のユーザープロフィールは読み書き可、管理者は全ユーザー読み取り可
+    function isAdminEmail() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && [
+          'motsu922@icloud.com',
+          'miyama.firebase@gmail.com'
+        ].hasAny([request.auth.token.email]);
+    }
+    function isRoleAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin';
+    }
+    function isIdmngAdmin() {
+      return isAdminEmail() || isRoleAdmin();
+    }
+    function canUseApp() {
+      return emailPasswordUser() || isIdmngAdmin();
+    }
+    function isOwnUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    match /platform_apps/{docId} {
+      allow read, write: if true;
+    }
+    match /platform_config/{docId} {
+      allow read, write: if true;
+    }
+    match /quality_cases/{docId} {
+      allow read, create, update, delete: if canUseApp();
+    }
+    match /qc_members/{docId} {
+      allow read, create, update, delete: if canUseApp();
+    }
+    match /chat_messages/{docId} {
+      allow read, create: if canUseApp();
+      allow update, delete: if false;
+    }
+    match /fcm_tokens/{docId} {
+      allow read, create, update, delete: if canUseApp();
+    }
+    match /system/{docId} {
+      allow read, write: if canUseApp();
+    }
+    match /auditLogs/{docId} {
+      allow create: if canUseApp();
+      allow read, update, delete: if isIdmngAdmin();
+    }
     match /users/{userId} {
-      allow read, write: if isAuth() && request.auth.uid == userId;
-      allow read: if isAdmin();
+      allow read: if isOwnUser(userId) || isIdmngAdmin();
+      allow create: if isOwnUser(userId)
+        && (
+          isAdminEmail()
+          || request.resource.data.get('role', 'user') == 'user'
+        );
+      allow update: if isIdmngAdmin()
+        || (
+          isOwnUser(userId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isDisabled'])
+        );
+      allow delete: if isIdmngAdmin();
     }
-
-    // 端末管理（読み取りは全認証ユーザー、書き込みは管理者のみ）
-    match /devices/{deviceId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+    match /devices/{docId} {
+      allow read: if isSignedIn();
+      allow write: if canUseApp();
     }
-
-    // 端末申請（作成は全認証ユーザー、管理は管理者）
-    match /deviceRequests/{requestId} {
-      allow create: if isAuth();
-      allow read, update, delete: if isAdmin();
+    match /deviceRequests/{docId} {
+      allow create: if true;
+      allow read, update, delete: if canUseApp();
     }
-
-    // 監査ログ（書き込みは全認証ユーザー、読み取りは管理者）
-    match /auditLogs/{logId} {
-      allow create: if isAuth();
-      allow read: if isAdmin();
+    match /pastTroubles/{docId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if canUseApp();
     }
-
-    // 異常履歴（全認証ユーザーが読み書き可）
-    match /anomalies/{anomalyId} {
-      allow read, write: if isAuth();
+    match /videoManuals/{manualId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn();
     }
-
-    // 発見タイミングは全認証ユーザーが追加可能。変更・削除は管理者のみ。
-    match /masters/discoveryTiming/items/{itemId} {
-      allow read: if isAuth();
-      allow create: if isAuth()
-        && request.resource.data.keys().hasOnly(['name', 'createdBy', 'createdAt'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 50
-        && request.resource.data.createdBy is string;
-      allow update, delete: if isAdmin();
+    match /approvalRequests/{requestId} {
+      allow read, create, update: if isSignedIn();
     }
-
-    // その他のマスタデータ（読み取りは全認証ユーザー、書き込みは管理者）
-    match /masters/{masterId}/{subcollection=**} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+    match /viewLogs/{logId} {
+      allow read, create: if isSignedIn();
     }
-
-    // 修理報告
-    match /repairReports/{reportId} {
-      allow read, write: if isAuth();
+    match /flashTestResults/{resultId} {
+      allow read, create: if isSignedIn();
     }
-
-    // 品質案件
-    match /quality_cases/{caseId} {
-      allow read, write: if isAuth();
-    }
-
-    // 変化点
-    match /changepoints/{changepointId} {
-      allow read, write: if isAuth();
-    }
-
-    // 過去不具合
-    match /pastTroubles/{troubleId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+    match /{document=**} {
+      allow read, write: if canUseApp();
     }
   }
 }
