@@ -40,7 +40,19 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
 
-    // マスタデータ（読み取りは全認証ユーザー、書き込みは管理者）
+    // 発見タイミングは全認証ユーザーが追加可能。変更・削除は管理者のみ。
+    match /masters/discoveryTiming/items/{itemId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && request.resource.data.keys().hasOnly(['name', 'createdBy', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 50
+        && request.resource.data.createdBy is string;
+      allow update, delete: if isAdmin();
+    }
+
+    // その他のマスタデータ（読み取りは全認証ユーザー、書き込みは管理者）
     match /masters/{masterId}/{subcollection=**} {
       allow read: if isAuth();
       allow write: if isAdmin();

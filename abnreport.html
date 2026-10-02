@@ -889,6 +889,7 @@
             <option value="頭出し">頭出し</option>
             <option value="初物">初物</option>
             <option value="終物">終物</option>
+            <option value="保全時">保全時</option>
             <option value="その他">その他</option>
           </select>
         </div>
@@ -1355,6 +1356,16 @@
           <button class="btn btn-primary" style="width:auto;padding:10px 20px;margin:0;background:#2e7d32;" id="btnAddHandler">追加</button>
         </div>
         <div id="handlerList" style="display:grid;gap:8px;"></div>
+      </div>
+
+      <div style="background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-top:16px;">
+        <h3 style="color:#00838f;margin-bottom:10px;">発見タイミング管理</h3>
+        <p style="color:#666;font-size:.88rem;line-height:1.5;margin-bottom:10px;">追加した項目は発信部署入力と過去履歴の編集に反映されます。</p>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <input type="text" id="newDiscoveryTiming" placeholder="新しい発見タイミング" style="flex:1;padding:10px;border:2px solid #e0e0e0;border-radius:6px;">
+          <button class="btn btn-primary" style="width:auto;padding:10px 20px;margin:0;background:#00838f;" id="btnAddDiscoveryTiming">追加</button>
+        </div>
+        <div id="discoveryTimingMasterList" style="display:grid;gap:8px;"></div>
       </div>
 
       <div style="background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);margin-top:16px;">
@@ -1898,6 +1909,7 @@ async function registerThisDevice(){
 }
 
 function applyRoleUi(role){
+  activeUserRole = role || 'user';
   // v17: 一般ユーザーもマスター管理を利用可
   const masterTabBtn = document.querySelector('.tab[data-tab="master"]');
   if (masterTabBtn) masterTabBtn.style.display = '';
@@ -2283,15 +2295,18 @@ let editDeletedTechPhotoUrls = [];
   let mastersCache = null;
   let unsubscribeSnapshot = null;
 let editPendingData = { mfg: {}, tech: {} }; //
+let activeUserRole = 'user';
+const DEFAULT_DISCOVERY_TIMINGS = ['生産中','頭出し','初物','終物','保全時','その他'];
   // マスタデータはキャッシュして再利用
   async function fetchMasters(){
     if (mastersCache) return mastersCache;
 
-    const [depSnap, lineSnap, hSnap, causeSnap] = await Promise.all([
+    const [depSnap, lineSnap, hSnap, causeSnap, discoveryTimingSnap] = await Promise.all([
       getDocs(collection(db,'masters','department','items')),
       getDocs(collection(db,'masters','line','items')),
       getDocs(collection(db,'masters','handler','items')),
-      getDocs(collection(db,'masters','causeCategory','items'))
+      getDocs(collection(db,'masters','causeCategory','items')),
+      getDocs(collection(db,'masters','discoveryTiming','items'))
     ]);
 
     const departments = depSnap.docs.map(d=>d.data().name).sort();
@@ -2321,8 +2336,36 @@ let editPendingData = { mfg: {}, tech: {} }; //
         return a.name.localeCompare(b.name, 'ja');
       });
 
-    mastersCache = { departments, lines, handlers, causeCategories };
+    const discoveryTimings = discoveryTimingSnap.docs
+      .map(d => String(d.data()?.name || '').trim())
+      .filter(Boolean)
+      .sort((a,b) => a.localeCompare(b, 'ja'));
+
+    mastersCache = { departments, lines, handlers, causeCategories, discoveryTimings };
     return mastersCache;
+  }
+
+  function getDiscoveryTimingOptions(extraValue = ''){
+    return Array.from(new Set([
+      ...DEFAULT_DISCOVERY_TIMINGS,
+      ...(mastersCache?.discoveryTimings || []),
+      String(extraValue || '').trim()
+    ].filter(Boolean)));
+  }
+
+  function renderDiscoveryTimingOptions(selectedValue = ''){
+    const selected = String(selectedValue || '').trim();
+    return `<option value="">選択</option>` + getDiscoveryTimingOptions(selected)
+      .map(name => `<option value="${escapeHtml(name)}" ${name === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`)
+      .join('');
+  }
+
+  function refreshDiscoveryTimingSelect(selectedValue = null){
+    const select = document.getElementById('discoveryTiming');
+    if (!select) return;
+    const selected = selectedValue === null ? select.value : selectedValue;
+    select.innerHTML = renderDiscoveryTimingOptions(selected);
+    select.value = selected || '';
   }
 
   // 整理Noの正規化
@@ -3276,6 +3319,7 @@ ${item.traceback ? `
     await loadInitialData();
     await updateDepartmentList();
     await updateCauseCategoryManageList();
+    await updateDiscoveryTimingManageList();
     setNowDateTo('occurrenceDate');
     initAndonLaunchButton();
     initAndonCompletionBridge();
@@ -5497,6 +5541,63 @@ document.addEventListener('click', async (e)=>{
     await updateHandlerManageList();
   });
 
+  async function updateDiscoveryTimingManageList(){
+    const list = document.getElementById('discoveryTimingMasterList');
+    if (!list) return;
+    const snap = await getDocs(collection(db,'masters','discoveryTiming','items'));
+    const customRows = snap.docs
+      .map(d => ({ id:d.id, name:String(d.data()?.name || '').trim() }))
+      .filter(row => row.name)
+      .sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+    const rows = [
+      ...DEFAULT_DISCOVERY_TIMINGS.map(name => ({ name, fixed:true })),
+      ...customRows.filter(row => !DEFAULT_DISCOVERY_TIMINGS.includes(row.name)).map(row => ({ ...row, fixed:false }))
+    ];
+    list.innerHTML = rows.map(row => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8f9fa;border-radius:6px;border-left:3px solid #00838f;">
+        <span style="font-weight:500;color:#333">${escapeHtml(row.name)}</span>
+        ${row.fixed
+          ? '<span style="font-size:.78rem;color:#777;">標準項目</span>'
+          : (activeUserRole === 'admin' ? `<button class="btn-small btn-delete" data-del-discovery-timing="${row.id}">削除</button>` : '<span style="font-size:.78rem;color:#777;">追加項目</span>')}
+      </div>`).join('');
+    mastersCache = null;
+    mastersCache = await fetchMasters();
+    refreshDiscoveryTimingSelect();
+  }
+
+  document.getElementById('btnAddDiscoveryTiming')?.addEventListener('click', async ()=>{
+    const input = document.getElementById('newDiscoveryTiming');
+    const name = String(input?.value || '').trim();
+    if (!name){ alert('発見タイミングを入力してください'); return; }
+    if (name.length > 50){ alert('発見タイミングは50文字以内で入力してください'); return; }
+    if (getDiscoveryTimingOptions().includes(name)){ alert('同じ発見タイミングが登録されています'); return; }
+    try {
+      await addDoc(collection(db,'masters','discoveryTiming','items'), {
+        name,
+        createdBy: auth.currentUser?.email || auth.currentUser?.uid || '',
+        createdAt: serverTimestamp()
+      });
+      input.value = '';
+      await updateDiscoveryTimingManageList();
+    } catch (error) {
+      console.error('発見タイミングの追加に失敗:', error);
+      alert('発見タイミングの追加に失敗しました: ' + (error.code || error.message));
+    }
+  });
+
+  document.addEventListener('click', async (e)=>{
+    const del = e.target.closest('button[data-del-discovery-timing]');
+    if (!del) return;
+    if (!confirm('この発見タイミングを削除しますか？')) return;
+    try {
+      await deleteDoc(doc(db,'masters','discoveryTiming','items', del.getAttribute('data-del-discovery-timing')));
+      await updateDiscoveryTimingManageList();
+    } catch (error) {
+      console.error('発見タイミングの削除に失敗:', error);
+      alert('発見タイミングの削除に失敗しました: ' + (error.code || error.message));
+    }
+  });
+
   async function updateCauseCategoryManageList(){
     const list = document.getElementById('causeCategoryMasterList');
     if (!list) return;
@@ -5776,6 +5877,7 @@ function saveEditTabData() {
       traceback:           document.getElementById('edit_traceback')?.value           ?? null,
       lotNo:               document.getElementById('edit_lotNo')?.value               ?? null,
       qualityResponse:     document.getElementById('edit_qualityResponse')?.value     ?? null,
+      discoveryTiming:     document.getElementById('edit_discoveryTiming')?.value     ?? null,
       occurrenceTiming:    document.getElementById('edit_occurrenceTiming')?.value    ?? null,
       recurrenceType:      document.getElementById('edit_recurrenceType')?.value      ?? null,
       changePointCategory: document.getElementById('edit_changePointCategory')?.value ?? null,
@@ -5836,6 +5938,10 @@ function ep(tab, field, itemValue) {
         <div class="form-group"><label>遡り</label><input type="text" id="edit_traceback" value="${item.traceback || ''}"></div>
         <div class="form-group"><label>LotNo</label><input type="text" id="edit_lotNo" value="${item.lotNo || ''}"></div>
         <div class="form-group"><label>品質対応</label><textarea id="edit_qualityResponse">${item.qualityResponse || ''}</textarea></div>
+        <div class="form-group">
+          <label>発見タイミング</label>
+          <select id="edit_discoveryTiming">${renderDiscoveryTimingOptions(ep('mfg','discoveryTiming', item.discoveryTiming))}</select>
+        </div>
         <div class="form-group">
           <label>発生タイミング *</label>
           <select id="edit_occurrenceTiming" required>
@@ -6012,6 +6118,7 @@ document.getElementById('btnEditSave').addEventListener('click', async () => {
       updates.traceback = document.getElementById('edit_traceback')?.value || '';
       updates.lotNo = document.getElementById('edit_lotNo')?.value || '';
       updates.qualityResponse = document.getElementById('edit_qualityResponse')?.value || '';
+      updates.discoveryTiming = document.getElementById('edit_discoveryTiming')?.value || '';
       updates.occurrenceTiming = document.getElementById('edit_occurrenceTiming')?.value || '';
       updates.recurrenceType = document.getElementById('edit_recurrenceType')?.value || '';
       updates.changePointCategory = document.getElementById('edit_changePointCategory')?.value || '';
