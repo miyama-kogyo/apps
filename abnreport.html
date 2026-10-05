@@ -5663,8 +5663,13 @@ document.addEventListener('click', async (e)=>{
   // 過去の異常履歴ボタン
   document.getElementById('btnShowPastOnMfg')?.addEventListener('click', async () => {
     const serialNo = document.getElementById('serialNo').value.trim();
+    const anomalyContent = document.getElementById('anomalyContent').value.trim();
     if (!serialNo) {
       alert('整理Noを入力してください');
+      return;
+    }
+    if (!anomalyContent) {
+      alert('類似度を計算するため、異常内容を入力してください');
       return;
     }
     
@@ -5681,7 +5686,13 @@ document.addEventListener('click', async (e)=>{
       const matchingData = allData.filter(item => {
         const normalizedSerial = normalizeSerial(item.serialNo || '');
         return normalizedSerial.includes(normalizedSearch);
-      }).sort((a, b) => (b.occurrenceDate || '').localeCompare(a.occurrenceDate || ''));
+      }).map(item => ({
+        ...item,
+        similarity: calculateSimilarity(anomalyContent, item.anomalyContent || '')
+      })).sort((a, b) => (b.similarity !== a.similarity)
+        ? (b.similarity - a.similarity)
+        : (b.occurrenceDate || '').localeCompare(a.occurrenceDate || '')
+      );
       
       if (matchingData.length === 0) {
         content.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">該当する過去データがありません</div>';
@@ -5689,19 +5700,13 @@ document.addEventListener('click', async (e)=>{
       }
       
       const displayData = matchingData.slice(0, 5);
-      content.innerHTML = renderSimilarList(displayData.map(item => ({
-        ...item,
-        similarity: 100
-      })));
+      content.innerHTML = renderSimilarList(displayData);
       
       const showMoreBtn = document.getElementById('mfgShowMore');
       if (matchingData.length > 5) {
         showMoreBtn.style.display = 'block';
         showMoreBtn.onclick = () => {
-          content.innerHTML = renderSimilarList(matchingData.map(item => ({
-            ...item,
-            similarity: 100
-          })));
+          content.innerHTML = renderSimilarList(matchingData);
           showMoreBtn.style.display = 'none';
         };
       } else {
