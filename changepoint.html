@@ -736,7 +736,7 @@
     .detail-card-toolbar { display:flex; gap:8px; flex-wrap:wrap; padding:12px 24px; background:#eef4f0; }
     .detail-card-toolbar button { border:1px solid #aabeb0; border-radius:4px; background:white; padding:9px 14px; color:#26513b; font:inherit; font-size:14px; cursor:pointer; }
     .detail-card-toolbar[hidden] { display:none; }
-    #approvalWorkflow { scroll-margin-top:100px; }
+    #approvalWorkflow { scroll-margin-top:100px; width:calc(100% - 32px); margin:0 16px 16px; }
     .registration-result { margin:14px 0; padding:16px 0; border-block:1px solid #b5ccbd; display:flex; align-items:center; gap:12px; flex-wrap:wrap; color:#176349; }
     .registration-result[hidden] { display:none; }
     .board-filter-toggle,.board-mobile-views { display:none; }
@@ -808,6 +808,48 @@
       .detail-card-toolbar { padding:12px; }
     }
 
+
+    .stamp-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .workflow-stamps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .workflow-stamp { min-width:0; text-align:center; }
+    .stamp-role { display:flex; flex-direction:column; gap:3px; font-size:13px; color:#55675e; }
+    .stamp-role small { font-size:11px; }
+    .stamp-seal { width:106px; min-height:106px; margin:8px auto; border:2px dashed #c5cdc7; border-radius:50%; display:flex; flex-direction:column; justify-content:center; color:#859288; padding:12px 5px; }
+    .stamp-name { font-size:15px; font-weight:700; overflow-wrap:anywhere; line-height:1.3; }
+    .stamp-seal time { display:block; border-top:1px solid currentColor; margin:5px 4px 0; padding-top:4px; font-size:10px; line-height:1.35; }
+    .is-stamped .stamp-seal { border:2px solid #b7473e; color:#a33832; background:#fffdfc; }
+    .is-next .stamp-role { color:#176349; }
+    .is-next .stamp-seal { border-color:#63947b; color:#416d53; }
+    .stamp-department { font-size:11px; color:#69786f; overflow-wrap:anywhere; }
+    .stamp-action { padding:14px 0; margin-top:12px; border-top:1px solid #d4ded7; }
+    .stamp-action label { display:block; font-size:13px; font-weight:600; margin-bottom:7px; color:#176349; }
+    .stamp-action>div { display:flex; gap:8px; }
+    .stamp-action input { flex:1; min-width:0; max-width:250px; border:1px solid #bdcbc2; border-radius:4px; padding:9px; font:inherit; font-size:16px; }
+    .stamp-action button { min-height:42px; font-size:14px; border-radius:4px; }
+    .workflow-fold { border-top:1px solid #d4ded7; padding:12px 0 0; margin-top:12px; scroll-margin-top:100px; }
+    .workflow-fold summary { cursor:pointer; font-size:14px; font-weight:600; }
+    .workflow-fold summary span { font-size:12px; font-weight:400; color:#627369; margin-left:8px; }
+    .workflow-fold[open] summary { margin-bottom:12px; }
+    .responder-checks h4 { font-size:13px; margin-bottom:10px; }
+    @media(max-width:700px){
+      .workflow-stamps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 8px; }
+      .stamp-seal { width:94px; min-height:94px; margin:5px auto; padding:10px 5px; }
+      .stamp-name { font-size:14px; }
+      .stamp-action>div { flex-wrap:wrap; }
+      .stamp-action input { max-width:none; flex-basis:100%; }
+      .stamp-action button { width:100%; }
+      #detailActions { padding:12px!important; }
+      #detailModal { padding:10px; }
+      #detailModal .modal-content { max-height:94dvh; }
+      #detailModal .modal-header { padding:12px 14px; }
+      #detailModal .modal-header h3 { font-size:17px; }
+      #detailModal .modal-close { min-width:32px; min-height:32px; }
+      #detailModal .modal-badges { padding:8px 14px; }
+      #detailModal .modal-body { padding:14px; }
+      .stamp-heading .approval-status-badge { font-size:11px; }
+      .workflow-fold summary { font-size:13px; }
+      .workflow-fold summary span { display:block; margin:4px 0 0 16px; }
+    }
   </style>
 </head>
 <body>
@@ -1073,7 +1115,7 @@
             <div class="hint" style="margin-bottom:8px;">対象外の項目はチェックを外せます。発信部署独自の確認項目も追加できます。</div>
             <div id="planChecklistPreview" class="checklist-panel"><div class="checklist-empty">変化点分類を選択してください</div></div>
             <div class="approval-add" style="margin-top:10px;">
-              <input type="text" id="planCustomCheckText" placeholder="発信部署の任意チェック項目">
+              <input type="text" id="planCustomCheckText" placeholder="対応者に確認してほしい項目">
               <button type="button" id="btnAddPlanCustomCheck">追加</button>
             </div>
             <div id="planCustomCheckList" class="custom-check-list"></div>
@@ -1236,9 +1278,9 @@
         <button type="button" id="btnCardWorkflow">確認・承認へ</button>
         <button type="button" id="btnCardPrint">カード印刷・QR</button>
       </div>
+      <div id="approvalWorkflow" class="approval-panel" style="display:none;"></div>
       <div class="modal-body" id="detailBody"></div>
       <div id="detailActions" class="modal-actions" style="display:none;padding:16px 24px;border-top:1px solid #e0e0e0;gap:12px;flex-direction:column;">
-        <div id="approvalWorkflow" class="approval-panel" style="display:none;"></div>
         <div id="switchFlowGuide" class="switch-flow-guide" style="display:none;">
           <div class="switch-flow-title">🧭 製造：切替えフロー</div>
           <div class="switch-flow-steps">
@@ -1971,7 +2013,7 @@
       if (boardCompleted(p)) return '完了';
       if (p.switchStatus === 'postponed') return '延期';
       if (p.workflowManaged || p.type === 'planned'){
-        return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 確認待ち', receiver_confirmed:'発生部署 承認待ち' })[approvalStatusOf(p)] || '未完了';
+        return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 対応待ち', receiver_confirmed:'発生部署 承認待ち' })[approvalStatusOf(p)] || '未完了';
       }
       return boardTracked(p) ? '未完了' : '完了管理なし';
     }
@@ -2649,7 +2691,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     function approvalStatusLabel(status){
-      return ({ draft:'発信部署 作成済み', sender_approved:'発信部署 承認済み', receiver_confirmed:'発生部署 確認済み', approved:'承認完了' })[status] || '未承認';
+      return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 対応待ち', receiver_confirmed:'発生部署 承認待ち', approved:'承認完了' })[status] || '未承認';
     }
 
     function formatAuditTime(value){
@@ -2659,6 +2701,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     function roleItems(items, role){
+      if (role === 'receiver') return items;
       return items.filter(x => (x.owner || 'both') === 'both' || x.owner === role);
     }
 
@@ -2679,15 +2722,47 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!list.length) return '<div class="checklist-empty">対象のチェック項目はありません</div>';
       return list.map(item => {
         const result = checklistResult(item, role);
-        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select>${role === 'sender' && !disabled ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : ''}</div>`;
+        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select>${approvalStatusOf(currentDetailItem) === 'draft' ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : ''}</div>`;
       }).join('');
     }
 
+    function workflowStampEntries(item){
+      return [
+        {department:'発信部署',role:'作成者',name:item.createdBy,at:item.createdAtLocal || item.createdAt},
+        {department:'発信部署',role:'承認者',name:item.senderApprovedBy,at:item.senderApprovedAt},
+        {department:'発生部署',role:'対応者',name:item.receiverConfirmedBy,at:item.receiverConfirmedAt},
+        {department:'発生部署',role:'承認者',name:item.receiverApprovedBy,at:item.receiverApprovedAt}
+      ];
+    }
+    function stampDate(value){
+      if (!value) return '日時未記録';
+      const d = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+      if (Number.isNaN(d.getTime())) return '日時未記録';
+      return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    }
+    function readStampName(){
+      const input = document.getElementById('workflowStampName');
+      const name = input?.value.trim() || '';
+      if (!name){ alert('スタンプに残す氏名を入力してください'); input?.focus(); return ''; }
+      localStorage.setItem('changepointActorName',name);
+      updateActorNameButton();
+      return name;
+    }
+    function workflowNotice(message, section){
+      const details = document.querySelector('[data-workflow-section="'+section+'"]');
+      if (details){ details.open=true; details.scrollIntoView({block:'start'}); }
+      alert(message);
+    }
     function renderApprovalWorkflow(item){
       const box = document.getElementById('approvalWorkflow');
       if (!box) return;
       const workflowManaged = item && (item.type === 'planned' || item.workflowManaged === true);
       if (!workflowManaged){ box.style.display = 'none'; box.innerHTML = ''; return; }
+      const sameItem = box.dataset.itemId === item._id && box.dataset.status === approvalStatusOf(item);
+      const opened = new Set(sameItem ? [...box.querySelectorAll('details[open]')].map(el=>el.dataset.workflowSection) : []);
+      const actor = sameItem ? (box.querySelector('#workflowStampName')?.value ?? '') : (localStorage.getItem('changepointActorName') || '');
+      box.dataset.itemId = item._id;
+      box.dataset.status = approvalStatusOf(item);
       box.style.display = 'block';
       const status = approvalStatusOf(item);
       const stage = APPROVAL_STAGES.indexOf(status);
@@ -2696,32 +2771,38 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const senderLocked = stage >= 1;
       const receiverEnabled = stage >= 1;
       const receiverLocked = stage >= 3;
-      const senderMeta = item.senderApprovedBy ? `${escapeHtml(item.senderApprovedBy)} / ${escapeHtml(formatAuditTime(item.senderApprovedAt))}` : '未承認';
-      const receiverConfirmMeta = item.receiverConfirmedBy ? `${escapeHtml(item.receiverConfirmedBy)} / ${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}` : '未確認';
-      const receiverApproveMeta = item.receiverApprovedBy ? `${escapeHtml(item.receiverApprovedBy)} / ${escapeHtml(formatAuditTime(item.receiverApprovedAt))}` : '未承認';
-      const stepLabels = ['作成', '発信部署承認', '発生部署確認', '発生部署承認'];
+      const actions = {
+        draft: ['発信部署の承認者', '承認スタンプを押す', 'approveSender()'],
+        sender_approved: ['発生部署の対応者', '対応スタンプを押す', 'confirmReceiver()'],
+        receiver_confirmed: ['発生部署の承認者', '承認して完了する', 'approveReceiver()']
+      };
+      const next = actions[status];
+      const receiverChecks = roleItems(items,'receiver');
+      const progress = (list,role) => list.filter(x=>['ok','na'].includes(checklistResult(x,role))).length+'/'+list.length;
       box.innerHTML = `
-        <div class="workflow-rule-box"><strong>運用ルール（MQW-09-01-品質-41-01）</strong><br>発生時に記入者と管理者が確認し、NGは処置後に再判定します。当日は完了後として管理し、翌日以降に確認者全員の完了後確認と関係部署の確認を終えてからファイル保管できます。</div>
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-          <strong style="color:#334155;">承認・5Mチェック</strong>
-          <span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span>
-        </div>
-        <div class="approval-steps">${stepLabels.map((label,index) => `<div class="approval-step ${index < stage ? 'done' : index === stage ? 'current' : ''}">${index + 1}. ${label}</div>`).join('')}</div>
-        <div class="approval-columns">
-          <section class="approval-column">
-            <h4>発信部署：${escapeHtml(item.planneddepartment || '-')}</h4>
-            <div class="checklist-panel">${renderApprovalChecklist(items, 'sender', senderLocked)}</div>
-            <div class="approval-meta">承認：${senderMeta}</div>
-            ${!senderLocked ? `<div class="approval-add"><input id="senderCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('sender')">追加</button></div>` : ''}
-          </section>
-          <section class="approval-column">
-            <h4>発生部署：${escapeHtml(item.department || '-')}</h4>
+        <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
+        <div class="workflow-stamps">${workflowStampEntries(item).map((stamp,index)=>`<div class="workflow-stamp ${stamp.name ? 'is-stamped' : ''} ${index===stage+1 && next ? 'is-next' : ''}">
+          <div class="stamp-role"><small>${escapeHtml(stamp.department)}</small><strong>${index+1}. ${escapeHtml(stamp.role)}</strong></div>
+          <div class="stamp-seal"><span class="stamp-name">${escapeHtml(stamp.name || (index===0 ? '氏名未記録' : '未押印'))}</span><time>${stamp.name ? escapeHtml(stampDate(stamp.at)) : '―'}</time></div>
+          <div class="stamp-department">${escapeHtml(index<2 ? item.planneddepartment || '-' : item.department || '-')}</div>
+        </div>`).join('')}</div>
+        ${next ? `<div class="stamp-action">
+          <label for="workflowStampName">次：${next[0]}</label>
+          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" onclick="${next[2]}">${next[1]}</button></div>
+        </div>` : ''}
+        <details class="workflow-fold" data-workflow-section="checks" ${opened.has('checks')?'open':''}>
+          <summary>対応者チェック <span>判定済み ${progress(receiverChecks,'receiver')}</span></summary>
+          <section class="responder-checks">
+            <h4>発生部署の対応者：${escapeHtml(item.department || '-')}</h4>
             <div class="checklist-panel">${renderApprovalChecklist(items, 'receiver', !receiverEnabled || receiverLocked)}</div>
-            <div class="approval-meta">確認：${receiverConfirmMeta}<br>承認：${receiverApproveMeta}</div>
+            ${!senderLocked ? `<div class="approval-add"><input id="senderCustomCheck" placeholder="確認項目を追加"><button type="button" onclick="addApprovalCustom('sender')">追加</button></div>` : ''}
             ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
           </section>
-        </div>
         ${excludedItems.length ? `<div class="excluded-checks"><strong>発行者が対象外とした項目</strong>${excludedItems.map((x,index) => `<div class="excluded-check-row"><span>${escapeHtml(x.label || '-') }</span>${!senderLocked ? `<button type="button" class="check-exclude-btn" onclick="restoreExcludedChecklist(${index})">対象に戻す</button>` : ''}</div>`).join('')}</div>` : ''}
+        </details>
+        <details class="workflow-fold" data-workflow-section="completion" ${opened.has('completion')?'open':''}>
+          <summary>完了条件・追加記録</summary>
+          <div class="workflow-rule-box">最終承認は実施日の翌日以降、完了後確認・関係部署確認・必要な継続管理を終えてから行います。</div>
         <div class="workflow-fields">
           <div class="form-group"><label>特別対応の状態<span class="required">*</span></label><select ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('specialHandlingStatus',this.value)"><option value="" ${!item.specialHandlingStatus ? 'selected' : ''}>選択</option><option value="in_progress" ${item.specialHandlingStatus === 'in_progress' ? 'selected' : ''}>対応中</option><option value="completed" ${item.specialHandlingStatus === 'completed' ? 'selected' : ''}>対応完了</option><option value="not_required" ${item.specialHandlingStatus === 'not_required' ? 'selected' : ''}>対応不要</option></select></div>
           <div class="form-group"><label>特記事項・NG対応内容</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('specialNotes',this.value)" placeholder="NGへの対応、再教育、識別方法など">${escapeHtml(item.specialNotes || '')}</textarea></div>
@@ -2732,12 +2813,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         </div>
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.continuedManagementRequired ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('continuedManagementRequired',this.checked)"><span>継続管理が必要（期限まで完了前として管理）</span></label>
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.relatedReviewCompleted ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('relatedReviewCompleted',this.checked)"><span>品質保証部・生産技術部への回覧と所見確認が完了した（起票部署が該当部署の場合の省略を含む）</span></label>
-        <div class="approval-actions">
-          ${status === 'draft' ? '<button class="btn" style="background:#2563eb;color:#fff;" onclick="approveSender()">発信部署で承認</button>' : ''}
-          ${status === 'sender_approved' ? '<button class="btn" style="background:#0f766e;color:#fff;" onclick="confirmReceiver()">発生部署で確認</button>' : ''}
-          ${status === 'receiver_confirmed' ? '<button class="btn" style="background:#15803d;color:#fff;" onclick="approveReceiver()">発生部署で最終承認・完了</button>' : ''}
-          <button class="btn" style="background:#334155;color:#fff;" onclick="printChangeCard()">変化点カード印刷</button>
-        </div>`;
+        </details>`;
     }
 
     async function saveChecklist(items){
@@ -2748,11 +2824,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     window.setApprovalResult = async function(key, role, result){
+      if (role !== 'receiver' || !['sender_approved','receiver_confirmed'].includes(approvalStatusOf(currentDetailItem))) return;
       const items = getRecordChecklist(currentDetailItem);
       const item = items.find(x => x.key === key);
       if (!item || !['','ok','ng','na'].includes(result)) return;
-      if (role === 'sender') { item.senderResult = result; item.senderChecked = ['ok','na'].includes(result); }
-      else { item.receiverResult = result; item.receiverChecked = ['ok','na'].includes(result); }
+      item.receiverResult = result;
+      item.receiverChecked = ['ok','na'].includes(result);
       try{ await saveChecklist(items); }
       catch(e){ console.error(e); alert('判定の保存に失敗しました'); renderApprovalWorkflow(currentDetailItem); }
     };
@@ -2817,9 +2894,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.approveSender = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'draft') return;
       const items = getRecordChecklist(currentDetailItem);
-      if (!allRoleChecksDone(items, 'sender')){ alert('発信部署の全項目をOKまたは該当なしにしてください。NGは対応後に再判定が必要です'); return; }
-      if (!confirm('発信部署の承認を登録しますか？')) return;
-      const who = getActorName();
+      const who = readStampName();
+      if (!who || !confirm(`${who} さんの発信部署承認スタンプを登録しますか？`)) return;
       try{
         await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:serverTimestamp() });
         currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:new Date() };
@@ -2829,8 +2905,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
 
     window.confirmReceiver = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'sender_approved') return;
-      if (!confirm('発生部署で内容を確認済みとして登録しますか？')) return;
-      const who = getActorName();
+      const items = getRecordChecklist(currentDetailItem);
+      if (!allRoleChecksDone(items, 'receiver')){ workflowNotice('対応者チェックをすべて合格または該当なしにしてください。NGは対応後に再判定が必要です', 'checks'); return; }
+      const who = readStampName();
+      if (!who || !confirm(`${who} さんの発生部署対応スタンプを登録しますか？`)) return;
       try{
         await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:serverTimestamp() });
         currentDetailItem = { ...currentDetailItem, approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:new Date() };
@@ -2841,23 +2919,23 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.approveReceiver = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'receiver_confirmed') return;
       const items = getRecordChecklist(currentDetailItem);
-      if (!allRoleChecksDone(items, 'receiver')){ alert('発生部署の全項目をOKまたは該当なしにしてください。NGのままでは完了できません'); return; }
-      if (!['completed','not_required'].includes(currentDetailItem.specialHandlingStatus)){ alert('特別対応を「対応完了」または「対応不要」にしてください'); return; }
-      if (currentDetailItem.specialHandlingStatus === 'completed' && !String(currentDetailItem.specialNotes || '').trim()){ alert('特別対応の内容を特記事項に入力してください'); return; }
-      if (!currentDetailItem.relatedReviewCompleted){ alert('品質保証部・生産技術部への回覧と所見確認を完了してください'); return; }
-      if (!String(currentDetailItem.completionConfirmers || '').trim()){ alert('完了後確認者を入力してください'); return; }
+      if (!allRoleChecksDone(items, 'receiver')){ workflowNotice('発生部署の全項目をOKまたは該当なしにしてください。NGのままでは完了できません', 'checks'); return; }
+      if (!['completed','not_required'].includes(currentDetailItem.specialHandlingStatus)){ workflowNotice('特別対応を「対応完了」または「対応不要」にしてください', 'completion'); return; }
+      if (currentDetailItem.specialHandlingStatus === 'completed' && !String(currentDetailItem.specialNotes || '').trim()){ workflowNotice('特別対応の内容を特記事項に入力してください', 'completion'); return; }
+      if (!currentDetailItem.relatedReviewCompleted){ workflowNotice('品質保証部・生産技術部への回覧と所見確認を完了してください', 'completion'); return; }
+      if (!String(currentDetailItem.completionConfirmers || '').trim()){ workflowNotice('完了後確認者を入力してください', 'completion'); return; }
       const today = ymdLocal(new Date());
       if (currentDetailItem.occurrenceDate){
         const nextDay = new Date(`${currentDetailItem.occurrenceDate}T00:00:00`); nextDay.setDate(nextDay.getDate() + 1);
         const earliest = ymdLocal(nextDay);
-        if (today < earliest){ alert(`完了後の最終承認は実施日の翌日（${earliest}）以降に行ってください`); return; }
+        if (today < earliest){ workflowNotice(`完了後の最終承認は実施日の翌日（${earliest}）以降に行ってください`, 'completion'); return; }
       }
       if (currentDetailItem.continuedManagementRequired){
-        if (!currentDetailItem.managementUntil){ alert('継続管理期限を設定してください'); return; }
-        if (today < currentDetailItem.managementUntil){ alert(`継続管理期間中です。${currentDetailItem.managementUntil}以降に完了してください`); return; }
+        if (!currentDetailItem.managementUntil){ workflowNotice('継続管理期限を設定してください', 'completion'); return; }
+        if (today < currentDetailItem.managementUntil){ workflowNotice(`継続管理期間中です。${currentDetailItem.managementUntil}以降に完了してください`, 'completion'); return; }
       }
-      if (!confirm('発生部署の最終承認を登録し、変化点を完了にしますか？')) return;
-      const who = getActorName();
+      const who = readStampName();
+      if (!who || !confirm(`${who} さんの発生部署承認スタンプを登録し、変化点を完了にしますか？`)) return;
       try{
         await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp(), completedBy:who, completedAt:serverTimestamp() });
         currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:new Date(), completedBy:who, completedAt:new Date() };
@@ -2893,13 +2971,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
       catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
       const resultLabel = (x, role) => ({ok:'合格',ng:'NG',na:'該当なし','':'未判定'})[checklistResult(x, role)] || '未判定';
-      const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'sender')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="4">チェック項目なし</td></tr>';
-      const excludedCheckRows = (Array.isArray(item.excludedChecklistItems) ? item.excludedChecklistItems : []).map(x => `<tr><td colspan="4" style="background:#fffbeb;color:#92400e;">対象外：${escapeHtml(x.label || '-')}</td></tr>`).join('');
+      const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
+      const excludedCheckRows = (Array.isArray(item.excludedChecklistItems) ? item.excludedChecklistItems : []).map(x => `<tr><td colspan="3" style="background:#fffbeb;color:#92400e;">対象外：${escapeHtml(x.label || '-')}</td></tr>`).join('');
       const checks = activeCheckRows + excludedCheckRows;
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
-      const ticket = (copyLabel, keeper) => `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))} / カード色：${cardColorName}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>発信</th><th>発生</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign"><div><b>発信部署承認</b><br>${escapeHtml(item.senderApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.senderApprovedAt))}</div><div><b>発生部署確認</b><br>${escapeHtml(item.receiverConfirmedBy || '未確認')}<br>${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}</div><div><b>発生部署承認・完了</b><br>${escapeHtml(item.receiverApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.receiverApprovedAt))}</div></div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
-      const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Gothic",sans-serif;color:#111}.ticket{height:137mm;border:1.5px solid #111;border-top:5mm solid var(--card-color);padding:3mm 6mm;display:flex;flex-direction:column;gap:2mm;page-break-inside:avoid}.cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}.ticket header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:1mm}.ticket header strong{font-size:17px;margin-right:10px}.ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}.ticket header small{display:block;margin-top:1mm}.qr{display:flex;align-items:center;gap:2mm;font-size:8px;max-width:42mm}.qr img{width:22mm;height:22mm;image-rendering:pixelated}.qr b{line-height:1.35}.meta{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #555}.meta div{padding:1mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-size:9px}.meta b{display:block;font-size:7px;color:#555}.content{border:1px solid #555;padding:1mm;font-size:9px}.content p{margin:.5mm 0 0;white-space:pre-wrap;min-height:5mm}table{width:100%;border-collapse:collapse;font-size:7px}th,td{border:1px solid #777;padding:.7mm;text-align:left}th:nth-child(3),th:nth-child(4),td:nth-child(3),td:nth-child(4){width:13mm;text-align:center}.review{font-size:7px;border:1px solid #777;padding:1mm}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm;margin-top:auto}.sign div{border:1px solid #555;min-height:10mm;padding:1mm;font-size:7px}footer{text-align:right;font-size:7px}</style></head><body>${ticket('原本','発信部署')}<div class="cut">切り取り線</div>${ticket('コピー','発生部署')}<script>window.onload=()=>window.print();<\/script></body></html>`;
+      const ticket = (copyLabel, keeper) => `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))} / カード色：${cardColorName}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Gothic",sans-serif;color:#111}.ticket{height:137mm;border:1.5px solid #111;border-top:5mm solid var(--card-color);padding:3mm 6mm;display:flex;flex-direction:column;gap:2mm;page-break-inside:avoid}.cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}.ticket header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:1mm}.ticket header strong{font-size:17px;margin-right:10px}.ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}.ticket header small{display:block;margin-top:1mm}.qr{display:flex;align-items:center;gap:2mm;font-size:8px;max-width:42mm}.qr img{width:22mm;height:22mm;image-rendering:pixelated}.qr b{line-height:1.35}.meta{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #555}.meta div{padding:1mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-size:9px}.meta b{display:block;font-size:7px;color:#555}.content{border:1px solid #555;padding:1mm;font-size:9px}.content p{margin:.5mm 0 0;white-space:pre-wrap;min-height:5mm}table{width:100%;border-collapse:collapse;font-size:7px}th,td{border:1px solid #777;padding:.7mm;text-align:left}th:nth-child(3),th:nth-child(4),td:nth-child(3),td:nth-child(4){width:13mm;text-align:center}.review{font-size:7px;border:1px solid #777;padding:1mm}.sign{display:grid;grid-template-columns:repeat(4,1fr);gap:2mm;margin-top:auto}.sign div{border:1px solid #555;min-height:10mm;padding:1mm;font-size:7px}footer{text-align:right;font-size:7px}</style></head><body>${ticket('原本','発信部署')}<div class="cut">切り取り線</div>${ticket('コピー','発生部署')}<script>window.onload=()=>window.print();<\/script></body></html>`;
       const w = window.open('', '_blank');
       if (!w){ alert('印刷画面を開けません。ポップアップを許可してください'); return; }
       w.document.open(); w.document.write(html); w.document.close();
@@ -2916,9 +2994,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         document.getElementById('detailTitle').textContent = `整理No: ${item.serialNo || '-'}　${item.lineName || ''}`;
         document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
       } else {
-        const t = (item.type === 'planned') ? '計画変化点' : '突発変化点';
-        document.getElementById('detailTitle').textContent = `変化点カード / ${t}（${item.category || ''}）`;
-        document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
+        document.getElementById('detailTitle').textContent = '変化点カード';
+        document.getElementById('detailDate').textContent = `${item.lineName || '-'} / 整理No. ${item.serialNo || '-'} / ${item.occurrenceDate || '日程未確定'}`;
       }
 
       let badges = '';
@@ -2927,7 +3004,6 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         if (item.type === 'planned') badges += `<span class="badge badge-planned">計画</span>`;
         else badges += `<span class="badge badge-sudden">突発</span>`;
         badges += `<span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
-        if (isPlannedCP) badges += `<span class="approval-status-badge ${approvalStatusOf(item) === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</span>`;
       }
       document.getElementById('detailBadges').innerHTML = badges;
 
