@@ -831,6 +831,20 @@
     .workflow-fold summary span { font-size:12px; font-weight:400; color:#627369; margin-left:8px; }
     .workflow-fold[open] summary { margin-bottom:12px; }
     .responder-checks h4 { font-size:13px; margin-bottom:10px; }
+    .workflow-checks { scroll-margin-top:100px; }
+    .checks-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .checks-heading h4 { font-size:16px; }
+    .checks-heading>span { font-size:12px; color:#627369; }
+    .workflow-signoff { margin-top:18px; padding-top:16px; border-top:1px solid #d4ded7; }
+    .responder-checks .checklist-panel { padding:0; background:transparent; border:0; }
+    .responder-checks .checklist-row { display:grid; grid-template-columns:minmax(0,1fr) 96px; gap:6px 12px; }
+    .responder-checks .check-label { grid-column:1; grid-row:1; min-width:0; overflow-wrap:anywhere; }
+    .responder-checks .checklist-source { grid-column:1; grid-row:2; justify-self:start; }
+    .responder-checks .check-result-select { grid-column:2; grid-row:1; width:100%; min-width:0; margin:0; opacity:1; color:#273b30; }
+    .responder-checks .check-exclude-btn { grid-column:2; grid-row:2; }
+    .responder-checks [data-result="ok"] { background:#e6f4eb; color:#1c643e; border-color:#8abc9e; }
+    .responder-checks [data-result="ng"] { background:#fff0ed; color:#a52e25; border-color:#d79892; }
+    .responder-checks [data-result="na"] { background:#edf1f4; color:#4d5d68; }
     @media(max-width:700px){
       .workflow-stamps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 8px; }
       .stamp-seal { width:94px; min-height:94px; margin:5px auto; padding:10px 5px; }
@@ -1278,7 +1292,6 @@
         <button type="button" id="btnCardWorkflow">確認・承認へ</button>
         <button type="button" id="btnCardPrint">カード印刷・QR</button>
       </div>
-      <div id="approvalWorkflow" class="approval-panel" style="display:none;"></div>
       <div class="modal-body" id="detailBody"></div>
       <div id="detailActions" class="modal-actions" style="display:none;padding:16px 24px;border-top:1px solid #e0e0e0;gap:12px;flex-direction:column;">
         <div id="switchFlowGuide" class="switch-flow-guide" style="display:none;">
@@ -1320,6 +1333,7 @@
           <button class="btn" id="btnDetailDelete" style="flex:1;min-width:160px;background:#e53935;color:#fff;">🗑️ 削除</button>
         </div>
       </div>
+      <div id="approvalWorkflow" class="approval-panel" style="display:none;"></div>
     </div>
   </div>
 
@@ -2722,7 +2736,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!list.length) return '<div class="checklist-empty">対象のチェック項目はありません</div>';
       return list.map(item => {
         const result = checklistResult(item, role);
-        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select>${approvalStatusOf(currentDetailItem) === 'draft' ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : ''}</div>`;
+        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" data-result="${escapeAttr(result)}" aria-label="${escapeAttr(item.label || 'チェック項目')}の判定" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select>${approvalStatusOf(currentDetailItem) === 'draft' ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : ''}</div>`;
       }).join('');
     }
 
@@ -2750,7 +2764,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
     function workflowNotice(message, section){
       const details = document.querySelector('[data-workflow-section="'+section+'"]');
-      if (details){ details.open=true; details.scrollIntoView({block:'start'}); }
+      if (details){ if (details.tagName === 'DETAILS') details.open=true; details.scrollIntoView({block:'start'}); }
       alert(message);
     }
     function renderApprovalWorkflow(item){
@@ -2780,18 +2794,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const receiverChecks = roleItems(items,'receiver');
       const progress = (list,role) => list.filter(x=>['ok','na'].includes(checklistResult(x,role))).length+'/'+list.length;
       box.innerHTML = `
-        <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
-        <div class="workflow-stamps">${workflowStampEntries(item).map((stamp,index)=>`<div class="workflow-stamp ${stamp.name ? 'is-stamped' : ''} ${index===stage+1 && next ? 'is-next' : ''}">
-          <div class="stamp-role"><small>${escapeHtml(stamp.department)}</small><strong>${index+1}. ${escapeHtml(stamp.role)}</strong></div>
-          <div class="stamp-seal"><span class="stamp-name">${escapeHtml(stamp.name || (index===0 ? '氏名未記録' : '未押印'))}</span><time>${stamp.name ? escapeHtml(stampDate(stamp.at)) : '―'}</time></div>
-          <div class="stamp-department">${escapeHtml(index<2 ? item.planneddepartment || '-' : item.department || '-')}</div>
-        </div>`).join('')}</div>
-        ${next ? `<div class="stamp-action">
-          <label for="workflowStampName">次：${next[0]}</label>
-          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" onclick="${next[2]}">${next[1]}</button></div>
-        </div>` : ''}
-        <details class="workflow-fold" data-workflow-section="checks" ${opened.has('checks')?'open':''}>
-          <summary>対応者チェック <span>判定済み ${progress(receiverChecks,'receiver')}</span></summary>
+        <section class="workflow-checks" data-workflow-section="checks" aria-labelledby="responderChecksTitle">
+          <div class="checks-heading"><h4 id="responderChecksTitle">対応者チェック</h4><span>確認完了 ${progress(receiverChecks,'receiver')}</span></div>
           <section class="responder-checks">
             <h4>発生部署の対応者：${escapeHtml(item.department || '-')}</h4>
             <div class="checklist-panel">${renderApprovalChecklist(items, 'receiver', !receiverEnabled || receiverLocked)}</div>
@@ -2799,7 +2803,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
             ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
           </section>
         ${excludedItems.length ? `<div class="excluded-checks"><strong>発行者が対象外とした項目</strong>${excludedItems.map((x,index) => `<div class="excluded-check-row"><span>${escapeHtml(x.label || '-') }</span>${!senderLocked ? `<button type="button" class="check-exclude-btn" onclick="restoreExcludedChecklist(${index})">対象に戻す</button>` : ''}</div>`).join('')}</div>` : ''}
-        </details>
+        </section>
         <details class="workflow-fold" data-workflow-section="completion" ${opened.has('completion')?'open':''}>
           <summary>完了条件・追加記録</summary>
           <div class="workflow-rule-box">最終承認は実施日の翌日以降、完了後確認・関係部署確認・必要な継続管理を終えてから行います。</div>
@@ -2813,7 +2817,19 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         </div>
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.continuedManagementRequired ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('continuedManagementRequired',this.checked)"><span>継続管理が必要（期限まで完了前として管理）</span></label>
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.relatedReviewCompleted ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('relatedReviewCompleted',this.checked)"><span>品質保証部・生産技術部への回覧と所見確認が完了した（起票部署が該当部署の場合の省略を含む）</span></label>
-        </details>`;
+        </details>
+        <section class="workflow-signoff">
+        <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
+        ${next ? `<div class="stamp-action">
+          <label for="workflowStampName">次：${next[0]}</label>
+          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" onclick="${next[2]}">${next[1]}</button></div>
+        </div>` : ''}
+        <div class="workflow-stamps">${workflowStampEntries(item).map((stamp,index)=>`<div class="workflow-stamp ${stamp.name ? 'is-stamped' : ''} ${index===stage+1 && next ? 'is-next' : ''}">
+          <div class="stamp-role"><small>${escapeHtml(stamp.department)}</small><strong>${index+1}. ${escapeHtml(stamp.role)}</strong></div>
+          <div class="stamp-seal"><span class="stamp-name">${escapeHtml(stamp.name || (index===0 ? '氏名未記録' : '未押印'))}</span><time>${stamp.name ? escapeHtml(stampDate(stamp.at)) : '―'}</time></div>
+          <div class="stamp-department">${escapeHtml(index<2 ? item.planneddepartment || '-' : item.department || '-')}</div>
+        </div>`).join('')}</div>
+        </section>`;
     }
 
     async function saveChecklist(items){
