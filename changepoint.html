@@ -625,6 +625,14 @@
     .checklist-row input[type="checkbox"]{width:18px;height:18px;margin-top:2px;flex:0 0 auto;}
     .checklist-row .check-label{flex:1;line-height:1.45;}
     .checklist-source{font-size:.72rem;color:#64748b;background:#e2e8f0;border-radius:4px;padding:2px 6px;white-space:nowrap;}
+    .check-result-select{width:auto;min-width:92px;padding:6px 8px;border:1px solid #94a3b8;border-radius:4px;background:#fff;font-weight:700;}
+    .workflow-rule-box{margin:0 0 14px;padding:12px;border-left:4px solid #2563eb;background:#eff6ff;color:#1e3a5f;font-size:.88rem;line-height:1.65;}
+    .workflow-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+    .workflow-fields .form-group{margin:0;}
+    .workflow-fields textarea{min-height:74px;}
+    .workflow-check{display:flex;align-items:flex-start;gap:8px;padding:10px;border:1px solid #cbd5e1;background:#fff;}
+    .workflow-check input{width:18px;height:18px;margin-top:2px;}
+    @media(max-width:760px){.workflow-fields{grid-template-columns:1fr}.checklist-row{flex-wrap:wrap}.check-result-select{margin-left:27px;}}
     .custom-check-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
     .custom-check-tag{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:4px;padding:5px 8px;font-size:.85rem;}
     .custom-check-tag button{border:none;background:none;color:#b91c1c;cursor:pointer;font-weight:800;padding:0;}
@@ -644,7 +652,7 @@
     .approval-actions .btn{margin:0;width:auto;flex:1;min-width:150px;}
     .approval-status-badge{display:inline-flex;align-items:center;padding:4px 9px;border-radius:4px;font-size:.75rem;font-weight:800;background:#e2e8f0;color:#334155;}
     .approval-status-badge.approved{background:#dcfce7;color:#166534;}
-    .master-check-filter{display:grid;grid-template-columns:180px 1fr auto;gap:8px;margin-bottom:14px;}
+    .master-check-filter{display:grid;grid-template-columns:130px 1fr 1fr auto;gap:8px;margin-bottom:14px;}
     @media(max-width:700px){
       .approval-steps{grid-template-columns:1fr 1fr;}
       .approval-columns{grid-template-columns:1fr;}
@@ -780,7 +788,7 @@
             <select id="filterType">
               <option value="all">すべて</option>
               <option value="anomaly">異常のみ</option>
-              <option value="sudden">計画外変化点のみ</option>
+              <option value="sudden">突発変化点のみ</option>
               <option value="planned">計画変化点のみ</option>
             </select>
           </div>
@@ -804,7 +812,7 @@
       <div class="stats-row">
         <div class="stat-card"><div class="number" id="statTotal">0</div><div class="label">総件数</div></div>
         <div class="stat-card anomaly"><div class="number" id="statAnomaly">0</div><div class="label">異常</div></div>
-        <div class="stat-card sudden"><div class="number" id="statSudden">0</div><div class="label">計画外変化点</div></div>
+        <div class="stat-card sudden"><div class="number" id="statSudden">0</div><div class="label">突発変化点</div></div>
         <div class="stat-card planned"><div class="number" id="statPlanned">0</div><div class="label">計画変化点</div></div>
       </div>
 
@@ -847,10 +855,10 @@
     </div>
   </div>
 
-  <!-- 計画変化点入力画面 -->
+  <!-- 変化点入力画面 -->
   <div id="plannedScreen" class="screen">
     <div class="app-header">
-      <h1>📝 計画変化点入力</h1>
+        <h1>📝 変化点入力</h1>
       <div class="header-actions">
         <button class="btn-back" data-back>← メニュー</button>
         <button class="btn-logout" data-logout>ログアウト</button>
@@ -859,14 +867,17 @@
 
     <div class="container" style="max-width:1400px;">
       <div class="card">
-        <h2 style="margin-bottom:20px;color:#333;">計画変化点の登録（changepoints / type=planned）</h2>
+        <h2 style="margin-bottom:10px;color:#333;">変化点カードの登録</h2>
+        <div class="workflow-rule-box">変化点が判明したら発信部署が速やかに登録します。事前に内容と実施日が分かる場合は「計画」、それ以外は「突発」です。登録日は起票日として自動記録されます。</div>
 
         <form id="plannedForm">
           <div class="form-row">
             <div class="form-group">
-              <label>起案部署<span class="required">*</span></label>
-              <select id="planDepartment" required><option value="">選択してください</option></select>
-              <div class="hint">保存先:planneddepartment</div>
+              <label>計画区分<span class="required">*</span></label>
+              <select id="planType" required>
+                <option value="planned">計画</option>
+                <option value="sudden">突発</option>
+              </select>
             </div>
             <div class="form-group">
               <label>変化点分類<span class="required">*</span></label>
@@ -883,6 +894,11 @@
 
           <div class="form-row">
             <div class="form-group">
+              <label>発信部署（起票部署）<span class="required">*</span></label>
+              <select id="planDepartment" required><option value="">選択してください</option></select>
+              <div class="hint">保存先:planneddepartment</div>
+            </div>
+            <div class="form-group">
               <label>変化点発生部署<span class="required">*</span></label>
               <select id="planDepartmentOccur" required><option value="">選択してください</option></select>
               <div class="hint">保存先:department</div>
@@ -892,6 +908,10 @@
               <input type="text" id="planLineName" list="lineList2" required placeholder="例: 94-300 / RL1 など">
               <datalist id="lineList2"></datalist>
               <div class="hint">保存先:lineName</div>
+            </div>
+            <div class="form-group">
+              <label>工程名・作業内容<span class="required">*</span></label>
+              <input type="text" id="planProcessName" required placeholder="例: ブッシュ圧入 / 設備オペレータ">
             </div>
           </div>
 
@@ -903,9 +923,9 @@
               <div class="hint">保存先:serialNo</div>
             </div>
             <div class="form-group">
-              <label>切替え日（任意）</label>
+              <label>実施予定日・実施日<span class="required">*</span></label>
               <input type="date" id="planDate">
-              <div class="hint">保存先:occurrenceDate（切替え日）</div>
+              <div class="hint">計画は予定日、突発は実施日を入力</div>
             </div>
           </div>
 
@@ -957,12 +977,12 @@
             </button>
           </div>
           <div class="hint" style="margin-top:8px;">
-            ※「CSV出力」「QR出力」は、最後に登録した計画変化点の内容を出力します
+              ※「CSV出力」「ワークフローQR」は、最後に登録した変化点の内容を出力します
           </div>
         </form>
 
         <div style="margin-top:30px;">
-          <h3 style="font-size:1rem;color:#333;margin-bottom:16px;">📋 最近の計画変化点</h3>
+          <h3 style="font-size:1rem;color:#333;margin-bottom:16px;">📋 最近の変化点カード</h3>
           <div id="plannedHistory"></div>
         </div>
       </div>
@@ -1024,7 +1044,7 @@
         <button class="btn-logout" data-logout>ログアウト</button>
       </div>
     </div>
-    <div class="container" style="max-width:800px;">
+    <div class="container" style="max-width:1200px;">
       <div class="card">
         <div class="master-tabs">
           <button class="master-tab active" data-tab="department">部署</button>
@@ -1057,10 +1077,11 @@
               <option value="人">人</option><option value="設備">設備</option><option value="材料">材料</option><option value="方法">方法</option><option value="金型">金型</option>
             </select>
             <input type="text" id="addChecklistName" placeholder="新しいチェック項目を入力...">
+            <input type="text" id="addChecklistCriteria" placeholder="合格判定基準を入力...">
             <button class="btn btn-primary" id="btnAddChecklist">追加</button>
           </div>
           <table class="master-table">
-            <thead><tr><th style="width:90px;">分類</th><th>チェック項目</th><th style="width:150px;">操作</th></tr></thead>
+            <thead><tr><th style="width:90px;">分類</th><th>チェック項目</th><th>合格判定基準</th><th style="width:150px;">操作</th></tr></thead>
             <tbody id="checklistTableBody"></tbody>
           </table>
         </div>
@@ -1070,7 +1091,7 @@
 
   <!-- 詳細モーダル -->
   <div id="detailModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width:1100px;">
       <div class="modal-header">
         <div>
           <h3 id="detailTitle">詳細情報</h3>
@@ -1215,6 +1236,13 @@
     let checklistDocs = [];
     let plannedCustomChecklist = [];
     const CHANGE_CATEGORIES = ['人', '設備', '材料', '方法', '金型'];
+    const CHANGE_CATEGORY_GUIDANCE = {
+      '人':'新人配属、未経験者の応援、多能工化、1か月以上作業から離れた人の復帰',
+      '設備':'設備・治具・検査機の修理、改修、設定変更',
+      '材料':'部品・原材料・副資材の変更、新製品立上げ、号口打ち切り、特急品',
+      '方法':'作業手順、品質確認方法、製造条件、生産場所、置場、荷姿の変更',
+      '金型':'金型の修理・保全・設定変更、金型命数の変更'
+    };
 
     let calendarYear, calendarMonth;
     let lastRegisteredPlanned = null;
@@ -1231,7 +1259,9 @@
       { key: 'planneddepartment', label: '起案部署' },
       { key: 'department',        label: '発生部署' },
       { key: 'lineName',          label: 'ライン名' },
+      { key: 'processName',       label: '工程名・作業内容' },
       { key: 'serialNo',          label: '整理No' },
+      { key: 'issuedDate',        label: '起票日' },
       { key: 'occurrenceDate',    label: '発生日' },
       { key: 'occurrenceTime',    label: '時刻' },
       { key: 'lot',               label: '対象ロット' },
@@ -1482,7 +1512,7 @@
           margin-bottom:8px;
         ">📅 ${esc(labelKey)}</div>`;
         html += buildSection(items.anomaly,  '#e53935', '⚠️', '異常');
-        html += buildSection(items.sudden,   '#c79a00', '🔄', '計画外変化点');
+        html += buildSection(items.sudden,   '#c79a00', '🔄', '突発変化点');
         html += buildSection(items.planned,  '#1565c0', '📋', '計画変化点');
 
         tipEl.innerHTML = `<div style="
@@ -1516,7 +1546,7 @@
           labels,
           datasets: [
             { label:'異常',        data: anomaly, backgroundColor:'rgba(229,57,53,.65)', borderColor:'#c62828', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
-            { label:'計画外変化点', data: sudden,  backgroundColor:'rgba(249,196,0,.75)', borderColor:'#c79a00', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
+            { label:'突発変化点', data: sudden,  backgroundColor:'rgba(249,196,0,.75)', borderColor:'#c79a00', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
             { label:'計画変化点',  data: planned, backgroundColor:'rgba(33,150,243,.65)', borderColor:'#1565c0', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
           ]
         },
@@ -1669,10 +1699,13 @@
         masterId: d.id,
         category: d.category,
         label: d.name,
+        criteria: d.criteria || '',
         source: 'master',
         owner: 'both',
         senderChecked: false,
-        receiverChecked: false
+        receiverChecked: false,
+        senderResult: '',
+        receiverResult: ''
       }));
     }
 
@@ -1685,14 +1718,25 @@
         source: 'custom',
         owner: 'sender',
         senderChecked: false,
-        receiverChecked: false
+        receiverChecked: false,
+        senderResult: '',
+        receiverResult: ''
       }));
       return [...masterItems, ...customItems];
     }
 
     function getRecordChecklist(item){
-      if (Array.isArray(item?.checklistItems) && item.checklistItems.length) return item.checklistItems.map(x => ({ ...x }));
-      return masterChecklistFor(item?.category || '');
+      const masterItems = masterChecklistFor(item?.category || '');
+      if (!Array.isArray(item?.checklistItems) || !item.checklistItems.length) return masterItems;
+      const masterById = new Map(masterItems.map(x => [x.masterId, x]));
+      const stored = item.checklistItems.map(x => {
+        const currentMaster = x.masterId ? masterById.get(x.masterId) : null;
+        return currentMaster ? { ...x, label:currentMaster.label, criteria:currentMaster.criteria, category:currentMaster.category } : { ...x };
+      });
+      const existingMasterIds = new Set(stored.map(x => x.masterId).filter(Boolean));
+      const existingLabels = new Set(stored.map(x => String(x.label || '').trim()).filter(Boolean));
+      const missing = masterItems.filter(x => !existingMasterIds.has(x.masterId) && !existingLabels.has(String(x.label || '').trim()));
+      return [...stored, ...missing];
     }
 
     function renderPlanChecklistPreview(){
@@ -1701,8 +1745,9 @@
       const category = document.getElementById('planCategory')?.value || '';
       if (!category){ box.innerHTML = '<div class="checklist-empty">変化点分類を選択してください</div>'; return; }
       const items = masterChecklistFor(category);
+      const guidance = `<div style="padding:8px 10px;margin-bottom:8px;background:#fff;border-left:3px solid #2563eb;font-size:.84rem;"><b>${escapeHtml(category)}の対象</b><br>${escapeHtml(CHANGE_CATEGORY_GUIDANCE[category] || '')}</div>`;
       box.innerHTML = items.length
-        ? items.map(x => `<div class="checklist-row"><span style="color:#64748b;">□</span><span class="check-label">${escapeHtml(x.label)}</span><span class="checklist-source">マスタ</span></div>`).join('')
+        ? guidance + items.map(x => `<div class="checklist-row"><span style="color:#64748b;">□</span><span class="check-label">${escapeHtml(x.label)}${x.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(x.criteria)}</small>` : ''}</span><span class="checklist-source">マスタ</span></div>`).join('')
         : `<div class="checklist-empty">「${escapeHtml(category)}」のマスタ項目は未登録です。マスタ管理から追加できます。</div>`;
     }
 
@@ -1861,7 +1906,7 @@
           statusActions = `
             <div class="status-actions" onclick="event.stopPropagation();">
               ${!item.occurrenceDate ? `<button class="status-btn btn-decide-date" onclick="decideSwitchDateQuick('${escapeAttr(item._id)}')">📅 切替え日決定</button>` : ''}
-              ${item.occurrenceDate ? `<button class="status-btn btn-complete" onclick="completeSwitchQuick('${escapeAttr(item._id)}')">✅ 完了</button>` : ''}
+              ${item.occurrenceDate ? `<button class="status-btn btn-complete" onclick="showDetailById('${escapeAttr(item._id)}')">✅ 確認・完了</button>` : ''}
               ${item.occurrenceDate ? `<button class="status-btn btn-postpone" onclick="postponeSwitchQuick('${escapeAttr(item._id)}')">⏩ 延期</button>` : ''}
               <button class="status-btn btn-cancel" onclick="cancelSwitchQuick('${escapeAttr(item._id)}')">⛔ 中止</button>
             </div>
@@ -1952,7 +1997,7 @@
             if (switchStatus !== 'completed' && switchStatus !== 'canceled') {
               statusActions = `
                 <div class="status-actions" onclick="event.stopPropagation();">
-                  <button class="status-btn btn-complete" onclick="completeSwitchQuick('${escapeAttr(item._id)}')">✅ 完了</button>
+                  <button class="status-btn btn-complete" onclick="completeSwitchQuick('${escapeAttr(item._id)}')">✅ 確認・完了</button>
                   <button class="status-btn btn-postpone" onclick="postponeSwitchQuick('${escapeAttr(item._id)}')">⏩ 延期</button>
                   <button class="status-btn btn-cancel" onclick="cancelSwitchQuick('${escapeAttr(item._id)}')">⛔ 中止</button>
                 </div>
@@ -2002,12 +2047,9 @@
       } catch(err) { console.error(err); alert('設定に失敗しました: ' + (err.message || err)); }
     };
     window.completeSwitchQuick = async function(id) {
-      if (!confirm('この変化点を「完了」として登録しますか？')) return;
-      try {
-        const user = auth.currentUser;
-        await updateDoc(doc(db, 'changepoints', id), { switchStatus: 'completed', completedAt: serverTimestamp(), completedBy: getActorName() });
-        alert('完了を登録しました');
-      } catch(err) { console.error(err); alert('完了登録に失敗しました: ' + (err.message || err)); }
+      const item = changepointData.find(x => x._id === id);
+      if (item) showDetail(item);
+      alert('完了は確認項目、完了後確認、関係部署確認を終えた後、承認ワークフローから登録してください');
     };
     window.postponeSwitchQuick = async function(id) {
       const item = changepointData.find(x => x._id === id);
@@ -2108,7 +2150,7 @@
             summary = '📋 ' + (item.content || '').replace(/\n/g,' ').slice(0, 55);
           } else {
             cls += ' cp-sudden';
-            badges = `<span class="badge badge-sudden">計画外</span><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
+            badges = `<span class="badge badge-sudden">突発</span><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
             summary = '🔄 ' + (item.content || '').replace(/\n/g,' ').slice(0, 55);
           }
         }
@@ -2185,6 +2227,9 @@
 
     function setupPlannedForm(){
       document.getElementById('planCategory').addEventListener('change', renderPlanChecklistPreview);
+      document.getElementById('planType').addEventListener('change', (e) => {
+        if (e.target.value === 'sudden' && !document.getElementById('planDate').value) document.getElementById('planDate').value = ymdLocal(new Date());
+      });
       document.getElementById('btnAddPlanCustomCheck').addEventListener('click', () => {
         const input = document.getElementById('planCustomCheckText');
         const name = input.value.trim();
@@ -2199,7 +2244,7 @@
         const safeDate = (lastRegisteredPlanned.occurrenceDate || ymdLocal(new Date()));
         const safeTime = (lastRegisteredPlanned.occurrenceTime || '').replace(':','') || '----';
         const safeSerial = safeFilenamePart(lastRegisteredPlanned.serialNo || 'no-serial');
-        downloadCSV(`CP_planned_${safeDate}_${safeTime}_${safeSerial}.csv`, PLANNED_CP_CSV_HEADERS, lastRegisteredPlanned);
+        downloadCSV(`CP_${lastRegisteredPlanned.type || 'planned'}_${safeDate}_${safeTime}_${safeSerial}.csv`, PLANNED_CP_CSV_HEADERS, lastRegisteredPlanned);
       });
 
       document.getElementById('btnExportLastPlannedQR').addEventListener('click', async () => {
@@ -2208,15 +2253,21 @@
       });
 
       document.getElementById('btnRegisterPlanned').addEventListener('click', () => {
+        const type = document.getElementById('planType').value || '';
         const planneddepartment = document.getElementById('planDepartment').value || '';
         const department = document.getElementById('planDepartmentOccur').value || '';
         const category = document.getElementById('planCategory').value || '';
         const lineName = document.getElementById('planLineName').value.trim() || '';
+        const processName = document.getElementById('planProcessName').value.trim() || '';
         const content  = document.getElementById('planContent').value || '';
-        if (!planneddepartment){ alert('起案部署を選択してください'); return; }
+        const occurrenceDate = document.getElementById('planDate').value || '';
+        if (!['planned','sudden'].includes(type)){ alert('計画区分を選択してください'); return; }
+        if (!planneddepartment){ alert('発信部署を選択してください'); return; }
         if (!category){ alert('変化点分類を選択してください'); return; }
         if (!department){ alert('変化点発生部署を選択してください'); return; }
         if (!lineName){ alert('対象ライン名を入力してください'); return; }
+        if (!processName){ alert('工程名・作業内容を入力してください'); return; }
+        if (!occurrenceDate){ alert('実施予定日・実施日を入力してください'); return; }
         if (!content.trim()){ alert('変化点内容を入力してください'); return; }
         showConfirmDialog();
       });
@@ -2227,21 +2278,25 @@
     }
 
     function showConfirmDialog(){
+      const type = document.getElementById('planType').value || '';
       const planneddepartment = document.getElementById('planDepartment').value || '';
       const department = document.getElementById('planDepartmentOccur').value || '';
       const category = document.getElementById('planCategory').value || '';
       const lineName = document.getElementById('planLineName').value.trim() || '';
+      const processName = document.getElementById('planProcessName').value.trim() || '';
       const serialNo = document.getElementById('planSerialNo').value.trim() || '';
       const content  = document.getElementById('planContent').value || '';
       const occurrenceDate = document.getElementById('planDate').value || '';
       document.getElementById('confirmContent').innerHTML = `
-        <div class="confirm-item"><div class="confirm-label">起案部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">計画区分</div><div class="confirm-value">${type === 'planned' ? '計画' : '突発'}</div></div>
+        <div class="confirm-item"><div class="confirm-label">発信部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点分類</div><div class="confirm-value">${escapeHtml(category)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点発生部署</div><div class="confirm-value">${escapeHtml(department)}</div></div>
         <div class="confirm-item"><div class="confirm-label">対象ライン名</div><div class="confirm-value">${escapeHtml(lineName)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">工程名・作業内容</div><div class="confirm-value">${escapeHtml(processName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点内容</div><div class="confirm-value">${escapeHtml(content)}</div></div>
-        <div class="confirm-item"><div class="confirm-label">切替え日</div><div class="confirm-value">${escapeHtml(occurrenceDate || '(未定)')}</div></div>
+        <div class="confirm-item"><div class="confirm-label">実施予定日・実施日</div><div class="confirm-value">${escapeHtml(occurrenceDate)}</div></div>
         <div class="confirm-item"><div class="confirm-label">チェック項目</div><div class="confirm-value">${masterChecklistFor(category).length + plannedCustomChecklist.length}件</div></div>
       `;
       document.getElementById('confirmModal').style.display = 'block';
@@ -2257,13 +2312,15 @@
     function buildMailBody(data){
       const lines = [];
       lines.push('各位'); lines.push(''); lines.push('お疲れ様です。');
-      lines.push('下記の通り、計画変化点を登録しましたのでお知らせいたします。'); lines.push('');
+      lines.push('下記の通り、変化点カードを登録しましたのでお知らせいたします。'); lines.push('');
       lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       lines.push('【登録内容】'); lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━'); lines.push('');
-      if (data.planneddepartment) lines.push('■ 起案部署　　：' + data.planneddepartment);
+      if (data.type) lines.push('■ 計画区分　　：' + (data.type === 'planned' ? '計画' : '突発'));
+      if (data.planneddepartment) lines.push('■ 発信部署　　：' + data.planneddepartment);
       if (data.department) lines.push('■ 発生部署　　：' + data.department);
       if (data.category) lines.push('■ 分類　　　　：' + data.category);
       if (data.lineName) lines.push('■ ライン名　　：' + data.lineName);
+      if (data.processName) lines.push('■ 工程名・作業：' + data.processName);
       if (data.serialNo) lines.push('■ 整理No　　　：' + data.serialNo);
       if (data.occurrenceDate) lines.push('■ 切替え日　　：' + data.occurrenceDate);
       if (data.occurrenceTime) lines.push('■ 切替え時刻　：' + data.occurrenceTime);
@@ -2306,10 +2363,12 @@
     }
 
     async function executeRegistration(){
+      const type = document.getElementById('planType').value || 'planned';
       const planneddepartment = document.getElementById('planDepartment').value || '';
       const department = document.getElementById('planDepartmentOccur').value || '';
       const category = document.getElementById('planCategory').value || '';
       const lineName = document.getElementById('planLineName').value.trim() || '';
+      const processName = document.getElementById('planProcessName').value.trim() || '';
       const serialNo = document.getElementById('planSerialNo').value.trim() || '';
       const content  = document.getElementById('planContent').value || '';
       const occurrenceDate = document.getElementById('planDate').value || '';
@@ -2317,9 +2376,11 @@
       const user = auth.currentUser;
       const createdBy = getActorName();
       const checklistItems = buildRecordChecklist(category);
-      const data = { type: 'planned', planneddepartment, department, category, lineName, serialNo, content,
+      const issuedDate = ymdLocal(new Date());
+      const data = { type, workflowManaged: true, planneddepartment, department, category, lineName, processName, serialNo, content, issuedDate,
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null,
-        document: '', documentUrl: '', checklistItems, approvalStatus: 'draft', createdBy,
+        document: '', documentUrl: '', checklistItems, approvalStatus: 'draft', specialHandlingStatus: '', relatedReviewCompleted: false,
+        completionConfirmers: '', continuedManagementRequired: false, managementUntil: '', createdBy,
         createdAt: serverTimestamp() };
       try{
         const docRef = await addDoc(collection(db, 'changepoints'), data);
@@ -2335,9 +2396,9 @@
         try{
           const who = createdBy;
           const workflowUrl = buildWorkflowUrl(docRef.id);
-          openMailDraft({ to: '', cc: '', subject: buildMailSubject(lineName, department, category), body: buildMailBody({ planneddepartment, department, category, lineName, serialNo, occurrenceDate, occurrenceTime, content, who, workflowUrl }) });
+          openMailDraft({ to: '', cc: '', subject: buildMailSubject(lineName, department, category), body: buildMailBody({ type, planneddepartment, department, category, lineName, processName, serialNo, occurrenceDate, occurrenceTime, content, who, workflowUrl }) });
         }catch(_){}
-        alert('計画変化点を登録しました');
+        alert('変化点カードを登録しました');
         document.getElementById('plannedForm').reset();
         document.getElementById('planDate').value = '';
         plannedCustomChecklist = [];
@@ -2351,21 +2412,22 @@
 
     function renderPlannedHistory(){
       const container = document.getElementById('plannedHistory');
-      const plannedOnly = changepointData.filter(p => p.type === 'planned')
+      const plannedOnly = changepointData.filter(p => p.type === 'planned' || p.workflowManaged === true)
         .sort((a,b) => (String(b.occurrenceDate||'').localeCompare(String(a.occurrenceDate||''))));
       if (!plannedOnly.length){ container.innerHTML = '<div class="empty-state"><p>まだ登録がありません</p></div>'; return; }
       container.innerHTML = `
         <table class="history-table">
-          <thead><tr><th>発生日</th><th>時刻</th><th>分類</th><th>起案部署</th><th>発生部署</th><th>ライン</th><th>整理No</th><th>内容</th><th>承認状態</th><th style="width:150px;">操作</th></tr></thead>
+          <thead><tr><th>実施日</th><th>区分</th><th>分類</th><th>発信部署</th><th>発生部署</th><th>ライン</th><th>工程</th><th>整理No</th><th>内容</th><th>承認状態</th><th style="width:150px;">操作</th></tr></thead>
           <tbody>
             ${plannedOnly.slice(0, 20).map(item => `
               <tr>
                 <td>${escapeHtml(item.occurrenceDate || '')}</td>
-                <td>${escapeHtml(item.occurrenceTime || '')}</td>
+                <td>${item.type === 'planned' ? '計画' : '突発'}</td>
                 <td><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span></td>
                 <td>${escapeHtml(item.planneddepartment || '')}</td>
                 <td>${escapeHtml(item.department || '')}</td>
                 <td>${escapeHtml(item.lineName || '')}</td>
+                <td>${escapeHtml(item.processName || '')}</td>
                 <td>${escapeHtml(item.serialNo || '')}</td>
                 <td>${escapeHtml((item.content || '').slice(0, 30))}${(item.content || '').length > 30 ? '...' : ''}</td>
                 <td><span class="approval-status-badge ${approvalStatusOf(item) === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</span></td>
@@ -2405,11 +2467,13 @@
       document.getElementById('btnAddChecklist').addEventListener('click', async () => {
         const category = document.getElementById('addChecklistCategory').value;
         const name = document.getElementById('addChecklistName').value.trim();
-        if (!name) return;
+        const criteria = document.getElementById('addChecklistCriteria').value.trim();
+        if (!name || !criteria){ alert('チェック項目と合格判定基準を入力してください'); return; }
         if (checklistDocs.some(x => x.category === category && x.name === name)){ alert('同じチェック項目が登録されています'); return; }
         try{
-          await addDoc(collection(db, 'masters', 'changeChecklist', 'items'), { category, name, order: checklistDocs.filter(x => x.category === category).length + 1, createdAt: serverTimestamp() });
+          await addDoc(collection(db, 'masters', 'changeChecklist', 'items'), { category, name, criteria, order: checklistDocs.filter(x => x.category === category).length + 1, createdAt: serverTimestamp() });
           document.getElementById('addChecklistName').value = '';
+          document.getElementById('addChecklistCriteria').value = '';
           await loadMasters(); renderMasterTables();
         }catch(e){ console.error(e); alert('チェック項目の追加に失敗しました'); }
       });
@@ -2424,8 +2488,8 @@
       ).join('');
       const checkBody = document.getElementById('checklistTableBody');
       if (checkBody) checkBody.innerHTML = checklistDocs.length ? checklistDocs.map(d =>
-        `<tr><td><span class="approval-status-badge">${escapeHtml(d.category)}</span></td><td>${escapeHtml(d.name || '')}</td><td style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:#1976d2;color:#fff;" onclick="editChecklistMaster('${escapeAttr(d.id)}')">変更</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('changeChecklist', '${escapeAttr(d.id)}')">削除</button></td></tr>`
-      ).join('') : '<tr><td colspan="3" style="text-align:center;color:#64748b;padding:20px;">チェック項目は未登録です</td></tr>';
+        `<tr><td><span class="approval-status-badge">${escapeHtml(d.category)}</span></td><td>${escapeHtml(d.name || '')}</td><td>${escapeHtml(d.criteria || '未設定')}</td><td style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:#1976d2;color:#fff;" onclick="editChecklistMaster('${escapeAttr(d.id)}')">変更</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('changeChecklist', '${escapeAttr(d.id)}')">削除</button></td></tr>`
+      ).join('') : '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px;">チェック項目は未登録です</td></tr>';
     }
 
     window.deleteMaster = async function(type, id){
@@ -2438,8 +2502,10 @@
       const item = checklistDocs.find(x => x.id === id);
       if (!item) return;
       const name = prompt('チェック項目を変更してください', item.name || '');
-      if (!name || !name.trim() || name.trim() === item.name) return;
-      try{ await updateDoc(doc(db, 'masters', 'changeChecklist', 'items', id), { name: name.trim(), updatedAt: serverTimestamp() }); await loadMasters(); renderMasterTables(); }
+      if (!name || !name.trim()) return;
+      const criteria = prompt('合格判定基準を変更してください', item.criteria || '');
+      if (criteria === null || !criteria.trim()) return;
+      try{ await updateDoc(doc(db, 'masters', 'changeChecklist', 'items', id), { name: name.trim(), criteria: criteria.trim(), updatedAt: serverTimestamp() }); await loadMasters(); renderMasterTables(); }
       catch(e){ console.error(e); alert('変更に失敗しました'); }
     };
 
@@ -2548,24 +2614,32 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return items.filter(x => (x.owner || 'both') === 'both' || x.owner === role);
     }
 
+    function checklistResult(item, role){
+      const result = role === 'sender' ? item.senderResult : item.receiverResult;
+      if (['ok','ng','na'].includes(result)) return result;
+      const legacyChecked = role === 'sender' ? item.senderChecked : item.receiverChecked;
+      return legacyChecked === true ? 'ok' : '';
+    }
+
     function allRoleChecksDone(items, role){
       const list = roleItems(items, role);
-      return list.every(x => role === 'sender' ? x.senderChecked === true : x.receiverChecked === true);
+      return list.length > 0 && list.every(x => ['ok','na'].includes(checklistResult(x, role)));
     }
 
     function renderApprovalChecklist(items, role, disabled){
       const list = roleItems(items, role);
       if (!list.length) return '<div class="checklist-empty">対象のチェック項目はありません</div>';
       return list.map(item => {
-        const checked = role === 'sender' ? item.senderChecked : item.receiverChecked;
-        return `<label class="checklist-row"><input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="toggleApprovalCheck('${escapeAttr(item.key)}','${role}',this.checked)"><span class="check-label">${escapeHtml(item.label || '')}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span></label>`;
+        const result = checklistResult(item, role);
+        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select></div>`;
       }).join('');
     }
 
     function renderApprovalWorkflow(item){
       const box = document.getElementById('approvalWorkflow');
       if (!box) return;
-      if (!item || item.type !== 'planned'){ box.style.display = 'none'; box.innerHTML = ''; return; }
+      const workflowManaged = item && (item.type === 'planned' || item.workflowManaged === true);
+      if (!workflowManaged){ box.style.display = 'none'; box.innerHTML = ''; return; }
       box.style.display = 'block';
       const status = approvalStatusOf(item);
       const stage = APPROVAL_STAGES.indexOf(status);
@@ -2578,6 +2652,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const receiverApproveMeta = item.receiverApprovedBy ? `${escapeHtml(item.receiverApprovedBy)} / ${escapeHtml(formatAuditTime(item.receiverApprovedAt))}` : '未承認';
       const stepLabels = ['作成', '発信部署承認', '発生部署確認', '発生部署承認'];
       box.innerHTML = `
+        <div class="workflow-rule-box"><strong>運用ルール（MQW-09-01-品質-41-01）</strong><br>発生時に記入者と管理者が確認し、NGは処置後に再判定します。当日は完了後として管理し、翌日以降に確認者全員の完了後確認と関係部署の確認を終えてからファイル保管できます。</div>
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
           <strong style="color:#334155;">承認・5Mチェック</strong>
           <span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span>
@@ -2597,10 +2672,20 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
             ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
           </section>
         </div>
+        <div class="workflow-fields">
+          <div class="form-group"><label>特別対応の状態<span class="required">*</span></label><select ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('specialHandlingStatus',this.value)"><option value="" ${!item.specialHandlingStatus ? 'selected' : ''}>選択</option><option value="in_progress" ${item.specialHandlingStatus === 'in_progress' ? 'selected' : ''}>対応中</option><option value="completed" ${item.specialHandlingStatus === 'completed' ? 'selected' : ''}>対応完了</option><option value="not_required" ${item.specialHandlingStatus === 'not_required' ? 'selected' : ''}>対応不要</option></select></div>
+          <div class="form-group"><label>特記事項・NG対応内容</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('specialNotes',this.value)" placeholder="NGへの対応、再教育、識別方法など">${escapeHtml(item.specialNotes || '')}</textarea></div>
+          <div class="form-group"><label>品質保証部の所見</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('qualityComment',this.value)" placeholder="該当なしの場合は「なし」">${escapeHtml(item.qualityComment || '')}</textarea></div>
+          <div class="form-group"><label>生産技術部の所見</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('engineeringComment',this.value)" placeholder="該当なしの場合は「なし」">${escapeHtml(item.engineeringComment || '')}</textarea></div>
+          <div class="form-group"><label>完了後確認者<span class="required">*</span></label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('completionConfirmers',this.value)" placeholder="部長、GM、GL、作業指導者、記入者など">${escapeHtml(item.completionConfirmers || '')}</textarea></div>
+          <div class="form-group"><label>継続管理期限</label><input type="date" value="${escapeAttr(item.managementUntil || '')}" ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('managementUntil',this.value)"><div class="hint">継続管理が必要な場合に設定。新人作業者の指導教育は1週間を基本とします。</div></div>
+        </div>
+        <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.continuedManagementRequired ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('continuedManagementRequired',this.checked)"><span>継続管理が必要（期限まで完了前として管理）</span></label>
+        <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.relatedReviewCompleted ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('relatedReviewCompleted',this.checked)"><span>品質保証部・生産技術部への回覧と所見確認が完了した（起票部署が該当部署の場合の省略を含む）</span></label>
         <div class="approval-actions">
           ${status === 'draft' ? '<button class="btn" style="background:#2563eb;color:#fff;" onclick="approveSender()">発信部署で承認</button>' : ''}
           ${status === 'sender_approved' ? '<button class="btn" style="background:#0f766e;color:#fff;" onclick="confirmReceiver()">発生部署で確認</button>' : ''}
-          ${status === 'receiver_confirmed' ? '<button class="btn" style="background:#15803d;color:#fff;" onclick="approveReceiver()">発生部署で承認・完了</button>' : ''}
+          ${status === 'receiver_confirmed' ? '<button class="btn" style="background:#15803d;color:#fff;" onclick="approveReceiver()">発生部署で最終承認・完了</button>' : ''}
           <button class="btn" style="background:#334155;color:#fff;" onclick="printChangeCard()">変化点カード印刷</button>
         </div>`;
     }
@@ -2612,14 +2697,27 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       renderApprovalWorkflow(currentDetailItem);
     }
 
-    window.toggleApprovalCheck = async function(key, role, checked){
+    window.setApprovalResult = async function(key, role, result){
       const items = getRecordChecklist(currentDetailItem);
       const item = items.find(x => x.key === key);
-      if (!item) return;
-      if (role === 'sender') item.senderChecked = checked;
-      else item.receiverChecked = checked;
+      if (!item || !['','ok','ng','na'].includes(result)) return;
+      if (role === 'sender') { item.senderResult = result; item.senderChecked = ['ok','na'].includes(result); }
+      else { item.receiverResult = result; item.receiverChecked = ['ok','na'].includes(result); }
       try{ await saveChecklist(items); }
-      catch(e){ console.error(e); alert('チェック状態の保存に失敗しました'); renderApprovalWorkflow(currentDetailItem); }
+      catch(e){ console.error(e); alert('判定の保存に失敗しました'); renderApprovalWorkflow(currentDetailItem); }
+    };
+
+    window.toggleApprovalCheck = async function(key, role, checked){
+      return window.setApprovalResult(key, role, checked ? 'ok' : '');
+    };
+
+    window.saveWorkflowField = async function(field, value){
+      const allowed = ['specialHandlingStatus','specialNotes','qualityComment','engineeringComment','completionConfirmers','continuedManagementRequired','managementUntil','relatedReviewCompleted'];
+      if (!currentDetailItem?._id || !allowed.includes(field) || approvalStatusOf(currentDetailItem) === 'approved') return;
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { [field]:value, updatedAt:serverTimestamp(), updatedBy:getActorName() });
+        currentDetailItem = { ...currentDetailItem, [field]:value };
+      }catch(e){ console.error(e); alert('運用確認の保存に失敗しました'); }
     };
 
     window.addApprovalCustom = async function(role){
@@ -2628,7 +2726,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!label) return;
       const items = getRecordChecklist(currentDetailItem);
       if (items.some(x => x.label === label && (x.owner || 'both') === role)){ alert('同じ任意項目が追加されています'); return; }
-      items.push({ key:`${role}_${Date.now()}`, category:currentDetailItem.category || '', label, source:'custom', owner:role, senderChecked:false, receiverChecked:false });
+      items.push({ key:`${role}_${Date.now()}`, category:currentDetailItem.category || '', label, source:'custom', owner:role, senderChecked:false, receiverChecked:false, senderResult:'', receiverResult:'' });
       try{ await saveChecklist(items); }
       catch(e){ console.error(e); alert('任意項目の追加に失敗しました'); }
     };
@@ -2636,7 +2734,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.approveSender = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'draft') return;
       const items = getRecordChecklist(currentDetailItem);
-      if (!allRoleChecksDone(items, 'sender')){ alert('発信部署のチェック項目をすべて確認してください'); return; }
+      if (!allRoleChecksDone(items, 'sender')){ alert('発信部署の全項目をOKまたは該当なしにしてください。NGは対応後に再判定が必要です'); return; }
       if (!confirm('発信部署の承認を登録しますか？')) return;
       const who = getActorName();
       try{
@@ -2660,12 +2758,26 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.approveReceiver = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'receiver_confirmed') return;
       const items = getRecordChecklist(currentDetailItem);
-      if (!allRoleChecksDone(items, 'receiver')){ alert('発生部署のチェック項目をすべて確認してください'); return; }
-      if (!confirm('発生部署の承認を登録し、承認完了にしますか？')) return;
+      if (!allRoleChecksDone(items, 'receiver')){ alert('発生部署の全項目をOKまたは該当なしにしてください。NGのままでは完了できません'); return; }
+      if (!['completed','not_required'].includes(currentDetailItem.specialHandlingStatus)){ alert('特別対応を「対応完了」または「対応不要」にしてください'); return; }
+      if (currentDetailItem.specialHandlingStatus === 'completed' && !String(currentDetailItem.specialNotes || '').trim()){ alert('特別対応の内容を特記事項に入力してください'); return; }
+      if (!currentDetailItem.relatedReviewCompleted){ alert('品質保証部・生産技術部への回覧と所見確認を完了してください'); return; }
+      if (!String(currentDetailItem.completionConfirmers || '').trim()){ alert('完了後確認者を入力してください'); return; }
+      const today = ymdLocal(new Date());
+      if (currentDetailItem.occurrenceDate){
+        const nextDay = new Date(`${currentDetailItem.occurrenceDate}T00:00:00`); nextDay.setDate(nextDay.getDate() + 1);
+        const earliest = ymdLocal(nextDay);
+        if (today < earliest){ alert(`完了後の最終承認は実施日の翌日（${earliest}）以降に行ってください`); return; }
+      }
+      if (currentDetailItem.continuedManagementRequired){
+        if (!currentDetailItem.managementUntil){ alert('継続管理期限を設定してください'); return; }
+        if (today < currentDetailItem.managementUntil){ alert(`継続管理期間中です。${currentDetailItem.managementUntil}以降に完了してください`); return; }
+      }
+      if (!confirm('発生部署の最終承認を登録し、変化点を完了にしますか？')) return;
       const who = getActorName();
       try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'approved', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'approved', receiverApprovedBy:who, receiverApprovedAt:new Date() };
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp(), completedBy:who, completedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:new Date(), completedBy:who, completedAt:new Date() };
         renderApprovalWorkflow(currentDetailItem);
       }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
     };
@@ -2690,16 +2802,19 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     window.printChangeCard = async function(){
-      if (!currentDetailItem || currentDetailItem.type !== 'planned') return;
+      if (!currentDetailItem || (currentDetailItem.type !== 'planned' && currentDetailItem.workflowManaged !== true)) return;
       const item = currentDetailItem;
       const items = getRecordChecklist(item);
       const workflowUrl = buildWorkflowUrl(item._id);
       let qrDataUrl = '';
       try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
       catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
-      const checks = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${x.senderChecked ? '✓' : '□'}</td><td>${x.receiverChecked ? '✓' : '□'}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
-      const ticket = (copyLabel, keeper) => `<section class="ticket"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>切替日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>5Mチェック項目</th><th>発信</th><th>発生</th></tr></thead><tbody>${checks}</tbody></table><div class="sign"><div><b>発信部署承認</b><br>${escapeHtml(item.senderApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.senderApprovedAt))}</div><div><b>発生部署確認</b><br>${escapeHtml(item.receiverConfirmedBy || '未確認')}<br>${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}</div><div><b>発生部署承認・完了</b><br>${escapeHtml(item.receiverApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.receiverApprovedAt))}</div></div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
-      const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Gothic",sans-serif;color:#111}.ticket{height:137mm;border:1.5px solid #111;padding:5mm 7mm;display:flex;flex-direction:column;gap:3mm;page-break-inside:avoid}.cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}.ticket header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:2mm}.ticket header strong{font-size:18px;margin-right:10px}.ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}.ticket header small{display:block;margin-top:2mm}.qr{display:flex;align-items:center;gap:2mm;font-size:8px;max-width:42mm}.qr img{width:25mm;height:25mm;image-rendering:pixelated}.qr b{line-height:1.35}.meta{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #555}.meta div{padding:1.5mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-size:10px}.meta b{display:block;font-size:8px;color:#555}.content{border:1px solid #555;padding:1.5mm;font-size:10px}.content p{margin:1mm 0 0;white-space:pre-wrap;min-height:8mm}table{width:100%;border-collapse:collapse;font-size:8px}th,td{border:1px solid #777;padding:1mm;text-align:left}th:nth-child(2),th:nth-child(3),td:nth-child(2),td:nth-child(3){width:13mm;text-align:center}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:auto}.sign div{border:1px solid #555;min-height:13mm;padding:1.5mm;font-size:8px}footer{text-align:right;font-size:8px}</style></head><body>${ticket('原本','発信部署')}<div class="cut">切り取り線</div>${ticket('コピー','発生部署')}<script>window.onload=()=>window.print();<\/script></body></html>`;
+      const resultLabel = (x, role) => ({ok:'合格',ng:'NG',na:'該当なし','':'未判定'})[checklistResult(x, role)] || '未判定';
+      const checks = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'sender')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="4">チェック項目なし</td></tr>';
+      const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
+      const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
+      const ticket = (copyLabel, keeper) => `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))} / カード色：${cardColorName}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>発信</th><th>発生</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign"><div><b>発信部署承認</b><br>${escapeHtml(item.senderApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.senderApprovedAt))}</div><div><b>発生部署確認</b><br>${escapeHtml(item.receiverConfirmedBy || '未確認')}<br>${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}</div><div><b>発生部署承認・完了</b><br>${escapeHtml(item.receiverApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.receiverApprovedAt))}</div></div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Gothic",sans-serif;color:#111}.ticket{height:137mm;border:1.5px solid #111;border-top:5mm solid var(--card-color);padding:3mm 6mm;display:flex;flex-direction:column;gap:2mm;page-break-inside:avoid}.cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}.ticket header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:1mm}.ticket header strong{font-size:17px;margin-right:10px}.ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}.ticket header small{display:block;margin-top:1mm}.qr{display:flex;align-items:center;gap:2mm;font-size:8px;max-width:42mm}.qr img{width:22mm;height:22mm;image-rendering:pixelated}.qr b{line-height:1.35}.meta{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #555}.meta div{padding:1mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-size:9px}.meta b{display:block;font-size:7px;color:#555}.content{border:1px solid #555;padding:1mm;font-size:9px}.content p{margin:.5mm 0 0;white-space:pre-wrap;min-height:5mm}table{width:100%;border-collapse:collapse;font-size:7px}th,td{border:1px solid #777;padding:.7mm;text-align:left}th:nth-child(3),th:nth-child(4),td:nth-child(3),td:nth-child(4){width:13mm;text-align:center}.review{font-size:7px;border:1px solid #777;padding:1mm}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm;margin-top:auto}.sign div{border:1px solid #555;min-height:10mm;padding:1mm;font-size:7px}footer{text-align:right;font-size:7px}</style></head><body>${ticket('原本','発信部署')}<div class="cut">切り取り線</div>${ticket('コピー','発生部署')}<script>window.onload=()=>window.print();<\/script></body></html>`;
       const w = window.open('', '_blank');
       if (!w){ alert('印刷画面を開けません。ポップアップを許可してください'); return; }
       w.document.open(); w.document.write(html); w.document.close();
@@ -2709,13 +2824,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       currentDetailItem = item;
       const isAnomaly = (item._kind === 'anomaly') || (item.type === 'anomaly');
       const isCP = !isAnomaly;
-      const isPlannedCP = isCP && item.type === 'planned';
+      const isPlannedCP = isCP && (item.type === 'planned' || item.workflowManaged === true);
 
       if (isAnomaly){
         document.getElementById('detailTitle').textContent = `整理No: ${item.serialNo || '-'}　${item.lineName || ''}`;
         document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
       } else {
-        const t = (item.type === 'planned') ? '計画変化点' : '計画外変化点';
+        const t = (item.type === 'planned') ? '計画変化点' : '突発変化点';
         document.getElementById('detailTitle').textContent = `${t}（${item.category || ''}）`;
         document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
       }
@@ -2724,9 +2839,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (isAnomaly){ badges += `<span class="badge badge-anomaly">異常</span>`; }
       else {
         if (item.type === 'planned') badges += `<span class="badge badge-planned">計画</span>`;
-        else badges += `<span class="badge badge-sudden">計画外</span>`;
+        else badges += `<span class="badge badge-sudden">突発</span>`;
         badges += `<span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
-        if (item.type === 'planned') badges += `<span class="approval-status-badge ${approvalStatusOf(item) === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</span>`;
+        if (isPlannedCP) badges += `<span class="approval-status-badge ${approvalStatusOf(item) === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</span>`;
       }
       document.getElementById('detailBadges').innerHTML = badges;
 
@@ -2743,14 +2858,15 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         if (item.rootCauseAction) body += `<div class="detail-section"><div class="detail-section-title">📋 処置方法</div><div class="detail-section-content">${escapeHtml(item.rootCauseAction)}</div></div>`;
       } else {
         body = `<div class="detail-grid" style="margin-bottom:20px;">
-          <div class="detail-grid-item"><div class="label">種別</div><div class="value">${escapeHtml(item.type || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">計画区分</div><div class="value">${item.type === 'planned' ? '計画' : '突発'}</div></div>
           <div class="detail-grid-item"><div class="label">分類</div><div class="value">${escapeHtml(item.category || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">起票日</div><div class="value">${escapeHtml(item.issuedDate || toLocalDateString(item.createdAt) || '-')}</div></div>
           <div class="detail-grid-item"><div class="label">発生部署</div><div class="value">${escapeHtml(item.department || '-')}</div></div>
           <div class="detail-grid-item"><div class="label">ライン</div><div class="value">${escapeHtml(item.lineName || '-')}</div></div>
           <div class="detail-grid-item"><div class="label">整理No</div><div class="value">${escapeHtml(item.serialNo || '-')}</div></div>
           <div class="detail-grid-item"><div class="label">関連異常ID</div><div class="value">${escapeHtml(item.relatedAnomalyId || '-')}</div></div>
         </div>`;
-        if (item.type === 'planned') body += `<div class="detail-section"><div class="detail-section-title">🏷️ 起案部署</div><div class="detail-section-content">${escapeHtml(item.planneddepartment || '-')}</div></div>`;
+        if (isPlannedCP) body += `<div class="detail-section"><div class="detail-section-title">発信部署（起票部署）</div><div class="detail-section-content">${escapeHtml(item.planneddepartment || '-')}</div></div><div class="detail-section"><div class="detail-section-title">工程名・作業内容</div><div class="detail-section-content">${escapeHtml(item.processName || '-')}</div></div>`;
         body += `<div class="detail-section"><div class="detail-section-title">📝 変化点内容</div><div class="detail-section-content">${escapeHtml(item.content || '-')}</div></div>`;
         if (item.document) body += `<div class="detail-section"><div class="detail-section-title">📎 関連資料</div><div class="detail-section-content">${escapeHtml(item.document)}</div></div>`;
         if (item.documentUrl) body += `<div class="detail-section"><div class="detail-section-title">📁 添付ファイル</div><div class="detail-section-content"><a href="${escapeHtml(item.documentUrl)}" target="_blank" style="color:#667eea;">ファイルを開く</a></div></div>`;
@@ -2791,7 +2907,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         };
         const next = (s) => {
           if (s === 'undecided') return '次にやること：📅「今日で決定」または 🗓「指定日で決定」で切替え日を決めてください。';
-          if (s === 'scheduled' || s === 'postponed') return '次にやること：切替え実施後に ✅「切替え完了」。必要に応じて ⏩「延期」／⛔「中止」。';
+          if (s === 'scheduled' || s === 'postponed') return '次にやること：確認項目と完了後確認を終え、承認ワークフローで完了。必要に応じて延期または中止。';
           if (s === 'completed') return 'この変化点は完了済みです。';
           if (s === 'canceled') return 'この変化点は中止です。';
           return '';
@@ -2820,6 +2936,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
           if (dateInput) dateInput.value = todayYmd;
         } else if (switchStatus === 'scheduled' || switchStatus === 'postponed'){
           if (afterBox) afterBox.style.display = 'flex';
+          const completeButton = document.getElementById('btnSwitchComplete');
+          if (completeButton) completeButton.style.display = 'none';
           if (hintEl) hintEl.textContent = `切替え日：${switchDate || '未設定'} ／ 状態：${statusLabel(switchStatus)}`;
         } else {
           if (hintEl) hintEl.textContent = `切替え日：${switchDate || '-'} ／ 状態：${statusLabel(switchStatus)}`;
@@ -2871,16 +2989,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       }catch(err){ console.error(err); alert('切替え日の確定に失敗しました'); }
     }
     async function completeSwitch(){
-      if (!currentDetailItem) return;
-      const sw = currentDetailItem.switchStatus || currentDetailItem.switchState || '';
-      const swDate = currentDetailItem.occurrenceDate || '';
-      if (!swDate || (sw !== 'scheduled' && sw !== 'postponed')){ alert('先に「切替え日」を確定してください'); return; }
-      if (!confirm(`切替え完了として登録しますか？（切替え日：${swDate}）`)) return;
-      const user = auth.currentUser;
-      try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { switchStatus: 'completed', switchedAt: serverTimestamp(), switchedBy: getActorName() });
-        alert('切替え完了を登録しました'); document.getElementById('detailModal').classList.remove('active');
-      }catch(err){ console.error(err); alert('完了登録に失敗しました'); }
+      alert('完了は承認ワークフローの「発生部署で最終承認・完了」から登録してください');
     }
     async function cancelSwitch(){
       if (!currentDetailItem) return;
@@ -2924,7 +3033,11 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       container.innerHTML = `
         <input type="hidden" id="editId" value="${item._id}">
         <div class="form-row">
-          <div class="form-group"><label>起案部署</label><select id="editPlannedDept"><option value="">選択</option>${masterDepartments.map(d => `<option value="${d}" ${item.planneddepartment === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+          <div class="form-group"><label>計画区分</label><select id="editType"><option value="planned" ${item.type === 'planned' ? 'selected' : ''}>計画</option><option value="sudden" ${item.type === 'sudden' ? 'selected' : ''}>突発</option></select></div>
+          <div class="form-group"><label>工程名・作業内容</label><input type="text" id="editProcessName" value="${escapeAttr(item.processName || '')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>発信部署（起票部署）</label><select id="editPlannedDept"><option value="">選択</option>${masterDepartments.map(d => `<option value="${d}" ${item.planneddepartment === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
           <div class="form-group"><label>変化点分類</label><select id="editCategory"><option value="">選択</option>
             <option value="人" ${item.category === '人' ? 'selected' : ''}>人</option>
             <option value="方法" ${item.category === '方法' ? 'selected' : ''}>方法</option>
@@ -2956,10 +3069,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!id) return;
       const original = changepointData.find(x => x._id === id);
       const updates = {
+        type: document.getElementById('editType').value,
+        workflowManaged: true,
         planneddepartment: document.getElementById('editPlannedDept').value,
         category: document.getElementById('editCategory').value,
         department: document.getElementById('editDepartment').value,
         lineName: document.getElementById('editLineName').value,
+        processName: document.getElementById('editProcessName').value.trim(),
         serialNo: document.getElementById('editSerialNo').value,
         content: document.getElementById('editContent').value,
         occurrenceDate: document.getElementById('editDate').value,
@@ -2973,8 +3089,17 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         receiverConfirmedAt: null,
         receiverApprovedBy: null,
         receiverApprovedAt: null,
-        checklistItems: getRecordChecklist(original).map(x => ({ ...x, senderChecked:false, receiverChecked:false }))
+        specialHandlingStatus: '',
+        specialNotes: '',
+        qualityComment: '',
+        engineeringComment: '',
+        completionConfirmers: '',
+        continuedManagementRequired: false,
+        managementUntil: '',
+        relatedReviewCompleted: false,
+        checklistItems: getRecordChecklist(original).map(x => ({ ...x, senderChecked:false, receiverChecked:false, senderResult:'', receiverResult:'' }))
       };
+      if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || !updates.occurrenceDate){ alert('発信部署、発生部署、分類、ライン、工程、内容、実施日は必須です'); return; }
       try { await updateDoc(doc(db, 'changepoints', id), updates); alert('保存しました。内容変更のため承認状態を未承認に戻しました'); document.getElementById('editModal').classList.remove('active'); }
       catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
     });
