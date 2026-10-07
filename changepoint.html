@@ -626,6 +626,11 @@
     .checklist-row .check-label{flex:1;line-height:1.45;}
     .checklist-source{font-size:.72rem;color:#64748b;background:#e2e8f0;border-radius:4px;padding:2px 6px;white-space:nowrap;}
     .check-result-select{width:auto;min-width:92px;padding:6px 8px;border:1px solid #94a3b8;border-radius:4px;background:#fff;font-weight:700;}
+    .check-exclude-btn{border:1px solid #b91c1c;background:#fff;color:#b91c1c;padding:5px 8px;border-radius:4px;cursor:pointer;font-weight:700;white-space:nowrap;}
+    .excluded-checks{margin:12px 0;padding:10px;border:1px solid #f59e0b;background:#fffbeb;}
+    .excluded-check-row{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #fde68a;font-size:.84rem;}
+    .excluded-check-row:last-child{border-bottom:none;}
+    .excluded-check-row span{flex:1;}
     .workflow-rule-box{margin:0 0 14px;padding:12px;border-left:4px solid #2563eb;background:#eff6ff;color:#1e3a5f;font-size:.88rem;line-height:1.65;}
     .workflow-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
     .workflow-fields .form-group{margin:0;}
@@ -942,7 +947,7 @@
 
           <div class="form-group">
             <label>5Mチェック項目</label>
-            <div class="hint" style="margin-bottom:8px;">選択した分類のマスタ項目を表示します。発信部署独自の確認項目も追加できます。</div>
+            <div class="hint" style="margin-bottom:8px;">対象外の項目はチェックを外せます。発信部署独自の確認項目も追加できます。</div>
             <div id="planChecklistPreview" class="checklist-panel"><div class="checklist-empty">変化点分類を選択してください</div></div>
             <div class="approval-add" style="margin-top:10px;">
               <input type="text" id="planCustomCheckText" placeholder="発信部署の任意チェック項目">
@@ -1235,6 +1240,7 @@
     let lineDocs = [];
     let checklistDocs = [];
     let plannedCustomChecklist = [];
+    let plannedExcludedChecklist = new Map();
     const CHANGE_CATEGORIES = ['人', '設備', '材料', '方法', '金型'];
     const CHANGE_CATEGORY_GUIDANCE = {
       '人':'新人配属、未経験者の応援、多能工化、1か月以上作業から離れた人の復帰',
@@ -1710,7 +1716,7 @@
     }
 
     function buildRecordChecklist(category){
-      const masterItems = masterChecklistFor(category);
+      const masterItems = masterChecklistFor(category).filter(item => !plannedExcludedChecklist.has(item.masterId));
       const customItems = plannedCustomChecklist.map((name, index) => ({
         key: `sender_${Date.now()}_${index}`,
         category,
@@ -1735,7 +1741,10 @@
       });
       const existingMasterIds = new Set(stored.map(x => x.masterId).filter(Boolean));
       const existingLabels = new Set(stored.map(x => String(x.label || '').trim()).filter(Boolean));
-      const missing = masterItems.filter(x => !existingMasterIds.has(x.masterId) && !existingLabels.has(String(x.label || '').trim()));
+      const excluded = Array.isArray(item?.excludedChecklistItems) ? item.excludedChecklistItems : [];
+      const excludedMasterIds = new Set(excluded.map(x => x.masterId).filter(Boolean));
+      const excludedLabels = new Set(excluded.map(x => String(x.label || '').trim()).filter(Boolean));
+      const missing = masterItems.filter(x => !existingMasterIds.has(x.masterId) && !existingLabels.has(String(x.label || '').trim()) && !excludedMasterIds.has(x.masterId) && !excludedLabels.has(String(x.label || '').trim()));
       return [...stored, ...missing];
     }
 
@@ -1747,7 +1756,7 @@
       const items = masterChecklistFor(category);
       const guidance = `<div style="padding:8px 10px;margin-bottom:8px;background:#fff;border-left:3px solid #2563eb;font-size:.84rem;"><b>${escapeHtml(category)}の対象</b><br>${escapeHtml(CHANGE_CATEGORY_GUIDANCE[category] || '')}</div>`;
       box.innerHTML = items.length
-        ? guidance + items.map(x => `<div class="checklist-row"><span style="color:#64748b;">□</span><span class="check-label">${escapeHtml(x.label)}${x.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(x.criteria)}</small>` : ''}</span><span class="checklist-source">マスタ</span></div>`).join('')
+        ? guidance + items.map(x => { const excluded = plannedExcludedChecklist.get(x.masterId); return `<label class="checklist-row"><input type="checkbox" ${excluded ? '' : 'checked'} onchange="togglePlanChecklistItem('${escapeAttr(x.masterId)}',this.checked)"><span class="check-label">${escapeHtml(x.label)}${x.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(x.criteria)}</small>` : ''}</span><span class="checklist-source">${excluded ? '対象外' : '対象'}</span></label>`; }).join('')
         : `<div class="checklist-empty">「${escapeHtml(category)}」のマスタ項目は未登録です。マスタ管理から追加できます。</div>`;
     }
 
@@ -1760,6 +1769,14 @@
     window.removePlanCustomCheck = function(index){
       plannedCustomChecklist.splice(index, 1);
       renderPlanCustomChecklist();
+    };
+
+    window.togglePlanChecklistItem = function(masterId, included){
+      if (included){ plannedExcludedChecklist.delete(masterId); renderPlanChecklistPreview(); return; }
+      const item = masterChecklistFor(document.getElementById('planCategory')?.value || '').find(x => x.masterId === masterId);
+      if (!item){ renderPlanChecklistPreview(); return; }
+      plannedExcludedChecklist.set(masterId, { ...item });
+      renderPlanChecklistPreview();
     };
 
     function setupListeners(){
@@ -2226,7 +2243,7 @@
     }
 
     function setupPlannedForm(){
-      document.getElementById('planCategory').addEventListener('change', renderPlanChecklistPreview);
+      document.getElementById('planCategory').addEventListener('change', () => { plannedExcludedChecklist = new Map(); renderPlanChecklistPreview(); });
       document.getElementById('planType').addEventListener('change', (e) => {
         if (e.target.value === 'sudden' && !document.getElementById('planDate').value) document.getElementById('planDate').value = ymdLocal(new Date());
       });
@@ -2268,6 +2285,7 @@
         if (!lineName){ alert('対象ライン名を入力してください'); return; }
         if (!processName){ alert('工程名・作業内容を入力してください'); return; }
         if (!occurrenceDate){ alert('実施予定日・実施日を入力してください'); return; }
+        if (!buildRecordChecklist(category).length){ alert('少なくとも1件のチェック項目を対象として残してください'); return; }
         if (!content.trim()){ alert('変化点内容を入力してください'); return; }
         showConfirmDialog();
       });
@@ -2297,7 +2315,7 @@
         <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点内容</div><div class="confirm-value">${escapeHtml(content)}</div></div>
         <div class="confirm-item"><div class="confirm-label">実施予定日・実施日</div><div class="confirm-value">${escapeHtml(occurrenceDate)}</div></div>
-        <div class="confirm-item"><div class="confirm-label">チェック項目</div><div class="confirm-value">${masterChecklistFor(category).length + plannedCustomChecklist.length}件</div></div>
+        <div class="confirm-item"><div class="confirm-label">チェック項目</div><div class="confirm-value">対象 ${buildRecordChecklist(category).length}件 / 対象外 ${plannedExcludedChecklist.size}件</div></div>
       `;
       document.getElementById('confirmModal').style.display = 'block';
     }
@@ -2376,10 +2394,11 @@
       const user = auth.currentUser;
       const createdBy = getActorName();
       const checklistItems = buildRecordChecklist(category);
+      const excludedChecklistItems = Array.from(plannedExcludedChecklist.values()).map(x => ({ masterId:x.masterId, category:x.category, label:x.label, criteria:x.criteria || '', source:x.source || 'master', owner:'both', excludedBy:createdBy, excludedAtLocal:new Date().toISOString() }));
       const issuedDate = ymdLocal(new Date());
       const data = { type, workflowManaged: true, planneddepartment, department, category, lineName, processName, serialNo, content, issuedDate,
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null,
-        document: '', documentUrl: '', checklistItems, approvalStatus: 'draft', specialHandlingStatus: '', relatedReviewCompleted: false,
+        document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', specialHandlingStatus: '', relatedReviewCompleted: false,
         completionConfirmers: '', continuedManagementRequired: false, managementUntil: '', createdBy,
         createdAt: serverTimestamp() };
       try{
@@ -2402,6 +2421,7 @@
         document.getElementById('plannedForm').reset();
         document.getElementById('planDate').value = '';
         plannedCustomChecklist = [];
+        plannedExcludedChecklist = new Map();
         renderPlanCustomChecklist();
         renderPlanChecklistPreview();
         selectedFile = null;
@@ -2631,7 +2651,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!list.length) return '<div class="checklist-empty">対象のチェック項目はありません</div>';
       return list.map(item => {
         const result = checklistResult(item, role);
-        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select></div>`;
+        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select>${role === 'sender' && !disabled ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : ''}</div>`;
       }).join('');
     }
 
@@ -2644,6 +2664,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const status = approvalStatusOf(item);
       const stage = APPROVAL_STAGES.indexOf(status);
       const items = getRecordChecklist(item);
+      const excludedItems = Array.isArray(item.excludedChecklistItems) ? item.excludedChecklistItems : [];
       const senderLocked = stage >= 1;
       const receiverEnabled = stage >= 1;
       const receiverLocked = stage >= 3;
@@ -2672,6 +2693,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
             ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
           </section>
         </div>
+        ${excludedItems.length ? `<div class="excluded-checks"><strong>発行者が対象外とした項目</strong>${excludedItems.map((x,index) => `<div class="excluded-check-row"><span>${escapeHtml(x.label || '-') }</span>${!senderLocked ? `<button type="button" class="check-exclude-btn" onclick="restoreExcludedChecklist(${index})">対象に戻す</button>` : ''}</div>`).join('')}</div>` : ''}
         <div class="workflow-fields">
           <div class="form-group"><label>特別対応の状態<span class="required">*</span></label><select ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('specialHandlingStatus',this.value)"><option value="" ${!item.specialHandlingStatus ? 'selected' : ''}>選択</option><option value="in_progress" ${item.specialHandlingStatus === 'in_progress' ? 'selected' : ''}>対応中</option><option value="completed" ${item.specialHandlingStatus === 'completed' ? 'selected' : ''}>対応完了</option><option value="not_required" ${item.specialHandlingStatus === 'not_required' ? 'selected' : ''}>対応不要</option></select></div>
           <div class="form-group"><label>特記事項・NG対応内容</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('specialNotes',this.value)" placeholder="NGへの対応、再教育、識別方法など">${escapeHtml(item.specialNotes || '')}</textarea></div>
@@ -2709,6 +2731,39 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
 
     window.toggleApprovalCheck = async function(key, role, checked){
       return window.setApprovalResult(key, role, checked ? 'ok' : '');
+    };
+
+    window.excludeApprovalItem = async function(key){
+      if (!currentDetailItem?._id || approvalStatusOf(currentDetailItem) !== 'draft') return;
+      const items = getRecordChecklist(currentDetailItem);
+      const index = items.findIndex(x => x.key === key);
+      if (index < 0) return;
+      const target = items[index];
+      if (items.length <= 1){ alert('少なくとも1件のチェック項目を残してください'); return; }
+      items.splice(index, 1);
+      const excludedItems = Array.isArray(currentDetailItem.excludedChecklistItems) ? [...currentDetailItem.excludedChecklistItems] : [];
+      excludedItems.push({ ...target, excludedBy:getActorName(), excludedAtLocal:new Date().toISOString() });
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, excludedChecklistItems:excludedItems, updatedAt:serverTimestamp(), updatedBy:getActorName() });
+        currentDetailItem = { ...currentDetailItem, checklistItems:items, excludedChecklistItems:excludedItems };
+        renderApprovalWorkflow(currentDetailItem);
+      }catch(e){ console.error(e); alert('対象外の保存に失敗しました'); }
+    };
+
+    window.restoreExcludedChecklist = async function(index){
+      if (!currentDetailItem?._id || approvalStatusOf(currentDetailItem) !== 'draft') return;
+      const excludedItems = Array.isArray(currentDetailItem.excludedChecklistItems) ? [...currentDetailItem.excludedChecklistItems] : [];
+      const restored = excludedItems[index];
+      if (!restored) return;
+      excludedItems.splice(index, 1);
+      const { excludedBy, excludedAtLocal, ...checkItem } = restored;
+      const items = getRecordChecklist(currentDetailItem);
+      if (!items.some(x => x.key === checkItem.key || (checkItem.masterId && x.masterId === checkItem.masterId))) items.push({ ...checkItem, senderResult:'', receiverResult:'', senderChecked:false, receiverChecked:false });
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, excludedChecklistItems:excludedItems, updatedAt:serverTimestamp(), updatedBy:getActorName() });
+        currentDetailItem = { ...currentDetailItem, checklistItems:items, excludedChecklistItems:excludedItems };
+        renderApprovalWorkflow(currentDetailItem);
+      }catch(e){ console.error(e); alert('対象への復元に失敗しました'); }
     };
 
     window.saveWorkflowField = async function(field, value){
@@ -2810,7 +2865,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
       catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
       const resultLabel = (x, role) => ({ok:'合格',ng:'NG',na:'該当なし','':'未判定'})[checklistResult(x, role)] || '未判定';
-      const checks = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'sender')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="4">チェック項目なし</td></tr>';
+      const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'sender')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="4">チェック項目なし</td></tr>';
+      const excludedCheckRows = (Array.isArray(item.excludedChecklistItems) ? item.excludedChecklistItems : []).map(x => `<tr><td colspan="4" style="background:#fffbeb;color:#92400e;">対象外：${escapeHtml(x.label || '-')}</td></tr>`).join('');
+      const checks = activeCheckRows + excludedCheckRows;
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
       const ticket = (copyLabel, keeper) => `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))} / カード色：${cardColorName}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>発信</th><th>発生</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign"><div><b>発信部署承認</b><br>${escapeHtml(item.senderApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.senderApprovedAt))}</div><div><b>発生部署確認</b><br>${escapeHtml(item.receiverConfirmedBy || '未確認')}<br>${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}</div><div><b>発生部署承認・完了</b><br>${escapeHtml(item.receiverApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.receiverApprovedAt))}</div></div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
@@ -3099,6 +3156,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         relatedReviewCompleted: false,
         checklistItems: getRecordChecklist(original).map(x => ({ ...x, senderChecked:false, receiverChecked:false, senderResult:'', receiverResult:'' }))
       };
+      if (updates.category !== original.category){
+        updates.checklistItems = masterChecklistFor(updates.category);
+        updates.excludedChecklistItems = [];
+      } else {
+        updates.excludedChecklistItems = Array.isArray(original.excludedChecklistItems) ? original.excludedChecklistItems : [];
+      }
       if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || !updates.occurrenceDate){ alert('発信部署、発生部署、分類、ライン、工程、内容、実施日は必須です'); return; }
       try { await updateDoc(doc(db, 'changepoints', id), updates); alert('保存しました。内容変更のため承認状態を未承認に戻しました'); document.getElementById('editModal').classList.remove('active'); }
       catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
