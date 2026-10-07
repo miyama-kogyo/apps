@@ -1,0 +1,2990 @@
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>変化点管理システム</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    /* 認証画面 */
+    #authGate{
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex; align-items: center; justify-content: center; z-index: 2000;
+    }
+    #authCard{
+      background: #fff; padding: 40px; border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.2); width: 100%; max-width: 360px;
+    }
+    #authCard h2{ color:#333; margin-bottom:24px; text-align:center; }
+    #authCard .form-group{ margin-bottom:16px; }
+    #authCard label{ display:block; font-size:.85rem; color:#666; margin-bottom:6px; }
+    #authCard input{
+      width:100%; padding:12px; border:2px solid #e0e0e0;
+      border-radius:8px; font-size:1rem;
+    }
+    #authCard input:focus{ outline:none; border-color:#667eea; }
+    #authCard button{
+      width:100%; padding:14px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color:#fff; border:none; border-radius:8px;
+      font-size:1rem; font-weight:600; cursor:pointer; margin-top:8px;
+    }
+
+    /* メインメニュー */
+    #mainMenu{ display:none; padding:30px 0; min-height:100vh; }
+    .menu-container{ max-width:100%; margin:0; padding:0 10px; }
+    .menu-header{ text-align:center; margin-bottom:30px; color:#fff; }
+    .menu-header h1{ font-size:2.5rem; margin-bottom:8px; }
+    .menu-header p{ opacity:.9; font-size:1.1rem; }
+    #btnActorName{margin-top:10px;padding:7px 12px;border:1px solid rgba(255,255,255,.65);border-radius:6px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;}
+
+    /* トピックス */
+    .topics-filters{
+      display:flex; gap:10px; align-items:center;
+      margin: 10px 0 16px 0;
+      padding: 14px 16px;
+      border: 1px solid #e9ecef;
+      border-radius: 12px;
+      background: #fafbfc;
+    }
+    .topics-filters label{ font-size:1rem; color:#444; font-weight:600; }
+    .topics-filters select{
+      flex:1; min-width: 220px;
+      padding:12px 14px;
+      border:2px solid #e0e0e0;
+      border-radius:10px;
+      font-size:1.05rem;
+      background:#fff;
+    }
+
+    .topics-card{
+      background:#fff; border-radius:12px; padding:16px;
+      margin-bottom:16px; 
+      box-shadow:0 4px 16px rgba(0,0,0,.2);
+      border: 2px solid #e0e0e0;
+    }
+
+    .overdue-banner{
+      margin: 6px 0 10px 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 2px solid #ff8a80;
+      background: #fff5f5;
+      color: #7a1c1c;
+      box-shadow: 0 2px 8px rgba(255,107,107,.25);
+    }
+    .overdue-banner h3{
+      margin:0 0 6px 0;
+      font-size: .95rem;
+      display:flex; align-items:center; gap:6px;
+    }
+    .overdue-banner .overdue-list{ display:flex; flex-direction:column; gap:6px; }
+    .pill{
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:.75rem;
+      font-weight:700;
+      margin-left:6px;
+      vertical-align:middle;
+    }
+    .pill.overdue{
+      background:#ffebee;
+      color:#b71c1c;
+      border:1px solid #ffcdd2;
+    }
+
+    .topics-card h2{
+      font-size:1.15rem; color:#333; margin-bottom:12px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .topics-row{ display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+    .topics-row.two-columns{ grid-template-columns:repeat(2, 1fr); }
+    .topics-section{ 
+      background:#f8f9ff; 
+      border-radius:10px; 
+      padding:12px; 
+      border: 2px solid #c5cae9;
+      box-shadow: 0 2px 8px rgba(102,126,234,.12);
+    }
+    .topics-section.undecided{ grid-column: 1 / -1; }
+    .topics-section.undecided > .topics-row{ display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+    .topics-section.undecided .topics-item{ margin-bottom:0; }
+    .topics-section h3{
+      font-size:.95rem; color:#667eea; margin-bottom:10px;
+      display:flex; align-items:center; gap:6px;
+    }
+    .topics-section.tomorrow h3{ color:#ff9800; }
+    .topics-item{
+      background:#fff; 
+      border-radius:6px; 
+      padding:10px; 
+      margin-bottom:8px;
+      border-left:4px solid #2196f3; 
+      cursor:pointer; 
+      transition:all .2s;
+      border: 2px solid #e3f2fd;
+      box-shadow: 0 1px 4px rgba(33,150,243,.15);
+    }
+    .topics-item:hover{ 
+      transform: translateX(3px); 
+      box-shadow:0 2px 10px rgba(33,150,243,.3);
+      border-color: #90caf9;
+    }
+    .topics-item:last-child{ margin-bottom:0; }
+    .topics-item .time{ 
+      font-size:.95rem; 
+      color:#fff; 
+      margin-bottom:6px; 
+      font-weight:700;
+      background: linear-gradient(135deg, #5c6bc0 0%, #3949ab 100%);
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: inline-block;
+      border-left: 3px solid #283593;
+    }
+    
+    /* ステータスバッジ */
+    .status-badge{
+      display:inline-block;
+      padding:3px 10px;
+      border-radius:5px;
+      font-size:.75rem;
+      font-weight:700;
+      margin-left:8px;
+    }
+    .status-badge.planned{ background:#bbdefb; color:#1565c0; border:1px solid #1976d2; }
+    .status-badge.completed{ background:#c8e6c9; color:#2e7d32; border:1px solid #388e3c; }
+    .status-badge.canceled{ background:#ffcdd2; color:#c62828; border:1px solid #d32f2f; }
+    .status-badge.postponed{ background:#ffe0b2; color:#e65100; border:1px solid #ef6c00; }
+    
+    /* ステータス変更ボタン */
+    .status-actions{
+      display:flex;
+      gap:5px;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+    .status-btn{
+      padding:4px 10px;
+      border:none;
+      border-radius:5px;
+      font-size:.75rem;
+      font-weight:600;
+      cursor:pointer;
+      transition:all .2s;
+    }
+    .status-btn:hover{ transform:translateY(-1px); box-shadow:0 3px 6px rgba(0,0,0,.2); }
+    .status-btn.btn-complete{ background:#4caf50; color:#fff; }
+    .status-btn.btn-complete:hover{ background:#388e3c; }
+    .status-btn.btn-postpone{ background:#ff9800; color:#fff; }
+    .status-btn.btn-postpone:hover{ background:#f57c00; }
+    .status-btn.btn-cancel{ background:#f44336; color:#fff; }
+    .status-btn.btn-cancel:hover{ background:#d32f2f; }
+    .status-btn.btn-decide-date{ background:#2196f3; color:#fff; }
+    .status-btn.btn-decide-date:hover{ background:#1976d2; }
+
+    .topics-item .category{
+      display:inline-block; padding:3px 10px; border-radius:8px;
+      font-size:.75rem; font-weight:700; background:#c8e6c9; color:#2e7d32; margin-right:6px;
+    }
+    .topics-item .content{ font-size:.9rem; color:#333; line-height:1.5; margin-bottom:6px; }
+    .topics-item .proposal-date{
+      display:inline-block;
+      margin:0 0 6px 0;
+      padding:3px 9px;
+      border-radius:5px;
+      background:#fff8e1;
+      color:#8a5a00;
+      border:1px solid #ffe0a3;
+      font-size:.78rem;
+      font-weight:700;
+    }
+    .topics-item .lines{ 
+      font-size:.9rem; 
+      color:#1565c0; 
+      margin-top:6px; 
+      font-weight:700;
+      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+      padding: 5px 10px;
+      border-radius: 5px;
+      border-left: 3px solid #1976d2;
+    }
+    .topics-empty{ text-align:center; padding:20px; color:#888; font-size:.95rem; }
+
+    /* 今月の変化点テーブル */
+    .month-table-wrap{
+      max-height: 280px;
+      overflow-y: auto;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+    }
+    .month-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:.85rem;
+      background:#fff;
+    }
+    .month-table thead{
+      background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color:#fff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .month-table th{
+      padding:8px 10px;
+      text-align:left;
+      font-weight:600;
+      font-size:.8rem;
+    }
+    .month-table tbody tr{
+      border-bottom:1px solid #e0e0e0;
+      transition:background .2s;
+      cursor:pointer;
+    }
+    .month-table tbody tr:hover{
+      background:#f5f5ff;
+    }
+    .month-table td{
+      padding:8px 10px;
+      vertical-align:top;
+    }
+    .month-table td.date-col{
+      font-weight:600;
+      color:#667eea;
+      white-space:nowrap;
+    }
+    .month-table td.content-col{
+      max-width:200px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    /* メニューカード */
+    .menu-cards{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }
+    .menu-card{
+      background:#fff; border-radius:16px; padding:24px;
+      cursor:pointer; transition:all .3s; box-shadow:0 4px 20px rgba(0,0,0,.1);
+    }
+    .menu-card:hover{ transform: translateY(-5px); box-shadow:0 8px 30px rgba(0,0,0,.2); }
+    .menu-card .icon{ font-size:2.5rem; margin-bottom:12px; }
+    .menu-card h3{ font-size:1.1rem; color:#333; margin-bottom:6px; }
+    .menu-card p{ color:#666; font-size:.85rem; line-height:1.4; }
+
+    /* 共通ヘッダー */
+    .app-header{
+      background: rgba(255,255,255,.95); padding:16px 24px;
+      display:flex; justify-content:space-between; align-items:center;
+      box-shadow:0 2px 10px rgba(0,0,0,.1);
+    }
+    .app-header h1{ font-size:1.2rem; color:#333; display:flex; align-items:center; gap:10px; }
+    .btn-back{
+      padding:8px 16px; background:#f5f5f5; border:none;
+      border-radius:8px; cursor:pointer; font-size:.9rem;
+    }
+    .btn-back:hover{ background:#e0e0e0; }
+    .btn-logout{
+      padding:8px 16px; background:#ef5350; color:#fff; border:none;
+      border-radius:8px; cursor:pointer; font-size:.9rem; display:none;
+    }
+    .btn-logout:hover{ background:#e53935; }
+
+    /* 共通スタイル */
+    .screen{ display:none; }
+    .container{ max-width:1200px; margin:0 auto; padding:20px; }
+    .card{ background:#fff; border-radius:16px; padding:24px; box-shadow:0 4px 20px rgba(0,0,0,.15); margin-bottom:20px; }
+    .btn{
+      padding:10px 20px; border:none; border-radius:8px;
+      font-size:1rem; cursor:pointer; font-weight:500; transition:all .2s;
+    }
+    .btn-primary{ background: linear-gradient(135deg, #667eea, #764ba2); color:#fff; }
+    .btn-primary:hover{ transform: translateY(-2px); box-shadow:0 4px 12px rgba(102,126,234,.4); }
+    .btn-secondary{ background:#f5f5f5; color:#333; }
+    .btn-danger{ background:#e53935; color:#fff; }
+    .btn-sm{ padding:6px 12px; font-size:.85rem; }
+
+    /* CSVボタン disabled表現 */
+    .btn-disabled{ opacity:.45; cursor:not-allowed; filter:grayscale(30%); }
+
+    .form-group{ margin-bottom:16px; }
+    .form-group label{ display:block; font-size:.9rem; font-weight:600; color:#333; margin-bottom:6px; }
+    .form-group label .required{ color:#e53935; margin-left:4px; }
+    .form-group input, .form-group select, .form-group textarea{
+      width:100%; padding:10px 12px; border:2px solid #e0e0e0;
+      border-radius:8px; font-size:1rem;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus{
+      outline:none; border-color:#667eea;
+    }
+    .form-group textarea{ min-height:100px; resize:vertical; }
+    .form-group .hint{ font-size:.8rem; color:#888; margin-top:4px; }
+    .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+    .badge{ padding:2px 8px; border-radius:12px; font-size:.7rem; font-weight:600; }
+    .badge-anomaly{ background:#ffcdd2; color:#c62828; }
+    .badge-changepoint{ background:#c8e6c9; color:#2e7d32; }
+    .badge-planned{ background:#bbdefb; color:#1565c0; }
+    .badge-sudden{ background:#fff9c4; color:#856404; }
+
+    /* フィルター */
+    .filter-section{ display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; margin-bottom:20px; }
+    .filter-group{ display:flex; flex-direction:column; gap:6px; }
+    .filter-group label{ font-size:.85rem; color:#666; font-weight:500; }
+    .filter-group select, .filter-group input{
+      padding:10px 14px; border:2px solid #e0e0e0; border-radius:8px; font-size:1rem; min-width:150px;
+    }
+
+    /* 統計 */
+    .stats-row{ display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:20px; }
+    .stat-card{ background:#fff; border-radius:12px; padding:16px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,.1); }
+    .stat-card .number{ font-size:1.8rem; font-weight:bold; color:#667eea; }
+    .stat-card .label{ font-size:.8rem; color:#666; margin-top:4px; }
+    .stat-card.anomaly .number{ color:#e53935; }
+    .stat-card.sudden .number{ color:#e65100; }
+    .stat-card.planned .number{ color:#2196f3; }
+
+    /* ▼ タイムラインのグラフ表示 */
+    .chart-wrap{
+      position: relative;
+      width: 100%;
+      height: 320px;
+    }
+    @media (max-width: 768px){
+      .chart-wrap{ height: 260px; }
+    }
+
+    /* タイムライン */
+    .timeline{ position:relative; padding-left:24px; }
+    .timeline::before{
+      content:''; position:absolute; left:8px; top:0; bottom:0;
+      width:3px; background: linear-gradient(180deg, #667eea, #764ba2); border-radius:3px;
+    }
+    .timeline-item{
+      position:relative; margin-bottom:8px; padding:10px 16px;
+      background:#f8f9ff; border-radius:8px; border-left:4px solid #667eea;
+      cursor:pointer; transition:all .2s;
+    }
+    .timeline-item:hover{ transform: translateX(5px); box-shadow:0 4px 15px rgba(0,0,0,.1); }
+    .timeline-item::before{
+      content:''; position:absolute; left:-20px; top:14px;
+      width:10px; height:10px; background:#667eea;
+      border-radius:50%; border:2px solid #fff;
+    }
+    .timeline-item.anomaly-only{ border-left-color:#e53935; background:#fff5f5; }
+    .timeline-item.anomaly-only::before{ background:#e53935; }
+    .timeline-item.cp-sudden{ border-left-color:#f9c400; background:#fffde7; }
+    .timeline-item.cp-sudden::before{ background:#f9c400; }
+    .timeline-item.cp-planned{ border-left-color:#2196f3; background:#e3f2fd; }
+    .timeline-item.cp-planned::before{ background:#2196f3; }
+    .timeline-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .timeline-date{ font-size:.8rem; color:#666; min-width:85px; }
+    .timeline-badges{ display:flex; gap:4px; flex-wrap:wrap; }
+    .timeline-summary{ flex:1; font-size:.9rem; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:120px; }
+
+    /* カレンダー */
+    .calendar-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .calendar-nav{ display:flex; align-items:center; gap:16px; }
+    .calendar-nav button{ padding:8px 16px; background:#f5f5f5; border:none; border-radius:8px; cursor:pointer; font-size:1rem; }
+    .calendar-nav button:hover{ background:#e0e0e0; }
+    .calendar-nav .month-year{ font-size:1.3rem; font-weight:bold; color:#333; min-width:160px; text-align:center; }
+    .calendar-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; }
+    .calendar-day-header{ text-align:center; padding:10px; font-weight:600; color:#666; font-size:.85rem; }
+    .calendar-day{
+      min-height:150px; background:#f8f9ff; border-radius:8px; padding:8px;
+      cursor:pointer; transition:all .2s;
+    }
+    .calendar-day:hover{ background:#e8ebff; }
+    .calendar-day.other-month{ background:#f5f5f5; opacity:.6; }
+    .calendar-day.today{ background:#e3f2fd; border:2px solid #2196f3; }
+    .calendar-day .day-number{ font-size:.85rem; font-weight:600; color:#333; margin-bottom:6px; }
+    .calendar-day.sunday .day-number{ color:#e53935; }
+    .calendar-day.saturday .day-number{ color:#2196f3; }
+    .calendar-event{
+      background:#2196f3; color:#fff; padding:6px 8px; border-radius:4px;
+      font-size:.7rem; margin-bottom:4px; overflow:hidden; cursor:pointer;
+      line-height:1.4;
+    }
+    .calendar-event:hover{ opacity:.9; transform:scale(1.02); }
+    .calendar-event.category-人{ background:#e53935; }
+    .calendar-event.category-方法{ background:#2196f3; }
+    .calendar-event.category-材料{ background:#43a047; }
+    .calendar-event.category-金型{ background:#ff9800; }
+    .calendar-event.category-設備{ background:#9c27b0; }
+    .calendar-event.category-その他{ background:#607d8b; }
+    .calendar-more{ font-size:.7rem; color:#666; text-align:center; }
+
+    /* 管理画面 */
+    .master-tabs{ display:flex; gap:8px; margin-bottom:20px; }
+    .master-tab{
+      padding:10px 20px; background:#f5f5f5; border:none;
+      border-radius:8px 8px 0 0; cursor:pointer; font-size:.95rem;
+    }
+    .master-tab.active{ background:#667eea; color:#fff; }
+    .master-table{ width:100%; border-collapse:collapse; }
+    .master-table th{ background:#667eea; color:#fff; padding:12px; text-align:left; }
+    .master-table td{ padding:12px; border-bottom:1px solid #e0e0e0; }
+    .master-table tr:hover{ background:#f8f9ff; }
+    .master-add{ display:flex; gap:12px; margin-bottom:20px; }
+    .master-add input{ flex:1; }
+
+    /* モーダル */
+    .switch-flow-guide{
+      border:1px solid #e9ecef;
+      background:#f8f9fb;
+      border-radius:14px;
+      padding:12px 14px;
+    }
+    .switch-flow-title{ font-weight:800; color:#333; margin-bottom:10px; }
+    .switch-flow-steps{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .switch-flow-steps .step{
+      display:flex; align-items:center; gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      background:#fff;
+      border:1px solid #e5e7eb;
+      color:#444;
+      font-weight:700;
+    }
+    .switch-flow-steps .step .n{
+      width:26px; height:26px; border-radius:50%;
+      display:inline-flex; align-items:center; justify-content:center;
+      background:#eef2ff; color:#333;
+      font-weight:900;
+    }
+    .switch-flow-steps .step.active{
+      border-color:#667eea;
+      box-shadow:0 2px 12px rgba(102,126,234,.18);
+    }
+    .switch-flow-steps .step.active .n{ background:#667eea; color:#fff; }
+    .switch-flow-steps .arrow{ opacity:.6; font-weight:900; }
+    .switch-flow-status{
+      margin-top:10px;
+      font-size:.9rem;
+      color:#333;
+      background:#fff;
+      border:1px dashed #d7dde7;
+      border-radius:12px;
+      padding:10px 12px;
+    }
+
+    .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:3000; align-items:center; justify-content:center; padding:20px; }
+    .modal.active{ display:flex; }
+    .modal-content{ background:#fff; border-radius:16px; max-width:700px; width:100%; max-height:85vh; overflow-y:auto; }
+    .modal-header{ padding:20px 24px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:flex-start; }
+    .modal-header h3{ font-size:1.2rem; color:#333; }
+    .modal-close{ background:none; border:none; font-size:1.5rem; cursor:pointer; color:#999; }
+    .modal-badges{ display:flex; gap:8px; flex-wrap:wrap; padding:16px 24px; background:#f8f9ff; border-bottom:1px solid #e0e0e0; }
+    .modal-badges .badge{ padding:4px 12px; font-size:.8rem; }
+    .modal-body{ padding:24px; }
+    .modal-actions{ display:flex; gap:12px; padding:16px 24px; border-top:1px solid #e0e0e0; }
+    .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+    @media (max-width:600px){ .form-row{ grid-template-columns:1fr; } }
+    .detail-section{ margin-bottom:20px; }
+    .detail-section-title{ font-size:.85rem; font-weight:600; color:#667eea; margin-bottom:8px; }
+    .detail-section-content{
+      font-size:.95rem; color:#333; line-height:1.6;
+      background:#f8f9fa; padding:12px 16px; border-radius:8px; white-space:pre-wrap;
+    }
+    .detail-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
+    .detail-grid-item{ background:#f8f9fa; padding:10px 14px; border-radius:8px; }
+    .detail-grid-item .label{ font-size:.75rem; color:#888; margin-bottom:4px; }
+    .detail-grid-item .value{ font-size:.9rem; color:#333; }
+
+    /* ローディング・空状態 */
+    .loading{ text-align:center; padding:60px 20px; color:#666; }
+    .spinner{ width:40px; height:40px; border:4px solid #e0e0e0; border-top-color:#667eea; border-radius:50%; animation: spin 1s linear infinite; margin:0 auto 16px; }
+    @keyframes spin{ to{ transform: rotate(360deg);} }
+    .empty-state{ text-align:center; padding:40px 20px; color:#666; }
+    .empty-state .icon{ font-size:3rem; margin-bottom:12px; }
+
+    #signOutBtn{
+      position:fixed; top:16px; right:16px;
+      padding:8px 16px; background:rgba(239,83,80,.9); color:#fff; border:none; border-radius:8px;
+      cursor:pointer; font-size:.85rem; z-index:1000; display:none;
+    }
+    #signOutBtn:hover{ background:#e53935; }
+
+    /* 各画面ヘッダー内のログアウトボタン */
+    .header-actions{ display:flex; gap:10px; align-items:center; }
+
+    /* 履歴テーブル */
+    .history-table{ width:100%; border-collapse:collapse; font-size:.9rem; }
+    .history-table th{ background:#667eea; color:#fff; padding:10px; text-align:left; }
+    .history-table td{ padding:10px; border-bottom:1px solid #e0e0e0; }
+    .history-table tr:hover{ background:#f8f9ff; }
+
+    /* ファイルアップロードエリア */
+    .file-upload-area{
+      border:2px dashed #ccc; border-radius:8px; padding:20px;
+      text-align:center; cursor:pointer; transition: all .2s;
+      background:#fafafa;
+    }
+    .file-upload-area:hover{ border-color:#667eea; background:#f5f5ff; }
+
+    @media (max-width: 768px){
+      .menu-cards{ grid-template-columns:1fr; }
+      .topics-row{ grid-template-columns:1fr; }
+      .form-row{ grid-template-columns:1fr; }
+      .filter-section{ flex-direction:column; }
+      .detail-grid{ grid-template-columns:1fr; }
+      .calendar-day{ min-height:70px; padding:4px; }
+      .calendar-event{ font-size:.6rem; padding:1px 4px; }
+    }
+
+    /* 確認ダイアログのスタイル */
+    .confirm-modal {
+      display: none;
+      position: fixed;
+      z-index: 2500;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .confirm-modal-content {
+      background-color: white;
+      margin: 10% auto;
+      padding: 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    .confirm-modal-header {
+      font-size: 1.3rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    .confirm-modal-body {
+      margin-bottom: 25px;
+    }
+    .confirm-item {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 5px;
+    }
+    .confirm-label {
+      font-weight: 600;
+      color: #666;
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+    }
+    .confirm-value {
+      color: #333;
+      font-size: 0.95rem;
+    }
+    .confirm-modal-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .confirm-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .confirm-btn-confirm {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .confirm-btn-confirm:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+    .confirm-btn-cancel {
+      background: #95a5a6;
+      color: white;
+    }
+    .confirm-btn-cancel:hover {
+      background: #7f8c8d;
+    }
+
+    /* 5Mチェック・承認フロー */
+    .checklist-panel{border:1px solid #dbe2ea;border-radius:8px;background:#f8fafc;padding:14px;}
+    .checklist-empty{color:#64748b;font-size:.9rem;padding:8px 0;}
+    .checklist-row{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid #e5e7eb;}
+    .checklist-row:last-child{border-bottom:none;}
+    .checklist-row input[type="checkbox"]{width:18px;height:18px;margin-top:2px;flex:0 0 auto;}
+    .checklist-row .check-label{flex:1;line-height:1.45;}
+    .checklist-source{font-size:.72rem;color:#64748b;background:#e2e8f0;border-radius:4px;padding:2px 6px;white-space:nowrap;}
+    .custom-check-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+    .custom-check-tag{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:4px;padding:5px 8px;font-size:.85rem;}
+    .custom-check-tag button{border:none;background:none;color:#b91c1c;cursor:pointer;font-weight:800;padding:0;}
+    .approval-panel{width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:14px;}
+    .approval-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;}
+    .approval-step{padding:8px 6px;text-align:center;border-radius:6px;background:#f1f5f9;color:#64748b;font-size:.78rem;font-weight:700;border:1px solid #e2e8f0;}
+    .approval-step.done{background:#dcfce7;color:#166534;border-color:#86efac;}
+    .approval-step.current{background:#dbeafe;color:#1d4ed8;border-color:#93c5fd;}
+    .approval-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .approval-column{border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#f8fafc;}
+    .approval-column h4{margin:0 0 8px;color:#334155;font-size:.95rem;}
+    .approval-meta{font-size:.8rem;color:#64748b;margin:7px 0;line-height:1.5;}
+    .approval-add{display:flex;gap:6px;margin-top:10px;}
+    .approval-add input{flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;}
+    .approval-add button{padding:8px 10px;border:none;border-radius:6px;background:#475569;color:#fff;cursor:pointer;}
+    .approval-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+    .approval-actions .btn{margin:0;width:auto;flex:1;min-width:150px;}
+    .approval-status-badge{display:inline-flex;align-items:center;padding:4px 9px;border-radius:4px;font-size:.75rem;font-weight:800;background:#e2e8f0;color:#334155;}
+    .approval-status-badge.approved{background:#dcfce7;color:#166534;}
+    .master-check-filter{display:grid;grid-template-columns:180px 1fr auto;gap:8px;margin-bottom:14px;}
+    @media(max-width:700px){
+      .approval-steps{grid-template-columns:1fr 1fr;}
+      .approval-columns{grid-template-columns:1fr;}
+      .master-check-filter{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+  <!-- 認証画面 -->
+  <div id="authGate">
+    <div id="authCard">
+      <h2>変化点管理システム</h2>
+      <div class="spinner"></div>
+      <p style="color:#666;text-align:center;">起動しています...</p>
+      <p id="authMsg" style="color:#c62828;margin-top:12px;text-align:center;font-size:.9rem;"></p>
+    </div>
+  </div>
+
+  <button id="signOutBtn">ログアウト</button>
+
+  <!-- メインメニュー -->
+  <div id="mainMenu">
+    <div class="menu-container">
+      <div class="menu-header">
+        <h1>🔄 変化点管理システム</h1>
+        <button type="button" id="btnActorName">利用者名を設定</button>
+      </div>
+
+      <!-- トピックス（plannedのみ） -->
+      <div class="topics-card">
+        <h2>📢 トピックス（計画変化点）</h2>
+        <div class="topics-filters">
+          <label for="topicsDeptFilter">発生部署</label>
+          <select id="topicsDeptFilter">
+            <option value="">全て</option>
+          </select>
+        </div>
+        <div id="topicsOverdueBanner" class="overdue-banner" style="display:none;"></div>
+        <div class="topics-row">
+          <div class="topics-section today">
+            <h3>📅 今日の変化点</h3>
+            <div id="topicsToday"></div>
+          </div>
+
+          <div class="topics-section">
+            <h3>🗓 今週の変化点</h3>
+            <div id="topicsWeek"></div>
+          </div>
+
+          <div class="topics-section month">
+            <h3>📆 今月の変化点 <span style="font-size:.75rem;color:#888;font-weight:400;">（完了・中止を除く）</span></h3>
+            <div id="topicsMonth"></div>
+          </div>
+
+          <div class="topics-section undecided">
+            <h3>⚠️ 切り替え日未確定の変化点</h3>
+            <div id="topicsUndecided" class="topics-row two-columns"></div>
+            <div class="hint" style="margin-top:8px;color:#666;">
+              ※「切り替え日未確定」= 製造が「切り替え日」をまだ確定していない計画変化点
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- メニューカード -->
+      <div class="menu-cards">
+        <div class="menu-card" data-screen="timeline">
+          <div class="icon">📊</div>
+          <h3>タイムライン</h3>
+          <p>異常＋変化点を時系列で確認</p>
+        </div>
+        <div class="menu-card" data-screen="planned">
+          <div class="icon">📝</div>
+          <h3>計画変化点入力</h3>
+          <p>変化点情報を登録</p>
+        </div>
+        <div class="menu-card" data-screen="calendar">
+          <div class="icon">📆</div>
+          <h3>計画変化点カレンダー</h3>
+          <p>変化点予定を確認</p>
+        </div>
+        <div class="menu-card" data-screen="master">
+          <div class="icon">⚙️</div>
+          <h3>管理</h3>
+          <p>部署・ラインなどのマスタデータ管理</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- タイムライン画面 -->
+  <div id="timelineScreen" class="screen">
+    <div class="app-header">
+      <h1>📊 タイムライン</h1>
+      <div class="header-actions">
+        <button class="btn-back" data-back>← メニュー</button>
+        <button class="btn-logout" data-logout>ログアウト</button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="card">
+        <div class="filter-section">
+          <div class="filter-group">
+            <label>表示モード</label>
+            <select id="filterMode">
+              <option value="serial">整理No別</option>
+              <option value="line">ライン別</option>
+            </select>
+          </div>
+
+          <div class="filter-group" id="serialFilterGroup">
+            <label>整理No</label>
+            <input type="text" id="filterSerial" list="serialList" placeholder="入力...">
+            <datalist id="serialList"></datalist>
+          </div>
+
+          <div class="filter-group" id="lineFilterGroup" style="display:none;">
+            <label>ライン</label>
+            <select id="filterLine"><option value="">選択...</option></select>
+          </div>
+
+          <div class="filter-group">
+            <label>期間（開始）</label>
+            <input type="date" id="filterDateFrom">
+          </div>
+          <div class="filter-group">
+            <label>期間（終了）</label>
+            <input type="date" id="filterDateTo">
+          </div>
+
+          <div class="filter-group">
+            <label>表示タイプ</label>
+            <select id="filterType">
+              <option value="all">すべて</option>
+              <option value="anomaly">異常のみ</option>
+              <option value="sudden">計画外変化点のみ</option>
+              <option value="planned">計画変化点のみ</option>
+            </select>
+          </div>
+
+          <div class="filter-group" style="min-width:260px;">
+            <label>キーワード</label>
+            <input type="text" id="filterKeyword" placeholder="">
+          </div>
+
+          <div class="filter-group">
+            <label>並び順</label>
+            <select id="sortOrder">
+              <option value="desc" selected>降順（新しい→古い）</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" id="btnSearch">🔍 検索</button>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="number" id="statTotal">0</div><div class="label">総件数</div></div>
+        <div class="stat-card anomaly"><div class="number" id="statAnomaly">0</div><div class="label">異常</div></div>
+        <div class="stat-card sudden"><div class="number" id="statSudden">0</div><div class="label">計画外変化点</div></div>
+        <div class="stat-card planned"><div class="number" id="statPlanned">0</div><div class="label">計画変化点</div></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <h2 style="margin:0;font-size:1.05rem;color:#333;">📈 異常・変化点 推移</h2>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:.85rem;color:#666;">集計</span>
+            <select id="chartAgg" style="padding:8px 12px;border:2px solid #e0e0e0;border-radius:8px;">
+              <option value="day" selected>日別</option>
+              <option value="week">週別</option>
+              <option value="month">月別</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="chart-wrap" style="margin-top:12px;position:relative;">
+          <canvas id="timelineChart"></canvas>
+          <div id="chartTooltip" style="
+            display:none;
+            position:absolute;
+            z-index:200;
+            pointer-events:none;
+            max-width:340px;
+            min-width:200px;
+          "></div>
+        </div>
+
+        <div id="timelineChartEmpty" class="empty-state" style="display:none;padding:20px 0;">
+          <div class="icon">📉</div>
+          <p>表示できるデータがありません</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div id="timelineLoading" class="loading"><div class="spinner"></div><p>データ読み込み中...</p></div>
+        <div id="timelineEmpty" class="empty-state" style="display:none;"><div class="icon">📭</div><p>条件を指定して検索してください</p></div>
+        <div id="timelineView" class="timeline" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 計画変化点入力画面 -->
+  <div id="plannedScreen" class="screen">
+    <div class="app-header">
+      <h1>📝 計画変化点入力</h1>
+      <div class="header-actions">
+        <button class="btn-back" data-back>← メニュー</button>
+        <button class="btn-logout" data-logout>ログアウト</button>
+      </div>
+    </div>
+
+    <div class="container" style="max-width:1400px;">
+      <div class="card">
+        <h2 style="margin-bottom:20px;color:#333;">計画変化点の登録（changepoints / type=planned）</h2>
+
+        <form id="plannedForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label>起案部署<span class="required">*</span></label>
+              <select id="planDepartment" required><option value="">選択してください</option></select>
+              <div class="hint">保存先:planneddepartment</div>
+            </div>
+            <div class="form-group">
+              <label>変化点分類<span class="required">*</span></label>
+              <select id="planCategory" required>
+                <option value="">選択してください</option>
+                <option value="人">人</option>
+                <option value="方法">方法</option>
+                <option value="材料">材料</option>
+                <option value="金型">金型</option>
+                <option value="設備">設備</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>変化点発生部署<span class="required">*</span></label>
+              <select id="planDepartmentOccur" required><option value="">選択してください</option></select>
+              <div class="hint">保存先:department</div>
+            </div>
+            <div class="form-group">
+              <label>対象ライン名<span class="required">*</span></label>
+              <input type="text" id="planLineName" list="lineList2" required placeholder="例: 94-300 / RL1 など">
+              <datalist id="lineList2"></datalist>
+              <div class="hint">保存先:lineName</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>対象整理No</label>
+              <input type="text" id="planSerialNo" list="serialList2" placeholder="例: 6769">
+              <datalist id="serialList2"></datalist>
+              <div class="hint">保存先:serialNo</div>
+            </div>
+            <div class="form-group">
+              <label>切替え日（任意）</label>
+              <input type="date" id="planDate">
+              <div class="hint">保存先:occurrenceDate（切替え日）</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>切替え時刻（任意）</label>
+            <input type="time" id="planTime" step="60">
+            <div class="hint">保存先:occurrenceTime（切替え時刻）</div>
+          </div>
+
+          <div class="form-group">
+            <label>変化点内容<span class="required">*</span></label>
+            <textarea id="planContent" required placeholder="変化点の詳細内容を入力..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>5Mチェック項目</label>
+            <div class="hint" style="margin-bottom:8px;">選択した分類のマスタ項目を表示します。発信部署独自の確認項目も追加できます。</div>
+            <div id="planChecklistPreview" class="checklist-panel"><div class="checklist-empty">変化点分類を選択してください</div></div>
+            <div class="approval-add" style="margin-top:10px;">
+              <input type="text" id="planCustomCheckText" placeholder="発信部署の任意チェック項目">
+              <button type="button" id="btnAddPlanCustomCheck">追加</button>
+            </div>
+            <div id="planCustomCheckList" class="custom-check-list"></div>
+          </div>
+
+          <div class="form-group">
+            <label>📎 関連資料アップロード（5MBまで）</label>
+            <div class="file-upload-area" id="fileUploadArea">
+              <input type="file" id="planDocumentFile" accept="*/*" style="display:none;">
+              <div>📁 クリックまたはドラッグ&ドロップでファイルを選択</div>
+              <div style="font-size:.8rem;color:#888;margin-top:8px;">対応形式: PDF, 画像, Excel, Word など（最大5MB）</div>
+            </div>
+            <div id="filePreview" style="display:none;"></div>
+            <div id="uploadProgress" style="display:none;margin-top:10px;height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;">
+              <div id="uploadProgressBar" style="height:100%;background:linear-gradient(135deg, #667eea, #764ba2);width:0%;transition:width .3s;"></div>
+            </div>
+            <div class="hint">保存先：documentUrl（Storageにアップロード）</div>
+          </div>
+
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button type="button" id="btnRegisterPlanned" class="btn btn-primary" style="flex:1;min-width:140px;padding:14px;font-size:1.05rem;">
+              📤 登録する
+            </button>
+            <button type="button" id="btnExportLastPlannedCSV" class="btn btn-secondary btn-disabled" style="flex:1;min-width:120px;padding:14px;font-size:1.05rem;">
+              ⬇ CSV出力
+            </button>
+            <button type="button" id="btnExportLastPlannedQR" class="btn btn-secondary btn-disabled" style="flex:1;min-width:120px;padding:14px;font-size:1.05rem;">
+              📱 ワークフローQR
+            </button>
+          </div>
+          <div class="hint" style="margin-top:8px;">
+            ※「CSV出力」「QR出力」は、最後に登録した計画変化点の内容を出力します
+          </div>
+        </form>
+
+        <div style="margin-top:30px;">
+          <h3 style="font-size:1rem;color:#333;margin-bottom:16px;">📋 最近の計画変化点</h3>
+          <div id="plannedHistory"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- カレンダー画面 -->
+  <div id="calendarScreen" class="screen">
+    <div class="app-header">
+      <h1>📆 計画変化点カレンダー</h1>
+      <div class="header-actions">
+        <button class="btn-back" data-back>← メニュー</button>
+        <button class="btn-logout" data-logout>ログアウト</button>
+      </div>
+    </div>
+    <div class="container" style="max-width:100%; padding:10px;">
+      <div class="card">
+        <div class="filter-section">
+          <div class="filter-group">
+            <label>発生部署フィルター</label>
+            <select id="calendarDeptFilter">
+              <option value="">すべての部署</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>分類フィルター</label>
+            <select id="calendarCatFilter">
+              <option value="">すべての分類</option>
+              <option value="人">人</option>
+              <option value="方法">方法</option>
+              <option value="材料">材料</option>
+              <option value="金型">金型</option>
+              <option value="設備">設備</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="calendar-header">
+          <div class="calendar-nav">
+            <button id="calPrev">◀ 前月</button>
+            <div class="month-year" id="calMonthYear"></div>
+            <button id="calNext">次月 ▶</button>
+          </div>
+          <button class="btn btn-secondary" id="calToday">今月</button>
+        </div>
+
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理画面 -->
+  <div id="masterScreen" class="screen">
+    <div class="app-header">
+      <h1>⚙️ マスタ管理</h1>
+      <div class="header-actions">
+        <button class="btn-back" data-back>← メニュー</button>
+        <button class="btn-logout" data-logout>ログアウト</button>
+      </div>
+    </div>
+    <div class="container" style="max-width:800px;">
+      <div class="card">
+        <div class="master-tabs">
+          <button class="master-tab active" data-tab="department">部署</button>
+          <button class="master-tab" data-tab="line">ライン</button>
+          <button class="master-tab" data-tab="checklist">5Mチェック項目</button>
+        </div>
+        <div id="masterDepartment" class="master-content">
+          <div class="master-add">
+            <input type="text" id="addDeptName" placeholder="新しい部署名を入力...">
+            <button class="btn btn-primary" id="btnAddDept">追加</button>
+          </div>
+          <table class="master-table">
+            <thead><tr><th>部署名</th><th style="width:120px;">操作</th></tr></thead>
+            <tbody id="deptTableBody"></tbody>
+          </table>
+        </div>
+        <div id="masterLine" class="master-content" style="display:none;">
+          <div class="master-add">
+            <input type="text" id="addLineName" placeholder="新しいライン名を入力...">
+            <button class="btn btn-primary" id="btnAddLine">追加</button>
+          </div>
+          <table class="master-table">
+            <thead><tr><th>ライン名</th><th style="width:120px;">操作</th></tr></thead>
+            <tbody id="lineTableBody"></tbody>
+          </table>
+        </div>
+        <div id="masterChecklist" class="master-content" style="display:none;">
+          <div class="master-check-filter">
+            <select id="addChecklistCategory">
+              <option value="人">人</option><option value="設備">設備</option><option value="材料">材料</option><option value="方法">方法</option><option value="金型">金型</option>
+            </select>
+            <input type="text" id="addChecklistName" placeholder="新しいチェック項目を入力...">
+            <button class="btn btn-primary" id="btnAddChecklist">追加</button>
+          </div>
+          <table class="master-table">
+            <thead><tr><th style="width:90px;">分類</th><th>チェック項目</th><th style="width:150px;">操作</th></tr></thead>
+            <tbody id="checklistTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 詳細モーダル -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 id="detailTitle">詳細情報</h3>
+          <div id="detailDate" style="font-size:.9rem;color:#666;margin-top:4px;"></div>
+        </div>
+        <button class="modal-close" id="detailClose">&times;</button>
+      </div>
+      <div class="modal-badges" id="detailBadges"></div>
+      <div class="modal-body" id="detailBody"></div>
+      <div id="detailActions" class="modal-actions" style="display:none;padding:16px 24px;border-top:1px solid #e0e0e0;gap:12px;flex-direction:column;">
+        <div id="approvalWorkflow" class="approval-panel" style="display:none;"></div>
+        <div id="switchFlowGuide" class="switch-flow-guide" style="display:none;">
+          <div class="switch-flow-title">🧭 製造：切替えフロー</div>
+          <div class="switch-flow-steps">
+            <div class="step" data-step="1"><span class="n">①</span><span class="t">未確定</span></div>
+            <div class="arrow">→</div>
+            <div class="step" data-step="2"><span class="n">②</span><span class="t">切替え日決定</span></div>
+            <div class="arrow">→</div>
+            <div class="step" data-step="3"><span class="n">③</span><span class="t">切替え実施</span></div>
+          </div>
+          <div class="switch-flow-status" id="switchFlowStatusText"></div>
+        </div>
+
+        <div id="switchDecisionBox" style="width:100%;display:none;flex-direction:column;gap:10px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:200px;">
+              <label style="display:block;font-size:.85rem;color:#666;font-weight:600;margin-bottom:6px;">切替え日</label>
+              <input type="date" id="switchDateInput" style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:1rem;">
+              <div style="font-size:.8rem;color:#888;margin-top:6px;">※「今日で決定」または「指定日で決定」で切替え日を確定します</div>
+            </div>
+            <button class="btn" id="btnSwitchToday" style="background:#1565c0;color:#fff;">📅 今日で決定</button>
+            <button class="btn" id="btnSwitchDecide" style="background:#0b7a3b;color:#fff;">🗓 指定日で決定</button>
+          </div>
+        </div>
+
+        <div id="switchAfterDecisionBox" style="width:100%;display:none;flex-direction:column;gap:10px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <div id="switchStatusHint" style="flex:1;min-width:220px;background:#f8f9fa;border-radius:10px;padding:10px 12px;color:#333;font-size:.9rem;"></div>
+            <button class="btn" id="btnSwitchComplete" style="background:#2e7d32;color:#fff;">✅ 切替え完了</button>
+            <button class="btn" id="btnSwitchPostpone" style="background:#ef6c00;color:#fff;">⏩ 延期</button>
+            <button class="btn" id="btnSwitchCancel" style="background:#c62828;color:#fff;">⛔ 中止</button>
+          </div>
+          <div style="font-size:.8rem;color:#888;">※切替え後に「完了」。延期/中止もここで確定します。</div>
+        </div>
+
+        <div style="display:flex;gap:12px;width:100%;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btnDetailEdit" style="flex:1;min-width:160px;">✏️ 編集</button>
+          <button class="btn" id="btnDetailDelete" style="flex:1;min-width:160px;background:#e53935;color:#fff;">🗑️ 削除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div id="editModal" class="modal">
+    <div class="modal-content" style="max-width:700px;">
+      <div class="modal-header">
+        <h3>✏️ 変化点の編集</h3>
+        <button class="modal-close" id="editClose">&times;</button>
+      </div>
+      <div class="modal-body" id="editFormContainer" style="padding:24px;"></div>
+      <div style="padding:16px 24px;border-top:1px solid #e0e0e0;display:flex;gap:12px;">
+        <button class="btn btn-primary" id="btnEditSave" style="flex:1;">💾 保存</button>
+        <button class="btn btn-secondary" id="btnEditCancel" style="flex:1;">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QRコードモーダル -->
+  <div id="qrModal" class="modal">
+    <div class="modal-content" style="max-width:400px;text-align:center;">
+      <div class="modal-header">
+        <h3>📱 QRコード</h3>
+        <button class="modal-close" id="qrClose">&times;</button>
+      </div>
+      <div style="padding:30px;display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <div id="qrCanvas" style="background:#fff;padding:10px;border-radius:8px;"></div>
+        <div id="qrUrl" style="font-size:.8rem;color:#666;word-break:break-all;background:#f5f5f5;padding:10px;border-radius:6px;width:100%;"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <button class="btn btn-primary" id="btnDownloadQR">💾 QR画像を保存</button>
+          <button class="btn btn-secondary" id="btnCopyUrl">📋 URLをコピー</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認ダイアログ -->
+  <div id="confirmModal" class="confirm-modal">
+    <div class="confirm-modal-content">
+      <div class="confirm-modal-header">登録内容の確認（メール下書き作成）</div>
+      <div class="confirm-modal-body">
+        <div id="confirmContent"></div>
+        <div class="confirm-modal-buttons">
+          <button class="confirm-btn confirm-btn-cancel" id="btnConfirmCancel">キャンセル</button>
+          <button class="confirm-btn confirm-btn-confirm" id="btnConfirmOk">登録してOutlookを開く</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
+    import {
+      getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc,
+      query, orderBy, onSnapshot, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+    import {
+      getAuth, signInAnonymously, onAuthStateChanged,
+      setPersistence, browserLocalPersistence
+    } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+    import {
+      getStorage, ref, uploadBytesResumable, getDownloadURL
+    } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0YUIpIDh4WB4p1ewiNB0XfwHve0ByljU",
+      authDomain: "abnreport-fd733.firebaseapp.com",
+      databaseURL: "https://abnreport-fd733-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "abnreport-fd733",
+      storageBucket: "abnreport-fd733.firebasestorage.app",
+      messagingSenderId: "349748947315",
+      appId: "1:349748947315:web:010cb671d2a95bcf1f7d06"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const auth = getAuth(app);
+    const storage = getStorage(app);
+    const WORKFLOW_APP_URL = 'https://miyama-kogyo.github.io/apps/changepoint.html';
+
+    let anomalyData = [];
+    let changepointData = [];
+    let filteredData = [];
+
+    let masterDepartments = [];
+    let masterLines = [];
+    let deptDocs = [];
+    let lineDocs = [];
+    let checklistDocs = [];
+    let plannedCustomChecklist = [];
+    const CHANGE_CATEGORIES = ['人', '設備', '材料', '方法', '金型'];
+
+    let calendarYear, calendarMonth;
+    let lastRegisteredPlanned = null;
+    let lastDetailHtmlUrl = null;
+    let selectedFile = null;
+    let timelineChart = null;
+    let linkedChangepointOpened = false;
+    let appInitialized = false;
+
+    const PLANNED_CP_CSV_HEADERS = [
+      { key: 'docId',             label: 'DocID' },
+      { key: 'type',              label: '種別' },
+      { key: 'category',          label: '分類' },
+      { key: 'planneddepartment', label: '起案部署' },
+      { key: 'department',        label: '発生部署' },
+      { key: 'lineName',          label: 'ライン名' },
+      { key: 'serialNo',          label: '整理No' },
+      { key: 'occurrenceDate',    label: '発生日' },
+      { key: 'occurrenceTime',    label: '時刻' },
+      { key: 'lot',               label: '対象ロット' },
+      { key: 'document',          label: '関連資料' },
+      { key: 'documentUrl',       label: '資料URL' },
+      { key: 'content',           label: '内容' },
+      { key: 'createdAtLocal',    label: '登録日時(端末)' }
+    ];
+
+    const gate = document.getElementById('authGate');
+    const mainMenu = document.getElementById('mainMenu');
+    const screens = {
+      timeline: document.getElementById('timelineScreen'),
+      planned: document.getElementById('plannedScreen'),
+      calendar: document.getElementById('calendarScreen'),
+      master: document.getElementById('masterScreen')
+    };
+
+    function ymdLocal(dateObj){
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth()+1).padStart(2,'0');
+      const d = String(dateObj.getDate()).padStart(2,'0');
+      return `${y}-${m}-${d}`;
+    }
+    function toLocalDateString(value){
+      if (!value) return '';
+      let d = null;
+      if (typeof value === 'string') {
+        const m = value.match(/^\d{4}-\d{2}-\d{2}/);
+        if (m) return m[0];
+        d = new Date(value);
+      } else if (value instanceof Date) {
+        d = value;
+      } else if (typeof value.toDate === 'function') {
+        d = value.toDate();
+      } else if (typeof value.seconds === 'number') {
+        d = new Date(value.seconds * 1000);
+      }
+      return d && !Number.isNaN(d.getTime()) ? ymdLocal(d) : '';
+    }
+    function getProposalDate(item){
+      return toLocalDateString(item.proposalDate || item.draftDate || item.createdAtLocal || item.createdAt || item.createdDate || item.registeredAt);
+    }
+    function escapeHtml(text){
+      if (text === null || text === undefined) return '';
+      return String(text)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#039;')
+        .replace(/\n/g,'<br>');
+    }
+    function escapeAttr(text){
+      if (text === null || text === undefined) return '';
+      return String(text).replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function csvEscape(v){
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }
+    function downloadCSV(filename, headers, rowObj){
+      const bom = '\uFEFF';
+      const headerLine = headers.map(h => csvEscape(h.label)).join(',');
+      const valueLine  = headers.map(h => csvEscape(rowObj[h.key])).join(',');
+      const csv = bom + headerLine + '\n' + valueLine + '\n';
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function safeFilenamePart(s){
+      return String(s || '').replace(/[\\\/:*?"<>|]/g,'_');
+    }
+    function setExportButtonEnabled(enabled){
+      const btnCSV = document.getElementById('btnExportLastPlannedCSV');
+      const btnQR = document.getElementById('btnExportLastPlannedQR');
+      if (btnCSV) { btnCSV.disabled = !enabled; btnCSV.classList.toggle('btn-disabled', !enabled); }
+      if (btnQR)  { btnQR.disabled = !enabled;  btnQR.classList.toggle('btn-disabled', !enabled); }
+    }
+
+    function normText(s){ return String(s || '').toLowerCase().trim(); }
+    function matchesKeyword(item, keyword){
+      const kw = normText(keyword);
+      if (!kw) return true;
+      let hay = '';
+      if (item._kind === 'anomaly'){
+        hay = [item.serialNo, item.lineName, item.department, item.handler,
+               item.occurrenceDate, item.occurrenceTime, item.anomalyContent,
+               item.actionTaken, item.rootCauseAction].join(' ');
+      } else {
+        hay = [item.type, item.category, item.planneddepartment, item.department,
+               item.lineName, item.serialNo, item.occurrenceDate, item.occurrenceTime,
+               item.lot, item.document, item.content, item.relatedAnomalyId].join(' ');
+      }
+      return normText(hay).includes(kw);
+    }
+
+    function reorderLinkedTimelineItems(items){
+      const timeKey = (it) => `${it.sortDate || ''}T${it.sortTime || ''}`;
+      const cmpDesc = (a,b) => timeKey(b).localeCompare(timeKey(a));
+      const anomalies = new Map();
+      for (const it of items){ if (it._kind === 'anomaly') anomalies.set(it._id, it); }
+      const blocks = new Map();
+      for (const [aid, a] of anomalies.entries()){ blocks.set(aid, { anomaly: a, cps: [], key: timeKey(a) }); }
+      const standalone = [];
+      for (const it of items){
+        if (it._kind !== 'changepoint') continue;
+        const rel = (it.relatedAnomalyId || '').trim();
+        if (rel && blocks.has(rel)){ blocks.get(rel).cps.push(it); } else { standalone.push(it); }
+      }
+      const elements = [];
+      for (const [aid, b] of blocks.entries()){
+        b.cps.sort(cmpDesc);
+        let newest = b.key;
+        for (const cp of b.cps){ const k = timeKey(cp); if (k > newest) newest = k; }
+        b.key = newest;
+        elements.push({ _type:'block', key: b.key, block: b });
+      }
+      for (const cp of standalone){ elements.push({ _type:'single', key: timeKey(cp), item: cp }); }
+      elements.sort((A,B) => {
+        const d = B.key.localeCompare(A.key);
+        if (d !== 0) return d;
+        return (A._type === 'block') ? -1 : 1;
+      });
+      const out = [];
+      for (const el of elements){
+        if (el._type === 'single'){ out.push(el.item); }
+        else { for (const cp of el.block.cps) out.push(cp); out.push(el.block.anomaly); }
+      }
+      return out;
+    }
+
+    function buildAggKey(dateStr, agg){
+      if (!dateStr) return '';
+      if (agg === 'month') return String(dateStr).slice(0,7);
+      if (agg === 'week'){
+        const d = new Date(dateStr + 'T00:00:00');
+        d.setHours(0,0,0,0);
+        const day = (d.getDay() + 6) % 7;
+        d.setDate(d.getDate() - day + 3);
+        const firstThu = new Date(d.getFullYear(), 0, 4);
+        const firstDay = (firstThu.getDay() + 6) % 7;
+        firstThu.setDate(firstThu.getDate() - firstDay + 3);
+        const weekNo = 1 + Math.round((d - firstThu) / (7 * 24 * 3600 * 1000));
+        return `${d.getFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+      }
+      return dateStr;
+    }
+
+    let currentSortOrder = 'desc';
+
+    // ---- カスタムツールチップ用グローバル ----
+    let _chartItemMap = new Map(); // key → { anomaly:[], sudden:[], planned:[] }
+
+    function renderTimelineChart(){
+      const canvas = document.getElementById('timelineChart');
+      const emptyEl = document.getElementById('timelineChartEmpty');
+      const tipEl   = document.getElementById('chartTooltip');
+      if (!canvas) return;
+      if (timelineChart){ timelineChart.destroy(); timelineChart = null; }
+      if (tipEl) tipEl.style.display = 'none';
+      if (!filteredData || filteredData.length === 0){
+        canvas.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+      }
+      const agg = document.getElementById('chartAgg')?.value || 'day';
+
+      // カウントマップ + アイテムマップを同時構築
+      const map = new Map();
+      _chartItemMap = new Map();
+      for (const it of filteredData){
+        const key = buildAggKey(it.sortDate, agg);
+        if (!key) continue;
+        if (!map.has(key)) map.set(key, { anomaly: 0, sudden: 0, planned: 0 });
+        if (!_chartItemMap.has(key)) _chartItemMap.set(key, { anomaly: [], sudden: [], planned: [] });
+        const row  = map.get(key);
+        const irow = _chartItemMap.get(key);
+        if (it._kind === 'anomaly'){
+          row.anomaly++; irow.anomaly.push(it);
+        } else if (it._kind === 'changepoint' && it.type === 'sudden'){
+          row.sudden++;  irow.sudden.push(it);
+        } else if (it._kind === 'changepoint' && it.type === 'planned'){
+          row.planned++; irow.planned.push(it);
+        }
+      }
+      let labels = Array.from(map.keys()).sort((a,b)=>a.localeCompare(b));
+      const anomaly = labels.map(k => map.get(k).anomaly);
+      const sudden  = labels.map(k => map.get(k).sudden);
+      const planned = labels.map(k => map.get(k).planned);
+      const hasAny = anomaly.some(v=>v>0) || sudden.some(v=>v>0) || planned.some(v=>v>0);
+      if (!hasAny){ canvas.style.display = 'none'; if (emptyEl) emptyEl.style.display = 'block'; return; }
+      canvas.style.display = 'block';
+      if (emptyEl) emptyEl.style.display = 'none';
+      const maxY = Math.max(...anomaly, ...sudden, ...planned, 1);
+      const ctx = canvas.getContext('2d');
+
+      // ---- カスタムHTMLツールチップ関数 ----
+      const externalTooltip = (context) => {
+        if (!tipEl) return;
+        const { chart, tooltip } = context;
+        if (tooltip.opacity === 0){ tipEl.style.display = 'none'; return; }
+
+        const labelKey = tooltip.title?.[0] || '';
+        const items = _chartItemMap.get(labelKey);
+        if (!items){ tipEl.style.display = 'none'; return; }
+
+        const truncate = (s, n=38) => {
+          const t = String(s || '').replace(/\n/g,' ').trim();
+          return t.length > n ? t.slice(0, n) + '…' : t;
+        };
+        const esc = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        const buildSection = (list, color, emoji, labelPrefix) => {
+          if (!list.length) return '';
+          const rows = list.slice(0, 6).map(it => {
+            const meta = [it.lineName, it.serialNo ? 'No.'+it.serialNo : ''].filter(Boolean).join(' / ');
+            const txt  = it._kind === 'anomaly' ? (it.anomalyContent || it.content || '') : (it.content || '');
+            return `<div style="
+              border-left:3px solid ${color};
+              padding:5px 8px;
+              margin-bottom:5px;
+              background:#fff;
+              border-radius:4px;
+              font-size:.78rem;
+              line-height:1.45;
+            ">
+              <div style="font-weight:700;color:${color};">${emoji} ${esc(meta||'-')}</div>
+              <div style="color:#333;margin-top:2px;">${esc(truncate(txt,46))}</div>
+            </div>`;
+          }).join('');
+          const more = list.length > 6 ? `<div style="font-size:.72rem;color:#999;text-align:right;margin-top:2px;">他${list.length-6}件</div>` : '';
+          return `<div style="margin-bottom:8px;">
+            <div style="font-size:.78rem;font-weight:800;color:${color};margin-bottom:4px;">${labelPrefix}（${list.length}件）</div>
+            ${rows}${more}
+          </div>`;
+        };
+
+        let html = `<div style="
+          font-size:.8rem;
+          font-weight:700;
+          color:#333;
+          padding:5px 8px 8px;
+          border-bottom:1px solid #e0e0e0;
+          margin-bottom:8px;
+        ">📅 ${esc(labelKey)}</div>`;
+        html += buildSection(items.anomaly,  '#e53935', '⚠️', '異常');
+        html += buildSection(items.sudden,   '#c79a00', '🔄', '計画外変化点');
+        html += buildSection(items.planned,  '#1565c0', '📋', '計画変化点');
+
+        tipEl.innerHTML = `<div style="
+          background:#fff;
+          border:1px solid #dde3f0;
+          border-radius:10px;
+          box-shadow:0 6px 24px rgba(0,0,0,.18);
+          padding:12px 14px;
+          max-height:340px;
+          overflow-y:auto;
+        ">${html}</div>`;
+
+        // 吹き出し位置を計算（グラフ内に収まるよう）
+        const { offsetLeft: chartX, offsetTop: chartY } = chart.canvas;
+        const canvasWidth = chart.canvas.offsetWidth;
+        let x = tooltip.caretX + 12;
+        let y = tooltip.caretY - 20;
+        tipEl.style.display = 'block';
+        // はみ出し防止（右端）
+        const tipW = tipEl.offsetWidth || 320;
+        if (x + tipW > canvasWidth - 10) x = tooltip.caretX - tipW - 12;
+        if (x < 4) x = 4;
+        if (y < 4) y = 4;
+        tipEl.style.left = x + 'px';
+        tipEl.style.top  = y + 'px';
+      };
+
+      timelineChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label:'異常',        data: anomaly, backgroundColor:'rgba(229,57,53,.65)', borderColor:'#c62828', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
+            { label:'計画外変化点', data: sudden,  backgroundColor:'rgba(249,196,0,.75)', borderColor:'#c79a00', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
+            { label:'計画変化点',  data: planned, backgroundColor:'rgba(33,150,243,.65)', borderColor:'#1565c0', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              enabled: false,           // 標準tooltipをOFF
+              external: externalTooltip // カスタムHTMLに切り替え
+            }
+          },
+          scales: { x: { stacked: false }, y: { stacked: false, beginAtZero: true, suggestedMax: Math.max(3, maxY+1), ticks: { precision: 0 } } }
+        }
+      });
+
+      // マウスがグラフ外に出たら吹き出し非表示
+      canvas.addEventListener('mouseleave', () => { if (tipEl) tipEl.style.display = 'none'; }, { passive: true });
+    }
+
+    // 画面操作なしで匿名認証し、Firebaseへの接続権限だけを確保する。
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user){
+        gate.style.display = 'none';
+        mainMenu.style.display = 'block';
+        document.getElementById('signOutBtn').style.display = 'none';
+        updateActorNameButton();
+        if (!appInitialized){ appInitialized = true; await initApp(); }
+      } else {
+        gate.style.display = 'flex';
+        mainMenu.style.display = 'none';
+        Object.values(screens).forEach(s => s.style.display = 'none');
+        document.getElementById('signOutBtn').style.display = 'none';
+        try{
+          await signInAnonymously(auth);
+        }catch(e){
+          console.error('匿名認証エラー:', e);
+          document.getElementById('authMsg').textContent = '起動に失敗しました。管理者へ連絡してください。';
+        }
+      }
+    });
+
+    function getActorName(askIfMissing = true){
+      let name = (localStorage.getItem('changepointActorName') || '').trim();
+      if (!name && askIfMissing){
+        name = (prompt('承認履歴に記録する氏名を入力してください') || '').trim();
+        if (name) localStorage.setItem('changepointActorName', name);
+      }
+      return name || `端末利用者-${(auth.currentUser?.uid || 'unknown').slice(0,8)}`;
+    }
+
+    function updateActorNameButton(){
+      const btn = document.getElementById('btnActorName');
+      if (!btn) return;
+      const name = (localStorage.getItem('changepointActorName') || '').trim();
+      btn.textContent = name ? `利用者：${name}（変更）` : '利用者名を設定';
+    }
+
+    document.getElementById('btnActorName')?.addEventListener('click', () => {
+      const current = (localStorage.getItem('changepointActorName') || '').trim();
+      const name = (prompt('承認履歴に記録する氏名を入力してください', current) || '').trim();
+      if (!name) return;
+      localStorage.setItem('changepointActorName', name);
+      updateActorNameButton();
+    });
+
+    function showScreen(screen){
+      mainMenu.style.display = (screen === 'menu') ? 'block' : 'none';
+      Object.entries(screens).forEach(([key, el]) => {
+        el.style.display = (key === screen) ? 'block' : 'none';
+      });
+    }
+
+    document.querySelectorAll('.menu-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const screen = card.dataset.screen;
+        showScreen(screen);
+        if (screen === 'timeline'){
+          document.getElementById('timelineLoading').style.display = 'none';
+          document.getElementById('timelineEmpty').style.display = 'block';
+        } else if (screen === 'calendar'){
+          renderCalendar();
+        } else if (screen === 'master'){
+          renderMasterTables();
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-back]').forEach(btn => {
+      btn.addEventListener('click', () => showScreen('menu'));
+    });
+    async function initApp(){
+      const now = new Date();
+      calendarYear = now.getFullYear();
+      calendarMonth = now.getMonth();
+      await loadMasters();
+      setupListeners();
+      setupPlannedForm();
+      setupFileUpload();
+      setupQRModal();
+      setupCalendar();
+      setupMasterTabs();
+      setupFilterMode();
+      document.getElementById('planDate').value = '';
+      document.getElementById('planTime').value = '';
+      setExportButtonEnabled(false);
+      const kwEl = document.getElementById('filterKeyword');
+      if (kwEl){ kwEl.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); document.getElementById('btnSearch').click(); } }); }
+      const aggSel = document.getElementById('chartAgg');
+      if (aggSel){ aggSel.addEventListener('change', () => renderTimelineChart()); }
+    }
+
+    async function loadMasters(){
+      try{
+        const [deptSnap, lineSnap, checklistSnap] = await Promise.all([
+          getDocs(collection(db, 'masters', 'department', 'items')),
+          getDocs(collection(db, 'masters', 'line', 'items')),
+          getDocs(collection(db, 'masters', 'changeChecklist', 'items'))
+        ]);
+        deptDocs = deptSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        lineDocs = lineSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        checklistDocs = checklistSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(d => CHANGE_CATEGORIES.includes(d.category) && d.name)
+          .sort((a,b) => CHANGE_CATEGORIES.indexOf(a.category) - CHANGE_CATEGORIES.indexOf(b.category) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(String(b.name),'ja'));
+        masterDepartments = deptDocs.map(d => d.name).filter(Boolean).sort();
+        masterLines = lineDocs.map(d => d.name).filter(Boolean).sort();
+        document.getElementById('filterLine').innerHTML =
+          '<option value="">選択...</option>' +
+          masterLines.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+        document.getElementById('planDepartment').innerHTML =
+          '<option value="">選択してください</option>' +
+          masterDepartments.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+        document.getElementById('planDepartmentOccur').innerHTML =
+          '<option value="">選択してください</option>' +
+          masterDepartments.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+        document.getElementById('calendarDeptFilter').innerHTML =
+          '<option value="">すべての部署</option>' +
+          masterDepartments.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+        document.getElementById('lineList2').innerHTML = masterLines.map(l => `<option value="${escapeAttr(l)}">`).join('');
+        renderPlanChecklistPreview();
+      }catch(err){ console.error('マスタ読み込みエラー:', err); }
+    }
+
+    function masterChecklistFor(category){
+      return checklistDocs.filter(d => d.category === category).map(d => ({
+        key: `master_${d.id}`,
+        masterId: d.id,
+        category: d.category,
+        label: d.name,
+        source: 'master',
+        owner: 'both',
+        senderChecked: false,
+        receiverChecked: false
+      }));
+    }
+
+    function buildRecordChecklist(category){
+      const masterItems = masterChecklistFor(category);
+      const customItems = plannedCustomChecklist.map((name, index) => ({
+        key: `sender_${Date.now()}_${index}`,
+        category,
+        label: name,
+        source: 'custom',
+        owner: 'sender',
+        senderChecked: false,
+        receiverChecked: false
+      }));
+      return [...masterItems, ...customItems];
+    }
+
+    function getRecordChecklist(item){
+      if (Array.isArray(item?.checklistItems) && item.checklistItems.length) return item.checklistItems.map(x => ({ ...x }));
+      return masterChecklistFor(item?.category || '');
+    }
+
+    function renderPlanChecklistPreview(){
+      const box = document.getElementById('planChecklistPreview');
+      if (!box) return;
+      const category = document.getElementById('planCategory')?.value || '';
+      if (!category){ box.innerHTML = '<div class="checklist-empty">変化点分類を選択してください</div>'; return; }
+      const items = masterChecklistFor(category);
+      box.innerHTML = items.length
+        ? items.map(x => `<div class="checklist-row"><span style="color:#64748b;">□</span><span class="check-label">${escapeHtml(x.label)}</span><span class="checklist-source">マスタ</span></div>`).join('')
+        : `<div class="checklist-empty">「${escapeHtml(category)}」のマスタ項目は未登録です。マスタ管理から追加できます。</div>`;
+    }
+
+    function renderPlanCustomChecklist(){
+      const box = document.getElementById('planCustomCheckList');
+      if (!box) return;
+      box.innerHTML = plannedCustomChecklist.map((name,index) => `<span class="custom-check-tag">${escapeHtml(name)}<button type="button" onclick="removePlanCustomCheck(${index})" title="削除">×</button></span>`).join('');
+    }
+
+    window.removePlanCustomCheck = function(index){
+      plannedCustomChecklist.splice(index, 1);
+      renderPlanCustomChecklist();
+    };
+
+    function setupListeners(){
+      onSnapshot(query(collection(db, 'anomalies'), orderBy('occurrenceDate', 'desc')), (snap) => {
+        anomalyData = snap.docs.map(d => ({ _id: d.id, type: 'anomaly', ...d.data() }));
+        updateSerialList();
+      });
+      onSnapshot(query(collection(db, 'changepoints'), orderBy('occurrenceDate', 'desc')), (snap) => {
+        changepointData = snap.docs.map(d => ({ _id: d.id, docType: 'changepoint', ...d.data() }));
+        window.changepointData = changepointData; // ★ グローバル参照を更新
+        setupTopicsDeptFilter();
+        buildTopicsDeptOptions();
+        updateTopics();
+        renderPlannedHistory();
+        if (screens.calendar.style.display === 'block') renderCalendar();
+        openLinkedChangepointIfReady();
+      });
+    }
+
+    function openLinkedChangepointIfReady(){
+      if (linkedChangepointOpened) return;
+      const id = new URLSearchParams(window.location.search).get('changepointId');
+      if (!id) return;
+      const item = changepointData.find(x => x._id === id);
+      if (!item) return;
+      linkedChangepointOpened = true;
+      showDetail(item);
+    }
+
+    function updateSerialList(){
+      const serialNos = [...new Set(anomalyData.map(d => d.serialNo).filter(Boolean))].sort();
+      const optionsHtml = serialNos.map(no => `<option value="${escapeAttr(no)}">`).join('');
+      document.getElementById('serialList').innerHTML  = optionsHtml;
+      document.getElementById('serialList2').innerHTML = optionsHtml;
+    }
+
+    function buildTopicsDeptOptions(){
+      const sel = document.getElementById('topicsDeptFilter');
+      if (!sel) return;
+      const current = sel.value || '';
+      const deptSel = sel.value || '';
+      let planned = changepointData.filter(p => (p.type === 'planned'));
+      if (deptSel){ planned = planned.filter(p => String(p.department||'') === String(deptSel)); }
+      const depts = Array.from(new Set(planned.map(p => (p.department || '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ja'));
+      sel.innerHTML = '<option value="">全て</option>' + depts.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+      if (depts.includes(current)) sel.value = current;
+    }
+    function setupTopicsDeptFilter(){
+      const sel = document.getElementById('topicsDeptFilter');
+      if (!sel) return;
+      if (sel._bound) return;
+      sel.addEventListener('change', () => updateTopics());
+      sel._bound = true;
+    }
+
+    function updateTopics(){
+      const todayDate = new Date();
+      const today = ymdLocal(todayDate);
+
+      const day = todayDate.getDay();
+      const diffToMon = (day === 0) ? -6 : (1 - day);
+      const mon = new Date(todayDate); mon.setDate(todayDate.getDate() + diffToMon);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      const weekStart = ymdLocal(mon);
+      const weekEnd = ymdLocal(sun);
+
+      const deptSel = (document.getElementById('topicsDeptFilter') ? document.getElementById('topicsDeptFilter').value : '') || '';
+
+      let planned = changepointData.filter(p => (p.type === 'planned'));
+      if (deptSel){ planned = planned.filter(p => String(p.department||'') === String(deptSel)); }
+
+      const isLegacyCompleted = (p) => {
+        return !!p.activatedAt || !!p.effectiveAt || (p.isActivated === true) || (p.effectiveStatus === 'active') || (p.activationStatus === 'activated');
+      };
+      const getSwitchStatus = (p) => (p.switchStatus || p.switchState || ((p.occurrenceDate ? 'scheduled' : 'undecided'))) || ((p.occurrenceDate ? 'scheduled' : 'undecided'));
+      const getSwitchDate = (p) => (p.occurrenceDate || '');
+
+      const todayItems = planned
+        .filter(p => p.occurrenceDate === today)
+        .sort((a,b) => String(a.occurrenceTime||'').localeCompare(String(b.occurrenceTime||'')));
+
+      const weekItems = planned
+        .filter(p => { const d = String(p.occurrenceDate || ''); return d && d >= weekStart && d <= weekEnd; })
+        .sort((a,b) => String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||'')) || String(a.occurrenceTime||'').localeCompare(String(b.occurrenceTime||'')));
+
+      const undecidedItems = planned
+        .filter(p => !isLegacyCompleted(p))
+        .filter(p => {
+          const st = getSwitchStatus(p);
+          const sd = getSwitchDate(p);
+          if (sd) return false;
+          if (st === 'completed' || st === 'canceled') return false;
+          return true;
+        })
+        .sort((a,b) => String(a.department||'').localeCompare(String(b.department||''),'ja') || String(a.category||'').localeCompare(String(b.category||''),'ja'));
+
+      // ▼ 今月の変化点：完了・中止を除外
+      const currentYear = todayDate.getFullYear();
+      const currentMonth = todayDate.getMonth() + 1;
+      const mStart = `${currentYear}-${String(currentMonth).padStart(2,'0')}-01`;
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const mEnd = `${currentYear}-${String(currentMonth).padStart(2,'0')}-${String(lastDayOfMonth).padStart(2,'0')}`;
+
+      const monthItems = planned
+        .filter(p => {
+          const d = String(p.occurrenceDate || '');
+          return d && d >= mStart && d <= mEnd;
+        })
+        // ★ 完了・中止を除外
+        .filter(p => {
+          const st = p.switchStatus || '';
+          return st !== 'completed' && st !== 'canceled';
+        })
+        .sort((a,b) => String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||'')));
+
+      const isOverdue = (p) => {
+        const st = getSwitchStatus(p);
+        if (st === 'completed' || st === 'canceled') return false;
+        if (isLegacyCompleted(p)) return false;
+        const d = String(getSwitchDate(p) || '');
+        return !!d && d < today;
+      };
+      const overdueItems = planned
+        .filter(p => isOverdue(p))
+        .sort((a,b) => String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||'')) || String(a.lineName||'').localeCompare(String(b.lineName||''),'ja'));
+
+      const renderItems = (items, withDate=false) => items.map(item => {
+        const switchStatus = item.switchStatus || '';
+        const proposalDate = getProposalDate(item);
+        let statusBadge = '';
+        let statusActions = '';
+        if (switchStatus === 'completed') {
+          statusBadge = '<span class="status-badge completed">✅ 完了</span>';
+        } else if (switchStatus === 'canceled') {
+          statusBadge = '<span class="status-badge canceled">⛔ 中止</span>';
+        } else if (switchStatus === 'postponed') {
+          statusBadge = '<span class="status-badge postponed">⏩ 延期</span>';
+        } else if (item.occurrenceDate) {
+          statusBadge = '<span class="status-badge planned">📋 切替え日確定済</span>';
+        } else {
+          statusBadge = '<span class="status-badge planned">📝 計画中</span>';
+        }
+        if (switchStatus !== 'completed' && switchStatus !== 'canceled') {
+          statusActions = `
+            <div class="status-actions" onclick="event.stopPropagation();">
+              ${!item.occurrenceDate ? `<button class="status-btn btn-decide-date" onclick="decideSwitchDateQuick('${escapeAttr(item._id)}')">📅 切替え日決定</button>` : ''}
+              ${item.occurrenceDate ? `<button class="status-btn btn-complete" onclick="completeSwitchQuick('${escapeAttr(item._id)}')">✅ 完了</button>` : ''}
+              ${item.occurrenceDate ? `<button class="status-btn btn-postpone" onclick="postponeSwitchQuick('${escapeAttr(item._id)}')">⏩ 延期</button>` : ''}
+              <button class="status-btn btn-cancel" onclick="cancelSwitchQuick('${escapeAttr(item._id)}')">⛔ 中止</button>
+            </div>
+          `;
+        }
+        return `
+        <div class="topics-item" data-id="${escapeAttr(item._id)}">
+          <div class="time">📅 ${withDate ? escapeHtml(item.occurrenceDate || '日付未定') + (item.occurrenceTime ? ' ⏰ ' + escapeHtml(item.occurrenceTime) : '') : '⏰ ' + escapeHtml(item.occurrenceTime || '時刻未定')}${(typeof isOverdue === "function" && isOverdue(item)) ? `<span class="pill overdue" style="background:#fff;color:#c92a2a;margin-left:8px;">期限超過</span>` : ``}${statusBadge}</div>
+          ${proposalDate ? `<div class="proposal-date">起案日: ${escapeHtml(proposalDate)}</div>` : ''}
+          <div class="lines">
+            <strong style="font-size:1.15rem;">🏭 ${escapeHtml(item.department || '-')}</strong>
+            ${' <strong style="font-size:1.15rem;">｜ 🔧 ' + escapeHtml(item.lineName || '-') + '</strong>'}
+            ${item.serialNo ? ' <strong style="font-size:1.15rem;">｜ 📋 No.' + escapeHtml(item.serialNo) + '</strong>' : ''}
+          </div>
+          <div style="margin-top:8px;">
+            <span class="category">${escapeHtml(item.category || '-')}</span>
+            <span class="content">${escapeHtml((item.content || '').slice(0, 40))}${(item.content || '').length > 40 ? '...' : ''}</span>
+          </div>
+          ${statusActions}
+        </div>
+        `;
+      }).join('');
+
+      document.getElementById('topicsToday').innerHTML =
+        todayItems.length ? renderItems(todayItems, false) : '<div class="topics-empty">今日の変化点はありません</div>';
+
+      document.getElementById('topicsWeek').innerHTML =
+        weekItems.length ? renderItems(weekItems, true) : '<div class="topics-empty">今週の変化点はありません</div>';
+
+      // ▼ 今月の変化点：固定高さスクロールテーブル
+      const renderMonthTable = (items) => {
+        if (!items.length) return '<div class="topics-empty">今月の変化点はありません<br><span style="font-size:.8rem;color:#aaa;">（完了・中止を除く）</span></div>';
+        return `
+          <div class="month-table-wrap">
+            <table class="month-table">
+              <thead>
+                <tr>
+                  <th style="width:82px;">日付</th>
+                  <th style="width:90px;">部署</th>
+                  <th style="width:90px;">ライン</th>
+                  <th style="width:72px;">整理No.</th>
+                  <th>変化点内容</th>
+                  <th style="width:72px;">状態</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(item => {
+                  const st = item.switchStatus || '';
+                  let stLabel = '';
+                  if (st === 'postponed') stLabel = '<span style="color:#e65100;font-weight:700;font-size:.75rem;">⏩延期</span>';
+                  else if (item.occurrenceDate) stLabel = '<span style="color:#1565c0;font-weight:700;font-size:.75rem;">📋確定済</span>';
+                  else stLabel = '<span style="color:#888;font-size:.75rem;">未確定</span>';
+                  return `
+                  <tr data-id="${escapeAttr(item._id)}" onclick="(function(id){const item=changepointData.find(p=>p._id===id);if(item)showDetail(item);})(this.dataset.id)" style="cursor:pointer;">
+                    <td class="date-col">${escapeHtml(item.occurrenceDate || '-')}</td>
+                    <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(item.department||'')}">${escapeHtml(item.department || '-')}</td>
+                    <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(item.lineName||'')}">${escapeHtml(item.lineName || '-')}</td>
+                    <td>${escapeHtml(item.serialNo || '-')}</td>
+                    <td class="content-col" title="${escapeAttr(item.content || '')}">${escapeHtml((item.content || '-').slice(0,30))}${(item.content||'').length>30?'…':''}</td>
+                    <td>${stLabel}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div style="margin-top:6px;font-size:.75rem;color:#999;text-align:right;">${items.length}件（完了・中止除く）</div>
+        `;
+      };
+
+      document.getElementById('topicsMonth').innerHTML = renderMonthTable(monthItems);
+
+      document.getElementById('topicsUndecided').innerHTML =
+        undecidedItems.length ? renderItems(undecidedItems, true) : '<div class="topics-empty">切り替え日未確定の変化点はありません</div>';
+
+      // ▼ 警告バナー
+      const banner = document.getElementById('topicsOverdueBanner');
+      if (banner){
+        if (overdueItems.length){
+          const listHtml = overdueItems.slice(0, 8).map(item => {
+            const switchStatus = item.switchStatus || '';
+            const proposalDate = getProposalDate(item);
+            let statusBadge = '';
+            let statusActions = '';
+            if (switchStatus === 'completed') { statusBadge = '<span class="status-badge completed">✅ 完了</span>'; }
+            else if (switchStatus === 'canceled') { statusBadge = '<span class="status-badge canceled">⛔ 中止</span>'; }
+            else if (switchStatus === 'postponed') { statusBadge = '<span class="status-badge postponed">⏩ 延期</span>'; }
+            else { statusBadge = '<span class="status-badge planned">📋 切替え日確定済</span>'; }
+            if (switchStatus !== 'completed' && switchStatus !== 'canceled') {
+              statusActions = `
+                <div class="status-actions" onclick="event.stopPropagation();">
+                  <button class="status-btn btn-complete" onclick="completeSwitchQuick('${escapeAttr(item._id)}')">✅ 完了</button>
+                  <button class="status-btn btn-postpone" onclick="postponeSwitchQuick('${escapeAttr(item._id)}')">⏩ 延期</button>
+                  <button class="status-btn btn-cancel" onclick="cancelSwitchQuick('${escapeAttr(item._id)}')">⛔ 中止</button>
+                </div>
+              `;
+            }
+            return `
+            <div class="topics-item" data-id="${escapeAttr(item._id)}">
+              <div class="time">📅 ${escapeHtml(item.occurrenceDate || '-')}<span class="pill overdue" style="background:#fff;color:#c92a2a;margin-left:8px;">期限超過</span>${statusBadge}</div>
+              ${proposalDate ? `<div class="proposal-date">起案日: ${escapeHtml(proposalDate)}</div>` : ''}
+              <div class="lines"><strong style="font-size:1.15rem;">🏭 ${escapeHtml(item.department || '-')}</strong>${' <strong style="font-size:1.15rem;">｜ 🔧 ' + escapeHtml(item.lineName || '-') + '</strong>'}${item.serialNo ? ' <strong style="font-size:1.15rem;">｜ 📋 No.' + escapeHtml(item.serialNo) + '</strong>' : ''}</div>
+              <div style="margin-top:8px;">
+                <span class="category">${escapeHtml(item.category || '-')}</span>
+                <span class="content">${escapeHtml((item.content || '').slice(0, 34))}${(item.content || '').length > 34 ? '...' : ''}</span>
+              </div>
+              ${statusActions}
+            </div>
+            `;
+          }).join('');
+          banner.style.display = 'block';
+          banner.innerHTML = `
+            <h3>⚠️ 切り替え日を過ぎています（未完了） <span class="pill overdue">${overdueItems.length}件</span></h3>
+            <div class="overdue-list">${listHtml}</div>
+            <div style="margin-top:8px;font-size:.8rem;color:#7a1c1c;">※切り替え完了（または延期／中止）を入力してください。</div>
+          `;
+        } else {
+          banner.style.display = 'none';
+          banner.innerHTML = '';
+        }
+      }
+
+      document.querySelectorAll('.topics-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const item = changepointData.find(p => p._id === el.dataset.id);
+          if (item) showDetail(item);
+        });
+      });
+    }
+
+    window.decideSwitchDateQuick = async function(id) {
+      const newDate = prompt('切替え日（YYYY-MM-DD）を入力してください', ymdLocal(new Date()));
+      if (!newDate) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)){ alert('日付形式が正しくありません（YYYY-MM-DD）'); return; }
+      try {
+        const user = auth.currentUser;
+        await updateDoc(doc(db, 'changepoints', id), { occurrenceDate: newDate, switchStatus: 'scheduled', updatedAt: serverTimestamp(), updatedBy: getActorName() });
+        alert('切替え日を設定しました');
+      } catch(err) { console.error(err); alert('設定に失敗しました: ' + (err.message || err)); }
+    };
+    window.completeSwitchQuick = async function(id) {
+      if (!confirm('この変化点を「完了」として登録しますか？')) return;
+      try {
+        const user = auth.currentUser;
+        await updateDoc(doc(db, 'changepoints', id), { switchStatus: 'completed', completedAt: serverTimestamp(), completedBy: getActorName() });
+        alert('完了を登録しました');
+      } catch(err) { console.error(err); alert('完了登録に失敗しました: ' + (err.message || err)); }
+    };
+    window.postponeSwitchQuick = async function(id) {
+      const item = changepointData.find(x => x._id === id);
+      const current = item ? (item.occurrenceDate || ymdLocal(new Date())) : ymdLocal(new Date());
+      const newDate = prompt('延期後の切替え日（YYYY-MM-DD）を入力してください', current);
+      if (!newDate) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)){ alert('日付形式が正しくありません（YYYY-MM-DD）'); return; }
+      try {
+        const user = auth.currentUser;
+        await updateDoc(doc(db, 'changepoints', id), { switchStatus: 'postponed', occurrenceDate: newDate, postponedAt: serverTimestamp(), postponedBy: getActorName() });
+        alert('延期を登録しました');
+      } catch(err) { console.error(err); alert('延期登録に失敗しました: ' + (err.message || err)); }
+    };
+    window.cancelSwitchQuick = async function(id) {
+      if (!confirm('この変化点を「中止」として登録しますか？')) return;
+      try {
+        const user = auth.currentUser;
+        await updateDoc(doc(db, 'changepoints', id), { switchStatus: 'canceled', canceledAt: serverTimestamp(), canceledBy: getActorName() });
+        alert('中止を登録しました');
+      } catch(err) { console.error(err); alert('中止登録に失敗しました: ' + (err.message || err)); }
+    };
+
+    function setupFilterMode(){
+      document.getElementById('filterMode').addEventListener('change', (e) => {
+        document.getElementById('serialFilterGroup').style.display = (e.target.value === 'serial') ? 'flex' : 'none';
+        document.getElementById('lineFilterGroup').style.display = (e.target.value === 'line') ? 'flex' : 'none';
+      });
+    }
+
+    document.getElementById('btnSearch').addEventListener('click', () => {
+      const mode = document.getElementById('filterMode').value;
+      const serial = document.getElementById('filterSerial').value.trim();
+      const line = document.getElementById('filterLine').value;
+      const dateFrom = document.getElementById('filterDateFrom').value;
+      const dateTo = document.getElementById('filterDateTo').value;
+      const typeFilter = document.getElementById('filterType').value;
+      const keyword = document.getElementById('filterKeyword').value || '';
+      const sortOrder = 'desc';
+      currentSortOrder = sortOrder;
+
+      let allItems = [];
+      anomalyData.forEach(item => { allItems.push({ ...item, _kind: 'anomaly', sortDate: item.occurrenceDate || '', sortTime: item.occurrenceTime || '' }); });
+      changepointData.forEach(item => { allItems.push({ ...item, _kind: 'changepoint', sortDate: item.occurrenceDate || '', sortTime: item.occurrenceTime || '' }); });
+
+      filteredData = allItems.filter(item => {
+        if (mode === 'serial' && serial){ if (!String(item.serialNo || '').includes(serial)) return false; }
+        if (mode === 'line' && line){ if (String(item.lineName || '') !== String(line)) return false; }
+        const itemDate = item.sortDate || '';
+        if (dateFrom && itemDate < dateFrom) return false;
+        if (dateTo && itemDate > dateTo) return false;
+        if (typeFilter === 'anomaly'){ if (item._kind !== 'anomaly') return false; }
+        if (typeFilter === 'sudden'){ if (item._kind !== 'changepoint' || item.type !== 'sudden') return false; }
+        if (typeFilter === 'planned'){ if (item._kind !== 'changepoint' || item.type !== 'planned') return false; }
+        if (!matchesKeyword(item, keyword)) return false;
+        return true;
+      });
+
+      filteredData.sort((a,b) => {
+        const d = (a.sortDate || '').localeCompare(b.sortDate || '');
+        if (d !== 0) return -d;
+        return -(a.sortTime || '').localeCompare(b.sortTime || '');
+      });
+      filteredData = reorderLinkedTimelineItems(filteredData);
+      updateStats();
+      renderTimeline();
+      renderTimelineChart();
+    });
+
+    function updateStats(){
+      document.getElementById('statTotal').textContent = filteredData.length;
+      document.getElementById('statAnomaly').textContent = filteredData.filter(d => d._kind === 'anomaly').length;
+      document.getElementById('statSudden').textContent = filteredData.filter(d => d._kind === 'changepoint' && d.type === 'sudden').length;
+      document.getElementById('statPlanned').textContent = filteredData.filter(d => d._kind === 'changepoint' && d.type === 'planned').length;
+    }
+
+    function renderTimeline(){
+      document.getElementById('timelineLoading').style.display = 'none';
+      if (filteredData.length === 0){
+        document.getElementById('timelineEmpty').style.display = 'block';
+        document.getElementById('timelineView').style.display = 'none';
+        return;
+      }
+      document.getElementById('timelineEmpty').style.display = 'none';
+      document.getElementById('timelineView').style.display = 'block';
+      const container = document.getElementById('timelineView');
+      container.innerHTML = filteredData.map((item, i) => {
+        let cls = 'timeline-item';
+        let badges = '';
+        let summary = '';
+        if (item._kind === 'anomaly'){
+          cls += ' anomaly-only';
+          badges = `<span class="badge badge-anomaly">異常</span>`;
+          summary = (item.anomalyContent || '').replace(/\n/g,' ').slice(0, 55);
+        } else {
+          if (item.type === 'planned'){
+            cls += ' cp-planned';
+            badges = `<span class="badge badge-planned">計画</span><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
+            summary = '📋 ' + (item.content || '').replace(/\n/g,' ').slice(0, 55);
+          } else {
+            cls += ' cp-sudden';
+            badges = `<span class="badge badge-sudden">計画外</span><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
+            summary = '🔄 ' + (item.content || '').replace(/\n/g,' ').slice(0, 55);
+          }
+        }
+        const serialNo = item.serialNo ? `<span style="font-size:.8rem;color:#555;background:#f0f0f0;padding:2px 8px;border-radius:4px;margin-right:6px;">📋 No.${escapeHtml(item.serialNo)}</span>` : '';
+        const lineName = item.lineName ? `<span style="font-size:.8rem;color:#1565c0;background:#e3f2fd;padding:2px 8px;border-radius:4px;">🔧 ${escapeHtml(item.lineName)}</span>` : '';
+        const subInfo = (serialNo || lineName) ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">${serialNo}${lineName}</div>` : '';
+        return `
+          <div class="${cls}" data-index="${i}">
+            <div class="timeline-row">
+              <div class="timeline-date">${escapeHtml(item.sortDate || '')}</div>
+              <div class="timeline-badges">${badges}</div>
+              <div class="timeline-summary">${escapeHtml(summary)}</div>
+            </div>
+            ${subInfo}
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.timeline-item').forEach(el => {
+        el.addEventListener('click', () => showDetail(filteredData[parseInt(el.dataset.index, 10)]));
+      });
+    }
+
+    function setupCalendar(){
+      document.getElementById('calPrev').addEventListener('click', () => { calendarMonth--; if (calendarMonth < 0){ calendarMonth = 11; calendarYear--; } renderCalendar(); });
+      document.getElementById('calNext').addEventListener('click', () => { calendarMonth++; if (calendarMonth > 11){ calendarMonth = 0; calendarYear++; } renderCalendar(); });
+      document.getElementById('calToday').addEventListener('click', () => { const now = new Date(); calendarYear = now.getFullYear(); calendarMonth = now.getMonth(); renderCalendar(); });
+      document.getElementById('calendarDeptFilter').addEventListener('change', renderCalendar);
+      document.getElementById('calendarCatFilter').addEventListener('change', renderCalendar);
+    }
+
+    function renderCalendar(){
+      const deptFilter = document.getElementById('calendarDeptFilter').value;
+      const catFilter  = document.getElementById('calendarCatFilter').value;
+      document.getElementById('calMonthYear').textContent = `${calendarYear}年${calendarMonth + 1}月`;
+      const firstDay = new Date(calendarYear, calendarMonth, 1);
+      const lastDay  = new Date(calendarYear, calendarMonth + 1, 0);
+      const startDay = firstDay.getDay();
+      const daysInMonth = lastDay.getDate();
+      const today = ymdLocal(new Date());
+      const grid  = document.getElementById('calendarGrid');
+      let html = ['日','月','火','水','木','金','土'].map(d => `<div class="calendar-day-header">${d}</div>`).join('');
+      const plannedOnly = changepointData.filter(p => p.type === 'planned').filter(p => {
+        if (deptFilter && String(p.department || '') !== String(deptFilter)) return false;
+        if (catFilter && String(p.category || '') !== String(catFilter)) return false;
+        return true;
+      });
+      const prevMonth = new Date(calendarYear, calendarMonth, 0);
+      for (let i = startDay - 1; i >= 0; i--){ const day = prevMonth.getDate() - i; html += `<div class="calendar-day other-month"><div class="day-number">${day}</div></div>`; }
+      for (let day = 1; day <= daysInMonth; day++){
+        const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const dayOfWeek = new Date(calendarYear, calendarMonth, day).getDay();
+        const isToday = (dateStr === today);
+        const dayClass = isToday ? 'today' : (dayOfWeek === 0 ? 'sunday' : (dayOfWeek === 6 ? 'saturday' : ''));
+        const dayEvents = plannedOnly.filter(p => p.occurrenceDate === dateStr);
+        let eventsHtml = dayEvents.slice(0,3).map(e => {
+          const info = [e.department, e.lineName, e.serialNo].filter(Boolean).join(' / ');
+          const contentPreview = (e.content || '').slice(0, 30) + ((e.content || '').length > 30 ? '...' : '');
+          return `<div class="calendar-event category-${escapeAttr(e.category || 'その他')}" data-id="${escapeAttr(e._id)}" title="${escapeAttr(e.content || '')}">
+            <div style="font-weight:600;font-size:.75rem;">${escapeHtml(e.category || '')}</div>
+            <div style="font-size:.65rem;opacity:.9;">${escapeHtml(info || '-')}</div>
+            <div style="font-size:.65rem;margin-top:2px;line-height:1.3;">${escapeHtml(contentPreview)}</div>
+          </div>`;
+        }).join('');
+        if (dayEvents.length > 3) eventsHtml += `<div class="calendar-more">他${dayEvents.length - 3}件</div>`;
+        html += `<div class="calendar-day ${dayClass}" data-date="${escapeAttr(dateStr)}"><div class="day-number">${day}</div>${eventsHtml}</div>`;
+      }
+      const remaining = (7 - ((startDay + daysInMonth) % 7)) % 7;
+      for (let i = 1; i <= remaining; i++){ html += `<div class="calendar-day other-month"><div class="day-number">${i}</div></div>`; }
+      grid.innerHTML = html;
+      grid.querySelectorAll('.calendar-event').forEach(el => {
+        el.addEventListener('click', (e) => { e.stopPropagation(); const item = changepointData.find(p => p._id === el.dataset.id); if (item) showDetail(item); });
+      });
+    }
+
+    function setupPlannedForm(){
+      document.getElementById('planCategory').addEventListener('change', renderPlanChecklistPreview);
+      document.getElementById('btnAddPlanCustomCheck').addEventListener('click', () => {
+        const input = document.getElementById('planCustomCheckText');
+        const name = input.value.trim();
+        if (!name) return;
+        if (plannedCustomChecklist.includes(name)){ alert('同じ任意項目が追加されています'); return; }
+        plannedCustomChecklist.push(name);
+        input.value = '';
+        renderPlanCustomChecklist();
+      });
+      document.getElementById('btnExportLastPlannedCSV').addEventListener('click', () => {
+        if (!lastRegisteredPlanned){ alert('まだCSV出力できる登録データがありません'); return; }
+        const safeDate = (lastRegisteredPlanned.occurrenceDate || ymdLocal(new Date()));
+        const safeTime = (lastRegisteredPlanned.occurrenceTime || '').replace(':','') || '----';
+        const safeSerial = safeFilenamePart(lastRegisteredPlanned.serialNo || 'no-serial');
+        downloadCSV(`CP_planned_${safeDate}_${safeTime}_${safeSerial}.csv`, PLANNED_CP_CSV_HEADERS, lastRegisteredPlanned);
+      });
+
+      document.getElementById('btnExportLastPlannedQR').addEventListener('click', async () => {
+        if (!lastRegisteredPlanned){ alert('まだQR出力できる登録データがありません'); return; }
+        showQRModal(buildWorkflowUrl(lastRegisteredPlanned.docId || lastRegisteredPlanned._id));
+      });
+
+      document.getElementById('btnRegisterPlanned').addEventListener('click', () => {
+        const planneddepartment = document.getElementById('planDepartment').value || '';
+        const department = document.getElementById('planDepartmentOccur').value || '';
+        const category = document.getElementById('planCategory').value || '';
+        const lineName = document.getElementById('planLineName').value.trim() || '';
+        const content  = document.getElementById('planContent').value || '';
+        if (!planneddepartment){ alert('起案部署を選択してください'); return; }
+        if (!category){ alert('変化点分類を選択してください'); return; }
+        if (!department){ alert('変化点発生部署を選択してください'); return; }
+        if (!lineName){ alert('対象ライン名を入力してください'); return; }
+        if (!content.trim()){ alert('変化点内容を入力してください'); return; }
+        showConfirmDialog();
+      });
+
+      document.getElementById('btnConfirmCancel').addEventListener('click', () => { document.getElementById('confirmModal').style.display = 'none'; });
+      document.getElementById('btnConfirmOk').addEventListener('click', async () => { document.getElementById('confirmModal').style.display = 'none'; await executeRegistration(); });
+      document.getElementById('confirmModal').addEventListener('click', (e) => { if (e.target.id === 'confirmModal') document.getElementById('confirmModal').style.display = 'none'; });
+    }
+
+    function showConfirmDialog(){
+      const planneddepartment = document.getElementById('planDepartment').value || '';
+      const department = document.getElementById('planDepartmentOccur').value || '';
+      const category = document.getElementById('planCategory').value || '';
+      const lineName = document.getElementById('planLineName').value.trim() || '';
+      const serialNo = document.getElementById('planSerialNo').value.trim() || '';
+      const content  = document.getElementById('planContent').value || '';
+      const occurrenceDate = document.getElementById('planDate').value || '';
+      document.getElementById('confirmContent').innerHTML = `
+        <div class="confirm-item"><div class="confirm-label">起案部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">変化点分類</div><div class="confirm-value">${escapeHtml(category)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">変化点発生部署</div><div class="confirm-value">${escapeHtml(department)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">対象ライン名</div><div class="confirm-value">${escapeHtml(lineName)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
+        <div class="confirm-item"><div class="confirm-label">変化点内容</div><div class="confirm-value">${escapeHtml(content)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">切替え日</div><div class="confirm-value">${escapeHtml(occurrenceDate || '(未定)')}</div></div>
+        <div class="confirm-item"><div class="confirm-label">チェック項目</div><div class="confirm-value">${masterChecklistFor(category).length + plannedCustomChecklist.length}件</div></div>
+      `;
+      document.getElementById('confirmModal').style.display = 'block';
+    }
+
+    function buildMailSubject(lineName, department, category){
+      const parts = ['【変化点信号】'];
+      if (category) parts.push(category);
+      if (department) parts.push('発生部署:' + department);
+      if (lineName) parts.push('ライン:' + lineName);
+      return parts.join(' ');
+    }
+    function buildMailBody(data){
+      const lines = [];
+      lines.push('各位'); lines.push(''); lines.push('お疲れ様です。');
+      lines.push('下記の通り、計画変化点を登録しましたのでお知らせいたします。'); lines.push('');
+      lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      lines.push('【登録内容】'); lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━'); lines.push('');
+      if (data.planneddepartment) lines.push('■ 起案部署　　：' + data.planneddepartment);
+      if (data.department) lines.push('■ 発生部署　　：' + data.department);
+      if (data.category) lines.push('■ 分類　　　　：' + data.category);
+      if (data.lineName) lines.push('■ ライン名　　：' + data.lineName);
+      if (data.serialNo) lines.push('■ 整理No　　　：' + data.serialNo);
+      if (data.occurrenceDate) lines.push('■ 切替え日　　：' + data.occurrenceDate);
+      if (data.occurrenceTime) lines.push('■ 切替え時刻　：' + data.occurrenceTime);
+      lines.push(''); lines.push('■ 内容'); lines.push('---');
+      if (data.content) lines.push(data.content.trim());
+      lines.push('---'); lines.push('');
+      if (data.workflowUrl) {
+        lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        lines.push('【承認ワークフロー】');
+        lines.push('下記リンクを開き、チェック・確認・承認を行ってください。');
+        lines.push(data.workflowUrl);
+        lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━'); lines.push('');
+      }
+      lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━'); lines.push('');
+      lines.push('必要に応じて、ご確認・対応をお願いいたします。');
+      if (data.who) { lines.push(''); lines.push('登録者：' + data.who); }
+      lines.push('');
+      return lines.join('\n');
+    }
+    function openMailDraft(opts){
+      const to = (opts && opts.to) ? String(opts.to) : '';
+      const cc = (opts && opts.cc) ? String(opts.cc) : '';
+      const subject = (opts && opts.subject) ? String(opts.subject) : '';
+      let body = (opts && opts.body) ? String(opts.body) : '';
+      const enc = (s) => encodeURIComponent(String(s)).replace(/\+/g, '%20');
+      body = body.replace(/\r\n/g, '\n').split('\n').map(line => enc(line)).join('%0D%0A');
+      let url = 'mailto:' + enc(to);
+      const params = [];
+      if (cc) params.push('cc=' + enc(cc));
+      if (subject) params.push('subject=' + enc(subject));
+      if (body) params.push('body=' + body);
+      if (params.length) url += '?' + params.join('&');
+      window.open(url, '_blank');
+    }
+
+    function buildWorkflowUrl(docId){
+      const url = new URL(WORKFLOW_APP_URL);
+      url.searchParams.set('changepointId', docId);
+      return url.href;
+    }
+
+    async function executeRegistration(){
+      const planneddepartment = document.getElementById('planDepartment').value || '';
+      const department = document.getElementById('planDepartmentOccur').value || '';
+      const category = document.getElementById('planCategory').value || '';
+      const lineName = document.getElementById('planLineName').value.trim() || '';
+      const serialNo = document.getElementById('planSerialNo').value.trim() || '';
+      const content  = document.getElementById('planContent').value || '';
+      const occurrenceDate = document.getElementById('planDate').value || '';
+      const occurrenceTime = document.getElementById('planTime')?.value || '';
+      const user = auth.currentUser;
+      const createdBy = getActorName();
+      const checklistItems = buildRecordChecklist(category);
+      const data = { type: 'planned', planneddepartment, department, category, lineName, serialNo, content,
+        occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null,
+        document: '', documentUrl: '', checklistItems, approvalStatus: 'draft', createdBy,
+        createdAt: serverTimestamp() };
+      try{
+        const docRef = await addDoc(collection(db, 'changepoints'), data);
+        let documentUrl = '';
+        if (selectedFile){
+          try { documentUrl = await uploadFileToStorage(selectedFile, docRef.id); await updateDoc(doc(db, 'changepoints', docRef.id), { documentUrl }); }
+          catch(uploadErr){ alert('ファイルのアップロードに失敗しましたが、変化点は登録されました'); }
+        }
+        const now = new Date();
+        lastRegisteredPlanned = { docId: docRef.id, ...data, documentUrl, createdAtLocal: now.toISOString() };
+        lastDetailHtmlUrl = null;
+        setExportButtonEnabled(true);
+        try{
+          const who = createdBy;
+          const workflowUrl = buildWorkflowUrl(docRef.id);
+          openMailDraft({ to: '', cc: '', subject: buildMailSubject(lineName, department, category), body: buildMailBody({ planneddepartment, department, category, lineName, serialNo, occurrenceDate, occurrenceTime, content, who, workflowUrl }) });
+        }catch(_){}
+        alert('計画変化点を登録しました');
+        document.getElementById('plannedForm').reset();
+        document.getElementById('planDate').value = '';
+        plannedCustomChecklist = [];
+        renderPlanCustomChecklist();
+        renderPlanChecklistPreview();
+        selectedFile = null;
+        document.getElementById('filePreview').style.display = 'none';
+        document.getElementById('filePreview').innerHTML = '';
+      }catch(err){ alert('登録に失敗しました: ' + (err.message || err)); }
+    }
+
+    function renderPlannedHistory(){
+      const container = document.getElementById('plannedHistory');
+      const plannedOnly = changepointData.filter(p => p.type === 'planned')
+        .sort((a,b) => (String(b.occurrenceDate||'').localeCompare(String(a.occurrenceDate||''))));
+      if (!plannedOnly.length){ container.innerHTML = '<div class="empty-state"><p>まだ登録がありません</p></div>'; return; }
+      container.innerHTML = `
+        <table class="history-table">
+          <thead><tr><th>発生日</th><th>時刻</th><th>分類</th><th>起案部署</th><th>発生部署</th><th>ライン</th><th>整理No</th><th>内容</th><th>承認状態</th><th style="width:150px;">操作</th></tr></thead>
+          <tbody>
+            ${plannedOnly.slice(0, 20).map(item => `
+              <tr>
+                <td>${escapeHtml(item.occurrenceDate || '')}</td>
+                <td>${escapeHtml(item.occurrenceTime || '')}</td>
+                <td><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span></td>
+                <td>${escapeHtml(item.planneddepartment || '')}</td>
+                <td>${escapeHtml(item.department || '')}</td>
+                <td>${escapeHtml(item.lineName || '')}</td>
+                <td>${escapeHtml(item.serialNo || '')}</td>
+                <td>${escapeHtml((item.content || '').slice(0, 30))}${(item.content || '').length > 30 ? '...' : ''}</td>
+                <td><span class="approval-status-badge ${approvalStatusOf(item) === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</span></td>
+                <td>
+                  <button class="btn btn-sm" style="background:#334155;color:#fff;margin-right:4px;" onclick="showDetailById('${item._id}')">詳細</button>
+                  <button class="btn btn-sm" style="background:#ffc107;color:#000;margin-right:4px;" onclick="openEditFromHistory('${item._id}')">✏️</button>
+                  <button class="btn btn-sm" style="background:#e53935;color:#fff;" onclick="deleteChangepoint('${item._id}')">🗑️</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function setupMasterTabs(){
+      document.querySelectorAll('.master-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.master-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const targets = { department:'masterDepartment', line:'masterLine', checklist:'masterChecklist' };
+          Object.entries(targets).forEach(([key,id]) => { document.getElementById(id).style.display = (tab.dataset.tab === key) ? 'block' : 'none'; });
+        });
+      });
+      document.getElementById('btnAddDept').addEventListener('click', async () => {
+        const name = document.getElementById('addDeptName').value.trim();
+        if (!name) return;
+        try{ await addDoc(collection(db, 'masters', 'department', 'items'), { name }); document.getElementById('addDeptName').value = ''; await loadMasters(); renderMasterTables(); }
+        catch(e){ alert('追加に失敗しました'); }
+      });
+      document.getElementById('btnAddLine').addEventListener('click', async () => {
+        const name = document.getElementById('addLineName').value.trim();
+        if (!name) return;
+        try{ await addDoc(collection(db, 'masters', 'line', 'items'), { name }); document.getElementById('addLineName').value = ''; await loadMasters(); renderMasterTables(); }
+        catch(e){ alert('追加に失敗しました'); }
+      });
+      document.getElementById('btnAddChecklist').addEventListener('click', async () => {
+        const category = document.getElementById('addChecklistCategory').value;
+        const name = document.getElementById('addChecklistName').value.trim();
+        if (!name) return;
+        if (checklistDocs.some(x => x.category === category && x.name === name)){ alert('同じチェック項目が登録されています'); return; }
+        try{
+          await addDoc(collection(db, 'masters', 'changeChecklist', 'items'), { category, name, order: checklistDocs.filter(x => x.category === category).length + 1, createdAt: serverTimestamp() });
+          document.getElementById('addChecklistName').value = '';
+          await loadMasters(); renderMasterTables();
+        }catch(e){ console.error(e); alert('チェック項目の追加に失敗しました'); }
+      });
+    }
+
+    function renderMasterTables(){
+      document.getElementById('deptTableBody').innerHTML = deptDocs.map(d =>
+        `<tr><td>${escapeHtml(d.name || '')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></td></tr>`
+      ).join('');
+      document.getElementById('lineTableBody').innerHTML = lineDocs.map(d =>
+        `<tr><td>${escapeHtml(d.name || '')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteMaster('line', '${escapeAttr(d.id)}')">削除</button></td></tr>`
+      ).join('');
+      const checkBody = document.getElementById('checklistTableBody');
+      if (checkBody) checkBody.innerHTML = checklistDocs.length ? checklistDocs.map(d =>
+        `<tr><td><span class="approval-status-badge">${escapeHtml(d.category)}</span></td><td>${escapeHtml(d.name || '')}</td><td style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:#1976d2;color:#fff;" onclick="editChecklistMaster('${escapeAttr(d.id)}')">変更</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('changeChecklist', '${escapeAttr(d.id)}')">削除</button></td></tr>`
+      ).join('') : '<tr><td colspan="3" style="text-align:center;color:#64748b;padding:20px;">チェック項目は未登録です</td></tr>';
+    }
+
+    window.deleteMaster = async function(type, id){
+      if (!confirm('削除しますか？')) return;
+      try{ await deleteDoc(doc(db, 'masters', type, 'items', id)); await loadMasters(); renderMasterTables(); }
+      catch(e){ alert('削除に失敗しました'); }
+    };
+
+    window.editChecklistMaster = async function(id){
+      const item = checklistDocs.find(x => x.id === id);
+      if (!item) return;
+      const name = prompt('チェック項目を変更してください', item.name || '');
+      if (!name || !name.trim() || name.trim() === item.name) return;
+      try{ await updateDoc(doc(db, 'masters', 'changeChecklist', 'items', id), { name: name.trim(), updatedAt: serverTimestamp() }); await loadMasters(); renderMasterTables(); }
+      catch(e){ console.error(e); alert('変更に失敗しました'); }
+    };
+
+    function setupFileUpload(){
+      const area = document.getElementById('fileUploadArea');
+      const input = document.getElementById('planDocumentFile');
+      area.addEventListener('click', () => input.click());
+      area.addEventListener('dragover', (e) => { e.preventDefault(); area.style.borderColor = '#667eea'; area.style.background = '#f5f5ff'; });
+      area.addEventListener('dragleave', () => { area.style.borderColor = '#ccc'; area.style.background = '#fafafa'; });
+      area.addEventListener('drop', (e) => { e.preventDefault(); area.style.borderColor = '#ccc'; area.style.background = '#fafafa'; if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]); });
+      input.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFileSelect(e.target.files[0]); });
+    }
+
+    function handleFileSelect(file){
+      if (file.size > 5 * 1024 * 1024){ alert('ファイルサイズが5MBを超えています'); return; }
+      selectedFile = file;
+      const preview = document.getElementById('filePreview');
+      preview.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;background:#e8f5e9;border-radius:8px;">
+        <span style="flex:1;font-size:.9rem;color:#333;word-break:break-all;">📄 ${escapeHtml(file.name)} (${(file.size / 1024).toFixed(1)} KB)</span>
+        <button type="button" style="padding:4px 10px;background:#e53935;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.8rem;" id="btnRemoveFile">✕ 削除</button>
+      </div>`;
+      preview.style.display = 'block';
+      document.getElementById('btnRemoveFile').addEventListener('click', () => { selectedFile = null; preview.style.display = 'none'; preview.innerHTML = ''; document.getElementById('planDocumentFile').value = ''; });
+    }
+
+    async function uploadFileToStorage(file, docId){
+      const timestamp = Date.now();
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storageRef = ref(storage, `changepoints/${docId}/${timestamp}_${safeFileName}`);
+      const progressEl = document.getElementById('uploadProgress');
+      const progressBar = document.getElementById('uploadProgressBar');
+      progressEl.style.display = 'block';
+      return new Promise((resolve, reject) => {
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        uploadTask.on('state_changed',
+          (snapshot) => { progressBar.style.width = (snapshot.bytesTransferred / snapshot.totalBytes) * 100 + '%'; },
+          (error) => { progressEl.style.display = 'none'; reject(error); },
+          async () => { progressEl.style.display = 'none'; resolve(await getDownloadURL(uploadTask.snapshot.ref)); }
+        );
+      });
+    }
+
+    async function generateAndUploadDetailHtml(data){
+      const htmlContent = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>計画変化点</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px;}.card{max-width:600px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.15);overflow:hidden;}.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:24px;text-align:center;}.body{padding:24px;}.section{margin-bottom:20px;}.section-title{font-size:.85rem;font-weight:600;color:#667eea;margin-bottom:8px;}.section-content{font-size:.95rem;color:#333;background:#f8f9fa;padding:12px;border-radius:8px;white-space:pre-wrap;}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}.grid-item{background:#f8f9fa;padding:12px;border-radius:8px;}.grid-item .label{font-size:.75rem;color:#888;margin-bottom:4px;}.footer{padding:16px;background:#f8f9fa;text-align:center;font-size:.8rem;color:#888;}</style>
+</head><body><div class="card"><div class="header"><h1>📋 計画変化点</h1><div>${escapeHtml(data.occurrenceDate)} ${escapeHtml(data.occurrenceTime || '')}</div></div>
+<div class="body"><div class="grid">
+<div class="grid-item"><div class="label">起案部署</div><div>${escapeHtml(data.planneddepartment || '-')}</div></div>
+<div class="grid-item"><div class="label">発生部署</div><div>${escapeHtml(data.department || '-')}</div></div>
+<div class="grid-item"><div class="label">ライン名</div><div>${escapeHtml(data.lineName || '-')}</div></div>
+<div class="grid-item"><div class="label">整理No</div><div>${escapeHtml(data.serialNo || '-')}</div></div>
+</div><div class="section"><div class="section-title">📝 変化点内容</div><div class="section-content">${escapeHtml(data.content || '-')}</div></div>
+${data.documentUrl ? `<div class="section"><div class="section-title">📁 添付ファイル</div><div class="section-content"><a href="${escapeHtml(data.documentUrl)}" target="_blank">ファイルを開く</a></div></div>` : ''}
+</div><div class="footer">登録日時: ${escapeHtml(data.createdAtLocal || '-')}<br>変化点管理システム</div></div></body></html>`;
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const storageRef = ref(storage, `changepoints/${data.docId}/detail_${Date.now()}.html`);
+      const uploadTask = uploadBytesResumable(storageRef, blob, { contentType: 'text/html' });
+      return new Promise((resolve, reject) => {
+        uploadTask.on('state_changed', null, (error) => reject(error),
+          async () => { resolve(await getDownloadURL(uploadTask.snapshot.ref)); });
+      });
+    }
+
+    let qrCodeInstance = null;
+    function setupQRModal(){
+      document.getElementById('qrClose').addEventListener('click', () => { document.getElementById('qrModal').classList.remove('active'); });
+      document.getElementById('qrModal').addEventListener('click', (e) => { if (e.target.id === 'qrModal') document.getElementById('qrModal').classList.remove('active'); });
+      document.getElementById('btnDownloadQR').addEventListener('click', () => {
+        const canvas = document.getElementById('qrCanvas').querySelector('canvas');
+        if (canvas){ const a = document.createElement('a'); a.download = `QR_${lastRegisteredPlanned?.docId || 'cp'}.png`; a.href = canvas.toDataURL('image/png'); a.click(); }
+        else alert('QRコードが生成されていません');
+      });
+      document.getElementById('btnCopyUrl').addEventListener('click', () => {
+        const url = document.getElementById('qrUrl').textContent;
+        navigator.clipboard.writeText(url).then(() => alert('URLをコピーしました')).catch(() => { const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); alert('URLをコピーしました'); });
+      });
+    }
+    function showQRModal(url){
+      const qrContainer = document.getElementById('qrCanvas');
+      document.getElementById('qrUrl').textContent = url;
+      qrContainer.innerHTML = '';
+      try { qrCodeInstance = new QRCode(qrContainer, { text: url, width: 200, height: 200, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
+      catch(error){ qrContainer.innerHTML = '<p style="color:red;">QRコード生成に失敗しました</p>'; }
+      document.getElementById('qrModal').classList.add('active');
+    }
+
+    let currentDetailItem = null;
+
+    const APPROVAL_STAGES = ['draft', 'sender_approved', 'receiver_confirmed', 'approved'];
+
+    function approvalStatusOf(item){
+      return APPROVAL_STAGES.includes(item?.approvalStatus) ? item.approvalStatus : 'draft';
+    }
+
+    function approvalStatusLabel(status){
+      return ({ draft:'発信部署 作成済み', sender_approved:'発信部署 承認済み', receiver_confirmed:'発生部署 確認済み', approved:'承認完了' })[status] || '未承認';
+    }
+
+    function formatAuditTime(value){
+      if (!value) return '-';
+      const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+      return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('ja-JP');
+    }
+
+    function roleItems(items, role){
+      return items.filter(x => (x.owner || 'both') === 'both' || x.owner === role);
+    }
+
+    function allRoleChecksDone(items, role){
+      const list = roleItems(items, role);
+      return list.every(x => role === 'sender' ? x.senderChecked === true : x.receiverChecked === true);
+    }
+
+    function renderApprovalChecklist(items, role, disabled){
+      const list = roleItems(items, role);
+      if (!list.length) return '<div class="checklist-empty">対象のチェック項目はありません</div>';
+      return list.map(item => {
+        const checked = role === 'sender' ? item.senderChecked : item.receiverChecked;
+        return `<label class="checklist-row"><input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="toggleApprovalCheck('${escapeAttr(item.key)}','${role}',this.checked)"><span class="check-label">${escapeHtml(item.label || '')}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span></label>`;
+      }).join('');
+    }
+
+    function renderApprovalWorkflow(item){
+      const box = document.getElementById('approvalWorkflow');
+      if (!box) return;
+      if (!item || item.type !== 'planned'){ box.style.display = 'none'; box.innerHTML = ''; return; }
+      box.style.display = 'block';
+      const status = approvalStatusOf(item);
+      const stage = APPROVAL_STAGES.indexOf(status);
+      const items = getRecordChecklist(item);
+      const senderLocked = stage >= 1;
+      const receiverEnabled = stage >= 1;
+      const receiverLocked = stage >= 3;
+      const senderMeta = item.senderApprovedBy ? `${escapeHtml(item.senderApprovedBy)} / ${escapeHtml(formatAuditTime(item.senderApprovedAt))}` : '未承認';
+      const receiverConfirmMeta = item.receiverConfirmedBy ? `${escapeHtml(item.receiverConfirmedBy)} / ${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}` : '未確認';
+      const receiverApproveMeta = item.receiverApprovedBy ? `${escapeHtml(item.receiverApprovedBy)} / ${escapeHtml(formatAuditTime(item.receiverApprovedAt))}` : '未承認';
+      const stepLabels = ['作成', '発信部署承認', '発生部署確認', '発生部署承認'];
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+          <strong style="color:#334155;">承認・5Mチェック</strong>
+          <span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span>
+        </div>
+        <div class="approval-steps">${stepLabels.map((label,index) => `<div class="approval-step ${index < stage ? 'done' : index === stage ? 'current' : ''}">${index + 1}. ${label}</div>`).join('')}</div>
+        <div class="approval-columns">
+          <section class="approval-column">
+            <h4>発信部署：${escapeHtml(item.planneddepartment || '-')}</h4>
+            <div class="checklist-panel">${renderApprovalChecklist(items, 'sender', senderLocked)}</div>
+            <div class="approval-meta">承認：${senderMeta}</div>
+            ${!senderLocked ? `<div class="approval-add"><input id="senderCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('sender')">追加</button></div>` : ''}
+          </section>
+          <section class="approval-column">
+            <h4>発生部署：${escapeHtml(item.department || '-')}</h4>
+            <div class="checklist-panel">${renderApprovalChecklist(items, 'receiver', !receiverEnabled || receiverLocked)}</div>
+            <div class="approval-meta">確認：${receiverConfirmMeta}<br>承認：${receiverApproveMeta}</div>
+            ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
+          </section>
+        </div>
+        <div class="approval-actions">
+          ${status === 'draft' ? '<button class="btn" style="background:#2563eb;color:#fff;" onclick="approveSender()">発信部署で承認</button>' : ''}
+          ${status === 'sender_approved' ? '<button class="btn" style="background:#0f766e;color:#fff;" onclick="confirmReceiver()">発生部署で確認</button>' : ''}
+          ${status === 'receiver_confirmed' ? '<button class="btn" style="background:#15803d;color:#fff;" onclick="approveReceiver()">発生部署で承認・完了</button>' : ''}
+          <button class="btn" style="background:#334155;color:#fff;" onclick="printChangeCard()">変化点カード印刷</button>
+        </div>`;
+    }
+
+    async function saveChecklist(items){
+      if (!currentDetailItem?._id) return;
+      await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems: items, updatedAt: serverTimestamp() });
+      currentDetailItem = { ...currentDetailItem, checklistItems: items };
+      renderApprovalWorkflow(currentDetailItem);
+    }
+
+    window.toggleApprovalCheck = async function(key, role, checked){
+      const items = getRecordChecklist(currentDetailItem);
+      const item = items.find(x => x.key === key);
+      if (!item) return;
+      if (role === 'sender') item.senderChecked = checked;
+      else item.receiverChecked = checked;
+      try{ await saveChecklist(items); }
+      catch(e){ console.error(e); alert('チェック状態の保存に失敗しました'); renderApprovalWorkflow(currentDetailItem); }
+    };
+
+    window.addApprovalCustom = async function(role){
+      const input = document.getElementById(role === 'sender' ? 'senderCustomCheck' : 'receiverCustomCheck');
+      const label = input?.value.trim() || '';
+      if (!label) return;
+      const items = getRecordChecklist(currentDetailItem);
+      if (items.some(x => x.label === label && (x.owner || 'both') === role)){ alert('同じ任意項目が追加されています'); return; }
+      items.push({ key:`${role}_${Date.now()}`, category:currentDetailItem.category || '', label, source:'custom', owner:role, senderChecked:false, receiverChecked:false });
+      try{ await saveChecklist(items); }
+      catch(e){ console.error(e); alert('任意項目の追加に失敗しました'); }
+    };
+
+    window.approveSender = async function(){
+      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'draft') return;
+      const items = getRecordChecklist(currentDetailItem);
+      if (!allRoleChecksDone(items, 'sender')){ alert('発信部署のチェック項目をすべて確認してください'); return; }
+      if (!confirm('発信部署の承認を登録しますか？')) return;
+      const who = getActorName();
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:new Date() };
+        renderApprovalWorkflow(currentDetailItem);
+      }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
+    };
+
+    window.confirmReceiver = async function(){
+      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'sender_approved') return;
+      if (!confirm('発生部署で内容を確認済みとして登録しますか？')) return;
+      const who = getActorName();
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:new Date() };
+        renderApprovalWorkflow(currentDetailItem);
+      }catch(e){ console.error(e); alert('確認の登録に失敗しました'); }
+    };
+
+    window.approveReceiver = async function(){
+      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'receiver_confirmed') return;
+      const items = getRecordChecklist(currentDetailItem);
+      if (!allRoleChecksDone(items, 'receiver')){ alert('発生部署のチェック項目をすべて確認してください'); return; }
+      if (!confirm('発生部署の承認を登録し、承認完了にしますか？')) return;
+      const who = getActorName();
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'approved', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'approved', receiverApprovedBy:who, receiverApprovedAt:new Date() };
+        renderApprovalWorkflow(currentDetailItem);
+      }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
+    };
+
+    function createQrDataUrl(text){
+      return new Promise((resolve, reject) => {
+        if (typeof QRCode === 'undefined'){ reject(new Error('QRコード機能を読み込めません')); return; }
+        const holder = document.createElement('div');
+        holder.style.cssText = 'position:fixed;left:-9999px;top:-9999px;background:#fff;padding:8px;';
+        document.body.appendChild(holder);
+        try{
+          new QRCode(holder, { text, width:180, height:180, colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+          setTimeout(() => {
+            const canvas = holder.querySelector('canvas');
+            const image = holder.querySelector('img');
+            const dataUrl = canvas ? canvas.toDataURL('image/png') : image?.src;
+            holder.remove();
+            dataUrl ? resolve(dataUrl) : reject(new Error('QRコード画像を生成できません'));
+          }, 80);
+        }catch(e){ holder.remove(); reject(e); }
+      });
+    }
+
+    window.printChangeCard = async function(){
+      if (!currentDetailItem || currentDetailItem.type !== 'planned') return;
+      const item = currentDetailItem;
+      const items = getRecordChecklist(item);
+      const workflowUrl = buildWorkflowUrl(item._id);
+      let qrDataUrl = '';
+      try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
+      catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
+      const checks = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${x.senderChecked ? '✓' : '□'}</td><td>${x.receiverChecked ? '✓' : '□'}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
+      const ticket = (copyLabel, keeper) => `<section class="ticket"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>切替日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>5Mチェック項目</th><th>発信</th><th>発生</th></tr></thead><tbody>${checks}</tbody></table><div class="sign"><div><b>発信部署承認</b><br>${escapeHtml(item.senderApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.senderApprovedAt))}</div><div><b>発生部署確認</b><br>${escapeHtml(item.receiverConfirmedBy || '未確認')}<br>${escapeHtml(formatAuditTime(item.receiverConfirmedAt))}</div><div><b>発生部署承認・完了</b><br>${escapeHtml(item.receiverApprovedBy || '未承認')}<br>${escapeHtml(formatAuditTime(item.receiverApprovedAt))}</div></div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Gothic",sans-serif;color:#111}.ticket{height:137mm;border:1.5px solid #111;padding:5mm 7mm;display:flex;flex-direction:column;gap:3mm;page-break-inside:avoid}.cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}.ticket header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:2mm}.ticket header strong{font-size:18px;margin-right:10px}.ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}.ticket header small{display:block;margin-top:2mm}.qr{display:flex;align-items:center;gap:2mm;font-size:8px;max-width:42mm}.qr img{width:25mm;height:25mm;image-rendering:pixelated}.qr b{line-height:1.35}.meta{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #555}.meta div{padding:1.5mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-size:10px}.meta b{display:block;font-size:8px;color:#555}.content{border:1px solid #555;padding:1.5mm;font-size:10px}.content p{margin:1mm 0 0;white-space:pre-wrap;min-height:8mm}table{width:100%;border-collapse:collapse;font-size:8px}th,td{border:1px solid #777;padding:1mm;text-align:left}th:nth-child(2),th:nth-child(3),td:nth-child(2),td:nth-child(3){width:13mm;text-align:center}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:auto}.sign div{border:1px solid #555;min-height:13mm;padding:1.5mm;font-size:8px}footer{text-align:right;font-size:8px}</style></head><body>${ticket('原本','発信部署')}<div class="cut">切り取り線</div>${ticket('コピー','発生部署')}<script>window.onload=()=>window.print();<\/script></body></html>`;
+      const w = window.open('', '_blank');
+      if (!w){ alert('印刷画面を開けません。ポップアップを許可してください'); return; }
+      w.document.open(); w.document.write(html); w.document.close();
+    };
+
+    function showDetail(item){
+      currentDetailItem = item;
+      const isAnomaly = (item._kind === 'anomaly') || (item.type === 'anomaly');
+      const isCP = !isAnomaly;
+      const isPlannedCP = isCP && item.type === 'planned';
+
+      if (isAnomaly){
+        document.getElementById('detailTitle').textContent = `整理No: ${item.serialNo || '-'}　${item.lineName || ''}`;
+        document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
+      } else {
+        const t = (item.type === 'planned') ? '計画変化点' : '計画外変化点';
+        document.getElementById('detailTitle').textContent = `${t}（${item.category || ''}）`;
+        document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
+      }
+
+      let badges = '';
+      if (isAnomaly){ badges += `<span class="badge badge-anomaly">異常</span>`; }
+      else {
+        if (item.type === 'planned') badges += `<span class="badge badge-planned">計画</span>`;
+        else badges += `<span class="badge badge-sudden">計画外</span>`;
+        badges += `<span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
+        if (item.type === 'planned') badges += `<span class="approval-status-badge ${approvalStatusOf(item) === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))}</span>`;
+      }
+      document.getElementById('detailBadges').innerHTML = badges;
+
+      let body = '';
+      if (isAnomaly){
+        body = `<div class="detail-grid" style="margin-bottom:20px;">
+          <div class="detail-grid-item"><div class="label">整理No</div><div class="value">${escapeHtml(item.serialNo || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">ライン</div><div class="value">${escapeHtml(item.lineName || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">部署</div><div class="value">${escapeHtml(item.department || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">処置者</div><div class="value">${escapeHtml(item.handler || '-')}</div></div>
+        </div>`;
+        if (item.anomalyContent) body += `<div class="detail-section"><div class="detail-section-title">⚠️ 異常内容</div><div class="detail-section-content">${escapeHtml(item.anomalyContent)}</div></div>`;
+        if (item.actionTaken) body += `<div class="detail-section"><div class="detail-section-title">🔧 現場対応</div><div class="detail-section-content">${escapeHtml(item.actionTaken)}</div></div>`;
+        if (item.rootCauseAction) body += `<div class="detail-section"><div class="detail-section-title">📋 処置方法</div><div class="detail-section-content">${escapeHtml(item.rootCauseAction)}</div></div>`;
+      } else {
+        body = `<div class="detail-grid" style="margin-bottom:20px;">
+          <div class="detail-grid-item"><div class="label">種別</div><div class="value">${escapeHtml(item.type || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">分類</div><div class="value">${escapeHtml(item.category || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">発生部署</div><div class="value">${escapeHtml(item.department || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">ライン</div><div class="value">${escapeHtml(item.lineName || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">整理No</div><div class="value">${escapeHtml(item.serialNo || '-')}</div></div>
+          <div class="detail-grid-item"><div class="label">関連異常ID</div><div class="value">${escapeHtml(item.relatedAnomalyId || '-')}</div></div>
+        </div>`;
+        if (item.type === 'planned') body += `<div class="detail-section"><div class="detail-section-title">🏷️ 起案部署</div><div class="detail-section-content">${escapeHtml(item.planneddepartment || '-')}</div></div>`;
+        body += `<div class="detail-section"><div class="detail-section-title">📝 変化点内容</div><div class="detail-section-content">${escapeHtml(item.content || '-')}</div></div>`;
+        if (item.document) body += `<div class="detail-section"><div class="detail-section-title">📎 関連資料</div><div class="detail-section-content">${escapeHtml(item.document)}</div></div>`;
+        if (item.documentUrl) body += `<div class="detail-section"><div class="detail-section-title">📁 添付ファイル</div><div class="detail-section-content"><a href="${escapeHtml(item.documentUrl)}" target="_blank" style="color:#667eea;">ファイルを開く</a></div></div>`;
+      }
+      document.getElementById('detailBody').innerHTML = body;
+
+      const actionsEl = document.getElementById('detailActions');
+      actionsEl.style.display = isPlannedCP ? 'flex' : 'none';
+      renderApprovalWorkflow(isPlannedCP ? item : null);
+
+      const decisionBox = document.getElementById('switchDecisionBox');
+      const afterBox    = document.getElementById('switchAfterDecisionBox');
+      const dateInput   = document.getElementById('switchDateInput');
+      const hintEl      = document.getElementById('switchStatusHint');
+
+      const legacyCompleted = !!item.activatedAt || !!item.effectiveAt || (item.isActivated === true) || (item.effectiveStatus === 'active') || (item.activationStatus === 'activated');
+      const switchDate   = (item.occurrenceDate || '') || '';
+      const switchStatus = (item.switchStatus || item.switchState || (legacyCompleted ? 'completed' : (switchDate ? 'scheduled' : 'undecided'))) || (switchDate ? 'scheduled' : 'undecided');
+
+      const guideEl = document.getElementById('switchFlowGuide');
+      const guideText = document.getElementById('switchFlowStatusText');
+      if (guideEl && isPlannedCP){
+        guideEl.style.display = 'block';
+        const steps = guideEl.querySelectorAll('.step');
+        steps.forEach(s => s.classList.remove('active'));
+        let activeStep = 1;
+        if (switchStatus === 'scheduled' || switchStatus === 'postponed') activeStep = 2;
+        if (switchStatus === 'completed' || switchStatus === 'canceled') activeStep = 3;
+        const activeEl = guideEl.querySelector(`.step[data-step="${activeStep}"]`);
+        if (activeEl) activeEl.classList.add('active');
+        const label = (s) => {
+          if (s === 'undecided') return '切替え日：未確定';
+          if (s === 'scheduled') return `切替え日：${switchDate || '未設定'}（確定済み）`;
+          if (s === 'postponed') return `切替え日：${switchDate || '未設定'}（延期後）`;
+          if (s === 'completed') return `切替え：完了（${switchDate || '-'}）`;
+          if (s === 'canceled') return `切替え：中止（${switchDate || '-'}）`;
+          return `状態：${s || '-'}`;
+        };
+        const next = (s) => {
+          if (s === 'undecided') return '次にやること：📅「今日で決定」または 🗓「指定日で決定」で切替え日を決めてください。';
+          if (s === 'scheduled' || s === 'postponed') return '次にやること：切替え実施後に ✅「切替え完了」。必要に応じて ⏩「延期」／⛔「中止」。';
+          if (s === 'completed') return 'この変化点は完了済みです。';
+          if (s === 'canceled') return 'この変化点は中止です。';
+          return '';
+        };
+        if (guideText) guideText.textContent = `${label(switchStatus)}　／　${next(switchStatus)}`;
+      } else if (guideEl){ guideEl.style.display = 'none'; }
+
+      const todayYmd = ymdLocal(new Date());
+      if (dateInput && !dateInput.value) dateInput.value = todayYmd;
+
+      const statusLabel = (s) => {
+        if (s === 'undecided') return '切替え未確定';
+        if (s === 'scheduled') return '切替え日確定（未完了）';
+        if (s === 'postponed') return '延期（切替え日再設定済み）';
+        if (s === 'canceled') return '中止';
+        if (s === 'completed') return '完了';
+        return s || '-';
+      };
+
+      if (decisionBox) decisionBox.style.display = 'none';
+      if (afterBox) afterBox.style.display = 'none';
+
+      if (isPlannedCP){
+        if (switchStatus === 'undecided'){
+          if (decisionBox) decisionBox.style.display = 'flex';
+          if (dateInput) dateInput.value = todayYmd;
+        } else if (switchStatus === 'scheduled' || switchStatus === 'postponed'){
+          if (afterBox) afterBox.style.display = 'flex';
+          if (hintEl) hintEl.textContent = `切替え日：${switchDate || '未設定'} ／ 状態：${statusLabel(switchStatus)}`;
+        } else {
+          if (hintEl) hintEl.textContent = `切替え日：${switchDate || '-'} ／ 状態：${statusLabel(switchStatus)}`;
+        }
+      }
+
+      const editBtn = document.getElementById('btnDetailEdit');
+      const delBtn  = document.getElementById('btnDetailDelete');
+      const isUndecidedOnly = isPlannedCP && (switchStatus === 'undecided') && !switchDate;
+      if (editBtn) editBtn.style.display = isUndecidedOnly ? 'none' : '';
+      if (delBtn)  delBtn.style.display  = isUndecidedOnly ? 'none' : '';
+
+      const bodyEl   = document.getElementById('detailBody');
+      const badgesEl = document.getElementById('detailBadges');
+      const dateEl   = document.getElementById('detailDate');
+      if (isUndecidedOnly){
+        if (bodyEl){ bodyEl.innerHTML = ''; bodyEl.style.display = 'none'; }
+        if (badgesEl) badgesEl.style.display = 'none';
+        if (dateEl) dateEl.style.display = 'none';
+      } else {
+        if (bodyEl) bodyEl.style.display = '';
+        if (badgesEl) badgesEl.style.display = '';
+        if (dateEl) dateEl.style.display = '';
+      }
+
+      document.getElementById('detailModal').classList.add('active');
+    }
+
+    document.getElementById('detailClose').addEventListener('click', () => { document.getElementById('detailModal').classList.remove('active'); });
+    document.getElementById('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal') document.getElementById('detailModal').classList.remove('active'); });
+    document.getElementById('btnDetailEdit').addEventListener('click', () => { if (!currentDetailItem) return; document.getElementById('detailModal').classList.remove('active'); openEditModal(currentDetailItem._id); });
+    document.getElementById('btnDetailDelete').addEventListener('click', async () => { if (!currentDetailItem) return; await deleteChangepoint(currentDetailItem._id); document.getElementById('detailModal').classList.remove('active'); });
+
+    const btnSwitchToday = document.getElementById('btnSwitchToday');
+    const btnSwitchDecide = document.getElementById('btnSwitchDecide');
+    const btnSwitchComplete = document.getElementById('btnSwitchComplete');
+    const btnSwitchPostpone = document.getElementById('btnSwitchPostpone');
+    const btnSwitchCancel = document.getElementById('btnSwitchCancel');
+
+    async function decideSwitchDate(dateYmd, mode){
+      if (!currentDetailItem) return;
+      if (!dateYmd){ alert('切替え日を入力してください'); return; }
+      const user = auth.currentUser;
+      const msg = (mode === 'today') ? `切替え日を「今日（${dateYmd}）」で確定しますか？` : `切替え日を「${dateYmd}」で確定しますか？`;
+      if (!confirm(msg)) return;
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { switchStatus: 'scheduled', occurrenceDate: dateYmd, switchDecidedAt: serverTimestamp(), switchDecidedBy: getActorName() });
+        alert('切替え日を確定しました'); document.getElementById('detailModal').classList.remove('active');
+      }catch(err){ console.error(err); alert('切替え日の確定に失敗しました'); }
+    }
+    async function completeSwitch(){
+      if (!currentDetailItem) return;
+      const sw = currentDetailItem.switchStatus || currentDetailItem.switchState || '';
+      const swDate = currentDetailItem.occurrenceDate || '';
+      if (!swDate || (sw !== 'scheduled' && sw !== 'postponed')){ alert('先に「切替え日」を確定してください'); return; }
+      if (!confirm(`切替え完了として登録しますか？（切替え日：${swDate}）`)) return;
+      const user = auth.currentUser;
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { switchStatus: 'completed', switchedAt: serverTimestamp(), switchedBy: getActorName() });
+        alert('切替え完了を登録しました'); document.getElementById('detailModal').classList.remove('active');
+      }catch(err){ console.error(err); alert('完了登録に失敗しました'); }
+    }
+    async function cancelSwitch(){
+      if (!currentDetailItem) return;
+      if (!confirm('この変化点を「中止」として登録しますか？')) return;
+      const user = auth.currentUser;
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { switchStatus: 'canceled', canceledAt: serverTimestamp(), canceledBy: getActorName() });
+        alert('中止を登録しました'); document.getElementById('detailModal').classList.remove('active');
+      }catch(err){ console.error(err); alert('中止登録に失敗しました'); }
+    }
+    async function postponeSwitch(){
+      if (!currentDetailItem) return;
+      const current = document.getElementById('switchDateInput')?.value || ymdLocal(new Date());
+      const newDate = prompt('延期後の切替え日（YYYY-MM-DD）を入力してください', current);
+      if (!newDate) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)){ alert('日付形式が正しくありません（YYYY-MM-DD）'); return; }
+      const user = auth.currentUser;
+      try{
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { switchStatus: 'postponed', occurrenceDate: newDate, postponedAt: serverTimestamp(), postponedBy: getActorName() });
+        alert('延期を登録しました'); document.getElementById('detailModal').classList.remove('active');
+      }catch(err){ console.error(err); alert('延期登録に失敗しました'); }
+    }
+
+    if (btnSwitchToday) btnSwitchToday.addEventListener('click', () => decideSwitchDate(ymdLocal(new Date()), 'today'));
+    if (btnSwitchDecide) btnSwitchDecide.addEventListener('click', () => { const v = document.getElementById('switchDateInput')?.value || ''; decideSwitchDate(v, 'pick'); });
+    if (btnSwitchComplete) btnSwitchComplete.addEventListener('click', () => completeSwitch());
+    if (btnSwitchCancel) btnSwitchCancel.addEventListener('click', () => cancelSwitch());
+    if (btnSwitchPostpone) btnSwitchPostpone.addEventListener('click', () => postponeSwitch());
+
+    window.openEditFromHistory = function(id) { openEditModal(id); };
+    window.deleteChangepoint = async function(id) {
+      if (!confirm('この変化点を削除しますか？')) return;
+      try { await deleteDoc(doc(db, 'changepoints', id)); alert('削除しました'); }
+      catch (err) { alert('削除に失敗しました: ' + (err.message || err)); }
+    };
+
+    function openEditModal(id) {
+      const item = changepointData.find(x => x._id === id);
+      if (!item) return;
+      const container = document.getElementById('editFormContainer');
+      container.innerHTML = `
+        <input type="hidden" id="editId" value="${item._id}">
+        <div class="form-row">
+          <div class="form-group"><label>起案部署</label><select id="editPlannedDept"><option value="">選択</option>${masterDepartments.map(d => `<option value="${d}" ${item.planneddepartment === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+          <div class="form-group"><label>変化点分類</label><select id="editCategory"><option value="">選択</option>
+            <option value="人" ${item.category === '人' ? 'selected' : ''}>人</option>
+            <option value="方法" ${item.category === '方法' ? 'selected' : ''}>方法</option>
+            <option value="材料" ${item.category === '材料' ? 'selected' : ''}>材料</option>
+            <option value="金型" ${item.category === '金型' ? 'selected' : ''}>金型</option>
+            <option value="設備" ${item.category === '設備' ? 'selected' : ''}>設備</option>
+          </select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>発生部署</label><select id="editDepartment"><option value="">選択</option>${masterDepartments.map(d => `<option value="${d}" ${item.department === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+          <div class="form-group"><label>ライン名</label><input type="text" id="editLineName" value="${escapeAttr(item.lineName || '')}" list="editLineList"><datalist id="editLineList">${masterLines.map(l => `<option value="${l}">`).join('')}</datalist></div>
+        </div>
+        <div class="form-group"><label>整理No</label><input type="text" id="editSerialNo" value="${escapeAttr(item.serialNo || '')}"></div>
+        <div class="form-group"><label>変化点内容</label><textarea id="editContent" style="min-height:120px;">${escapeHtml(item.content || '')}</textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>発生日</label><input type="date" id="editDate" value="${item.occurrenceDate || ''}"></div>
+          <div class="form-group"><label>発生時刻</label><input type="time" id="editTime" value="${item.occurrenceTime || ''}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>対象ロット</label><input type="text" id="editLot" value="${escapeAttr(item.lot || '')}"></div>
+          <div class="form-group"><label>関連資料</label><input type="text" id="editDocument" value="${escapeAttr(item.document || '')}"></div>
+        </div>
+      `;
+      document.getElementById('editModal').classList.add('active');
+    }
+
+    document.getElementById('btnEditSave').addEventListener('click', async () => {
+      const id = document.getElementById('editId').value;
+      if (!id) return;
+      const original = changepointData.find(x => x._id === id);
+      const updates = {
+        planneddepartment: document.getElementById('editPlannedDept').value,
+        category: document.getElementById('editCategory').value,
+        department: document.getElementById('editDepartment').value,
+        lineName: document.getElementById('editLineName').value,
+        serialNo: document.getElementById('editSerialNo').value,
+        content: document.getElementById('editContent').value,
+        occurrenceDate: document.getElementById('editDate').value,
+        occurrenceTime: document.getElementById('editTime').value,
+        lot: document.getElementById('editLot').value,
+        document: document.getElementById('editDocument').value,
+        approvalStatus: 'draft',
+        senderApprovedBy: null,
+        senderApprovedAt: null,
+        receiverConfirmedBy: null,
+        receiverConfirmedAt: null,
+        receiverApprovedBy: null,
+        receiverApprovedAt: null,
+        checklistItems: getRecordChecklist(original).map(x => ({ ...x, senderChecked:false, receiverChecked:false }))
+      };
+      try { await updateDoc(doc(db, 'changepoints', id), updates); alert('保存しました。内容変更のため承認状態を未承認に戻しました'); document.getElementById('editModal').classList.remove('active'); }
+      catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
+    });
+    document.getElementById('btnEditCancel').addEventListener('click', () => { document.getElementById('editModal').classList.remove('active'); });
+    document.getElementById('editClose').addEventListener('click', () => { document.getElementById('editModal').classList.remove('active'); });
+    document.getElementById('editModal').addEventListener('click', (e) => { if (e.target.id === 'editModal') document.getElementById('editModal').classList.remove('active'); });
+
+    // expose showDetail for inline onclick in month table
+    window.showDetail = showDetail;
+    window.showDetailById = function(id){ const item = changepointData.find(x => x._id === id); if (item) showDetail(item); };
+  </script>
+</body>
+</html>
