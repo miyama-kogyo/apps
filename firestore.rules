@@ -27,6 +27,13 @@ service cloud.firestore {
     function canUseApp() {
       return emailPasswordUser() || isIdmngAdmin();
     }
+    function isAnonymousUser() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+    function canUseChangePointApp() {
+      return canUseApp() || isAnonymousUser();
+    }
     function isOwnUser(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -94,6 +101,17 @@ service cloud.firestore {
     }
     match /flashTestResults/{resultId} {
       allow read, create: if isSignedIn();
+    }
+    // 変化点管理システムは画面操作なしの匿名認証を使用する。
+    match /changepoints/{docId} {
+      allow read, create, update, delete: if canUseChangePointApp();
+    }
+    match /anomalies/{docId} {
+      allow read: if canUseChangePointApp();
+    }
+    match /masters/{masterId}/items/{itemId} {
+      allow read, create, update, delete: if canUseChangePointApp()
+        && ['department', 'line', 'changeChecklist'].hasAny([masterId]);
     }
     match /{document=**} {
       allow read, write: if canUseApp();
