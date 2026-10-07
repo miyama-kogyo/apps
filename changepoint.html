@@ -2565,7 +2565,7 @@
       const data = { type, workflowManaged: true, planneddepartment, department, category, lineName, processName, serialNo, content, issuedDate,
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null,
         document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', specialHandlingStatus: '', relatedReviewCompleted: false,
-        completionConfirmers: '', continuedManagementRequired: false, managementUntil: '', createdBy,
+        continuedManagementRequired: false, managementUntil: '', createdBy,
         createdAt: serverTimestamp() };
       try{
         const docRef = await addDoc(collection(db, 'changepoints'), data);
@@ -2842,8 +2842,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (Number.isNaN(d.getTime())) return '日時未記録';
       return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
     }
-    function readStampName(){
-      if (currentDetailItem?._id && (workflowCommentSaves.has(currentDetailItem._id) ||
+    function readStampName(requireSavedComment = true){
+      if (requireSavedComment && currentDetailItem?._id && (workflowCommentSaves.has(currentDetailItem._id) ||
           (workflowCommentDrafts.has(currentDetailItem._id) && workflowCommentDrafts.get(currentDetailItem._id).trim() !== (currentDetailItem.workflowComment || '').trim()))){
         workflowNotice('所見コメントを保存してからスタンプを押してください。','comment');
         return '';
@@ -2854,6 +2854,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       localStorage.setItem('changepointActorName',name);
       updateActorNameButton();
       return name;
+    }
+    function stampCommentFields(who){
+      const id = currentDetailItem?._id;
+      if (!workflowCommentDrafts.has(id)) return {};
+      const value = workflowCommentDrafts.get(id).trim();
+      if (value === (currentDetailItem.workflowComment || '').trim()) return {};
+      return {workflowComment:value,workflowCommentBy:who,workflowCommentAt:new Date()};
     }
     function workflowNotice(message, section){
       const details = document.querySelector('[data-workflow-section="'+section+'"]');
@@ -2901,17 +2908,15 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         ${excludedItems.length ? `<div class="excluded-checks"><strong>発行者が対象外とした項目</strong>${excludedItems.map((x,index) => `<div class="excluded-check-row"><span>${escapeHtml(x.label || '-') }</span>${!senderLocked ? `<button type="button" class="check-exclude-btn" onclick="restoreExcludedChecklist(${index})">対象に戻す</button>` : ''}</div>`).join('')}</div>` : ''}
         </section>
         <details class="workflow-fold" data-workflow-section="completion" ${opened.has('completion')?'open':''}>
-          <summary>完了条件・追加記録</summary>
-          <div class="workflow-rule-box">最終承認は実施日の翌日以降、完了後確認・関係部署確認・必要な継続管理を終えてから行います。</div>
+          <summary>追加記録（任意）</summary>
         <div class="workflow-fields">
-          <div class="form-group"><label>特別対応の状態<span class="required">*</span></label><select ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('specialHandlingStatus',this.value)"><option value="" ${!item.specialHandlingStatus ? 'selected' : ''}>選択</option><option value="in_progress" ${item.specialHandlingStatus === 'in_progress' ? 'selected' : ''}>対応中</option><option value="completed" ${item.specialHandlingStatus === 'completed' ? 'selected' : ''}>対応完了</option><option value="not_required" ${item.specialHandlingStatus === 'not_required' ? 'selected' : ''}>対応不要</option></select></div>
+          <div class="form-group"><label>特別対応の状態</label><select ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('specialHandlingStatus',this.value)"><option value="" ${!item.specialHandlingStatus ? 'selected' : ''}>選択</option><option value="in_progress" ${item.specialHandlingStatus === 'in_progress' ? 'selected' : ''}>対応中</option><option value="completed" ${item.specialHandlingStatus === 'completed' ? 'selected' : ''}>対応完了</option><option value="not_required" ${item.specialHandlingStatus === 'not_required' ? 'selected' : ''}>対応不要</option></select></div>
           <div class="form-group"><label>特記事項・NG対応内容</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('specialNotes',this.value)" placeholder="NGへの対応、再教育、識別方法など">${escapeHtml(item.specialNotes || '')}</textarea></div>
           <div class="form-group"><label>品質保証部の所見</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('qualityComment',this.value)" placeholder="該当なしの場合は「なし」">${escapeHtml(item.qualityComment || '')}</textarea></div>
           <div class="form-group"><label>生産技術部の所見</label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('engineeringComment',this.value)" placeholder="該当なしの場合は「なし」">${escapeHtml(item.engineeringComment || '')}</textarea></div>
-          <div class="form-group"><label>完了後確認者<span class="required">*</span></label><textarea ${receiverLocked ? 'disabled' : ''} onblur="saveWorkflowField('completionConfirmers',this.value)" placeholder="部長、GM、GL、作業指導者、記入者など">${escapeHtml(item.completionConfirmers || '')}</textarea></div>
           <div class="form-group"><label>継続管理期限</label><input type="date" value="${escapeAttr(item.managementUntil || '')}" ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('managementUntil',this.value)"><div class="hint">継続管理が必要な場合に設定。新人作業者の指導教育は1週間を基本とします。</div></div>
         </div>
-        <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.continuedManagementRequired ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('continuedManagementRequired',this.checked)"><span>継続管理が必要（期限まで完了前として管理）</span></label>
+        <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.continuedManagementRequired ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('continuedManagementRequired',this.checked)"><span>継続管理が必要</span></label>
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.relatedReviewCompleted ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('relatedReviewCompleted',this.checked)"><span>品質保証部・生産技術部への回覧と所見確認が完了した（起票部署が該当部署の場合の省略を含む）</span></label>
         </details>
         <section class="workflow-comment" data-workflow-section="comment">
@@ -3032,7 +3037,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
 
     window.saveWorkflowField = async function(field, value){
-      const allowed = ['specialHandlingStatus','specialNotes','qualityComment','engineeringComment','completionConfirmers','continuedManagementRequired','managementUntil','relatedReviewCompleted'];
+      const allowed = ['specialHandlingStatus','specialNotes','qualityComment','engineeringComment','continuedManagementRequired','managementUntil','relatedReviewCompleted'];
       if (!currentDetailItem?._id || !allowed.includes(field) || approvalStatusOf(currentDetailItem) === 'approved') return;
       try{
         await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { [field]:value, updatedAt:serverTimestamp(), updatedBy:getActorName() });
@@ -3054,11 +3059,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.approveSender = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'draft') return;
       const items = getRecordChecklist(currentDetailItem);
-      const who = readStampName();
+      const who = readStampName(false);
       if (!who || !confirm(`${who} さんの発信部署承認スタンプを登録しますか？`)) return;
+      const comment = stampCommentFields(who);
       try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:new Date() };
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { ...comment, ...(comment.workflowCommentAt ? {workflowCommentAt:serverTimestamp()} : {}), checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, ...comment, checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:new Date() };
         renderApprovalWorkflow(currentDetailItem);
       }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
     };
@@ -3079,26 +3085,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.approveReceiver = async function(){
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'receiver_confirmed') return;
       const items = getRecordChecklist(currentDetailItem);
-      if (!allRoleChecksDone(items, 'receiver')){ workflowNotice('発生部署の全項目をOKまたは該当なしにしてください。NGのままでは完了できません', 'checks'); return; }
-      if (!['completed','not_required'].includes(currentDetailItem.specialHandlingStatus)){ workflowNotice('特別対応を「対応完了」または「対応不要」にしてください', 'completion'); return; }
-      if (currentDetailItem.specialHandlingStatus === 'completed' && !String(currentDetailItem.specialNotes || '').trim()){ workflowNotice('特別対応の内容を特記事項に入力してください', 'completion'); return; }
-      if (!currentDetailItem.relatedReviewCompleted){ workflowNotice('品質保証部・生産技術部への回覧と所見確認を完了してください', 'completion'); return; }
-      if (!String(currentDetailItem.completionConfirmers || '').trim()){ workflowNotice('完了後確認者を入力してください', 'completion'); return; }
-      const today = ymdLocal(new Date());
-      if (currentDetailItem.occurrenceDate){
-        const nextDay = new Date(`${currentDetailItem.occurrenceDate}T00:00:00`); nextDay.setDate(nextDay.getDate() + 1);
-        const earliest = ymdLocal(nextDay);
-        if (today < earliest){ workflowNotice(`完了後の最終承認は実施日の翌日（${earliest}）以降に行ってください`, 'completion'); return; }
-      }
-      if (currentDetailItem.continuedManagementRequired){
-        if (!currentDetailItem.managementUntil){ workflowNotice('継続管理期限を設定してください', 'completion'); return; }
-        if (today < currentDetailItem.managementUntil){ workflowNotice(`継続管理期間中です。${currentDetailItem.managementUntil}以降に完了してください`, 'completion'); return; }
-      }
-      const who = readStampName();
+      const who = readStampName(false);
       if (!who || !confirm(`${who} さんの発生部署承認スタンプを登録し、変化点を完了にしますか？`)) return;
+      const comment = stampCommentFields(who);
       try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp(), completedBy:who, completedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:new Date(), completedBy:who, completedAt:new Date() };
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { ...comment, ...(comment.workflowCommentAt ? {workflowCommentAt:serverTimestamp()} : {}), checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp(), completedBy:who, completedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, ...comment, checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:new Date(), completedBy:who, completedAt:new Date() };
         renderApprovalWorkflow(currentDetailItem);
       }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
     };
@@ -3131,7 +3123,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const checks = activeCheckRows;
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
-      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div><div class="qr" data-card-qr="${escapeAttr(item._id || '')}"><img ${qrDataUrl ? `src="${qrDataUrl}"` : 'hidden'} alt="ワークフローQR">${qrDataUrl ? '' : '<span class="qr-pending">QR準備中</span>'}<b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div><div class="qr" data-card-qr="${escapeAttr(item._id || '')}"><img ${qrDataUrl ? `src="${qrDataUrl}"` : 'hidden'} alt="ワークフローQR">${qrDataUrl ? '' : '<span class="qr-pending">QR準備中</span>'}<b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
 
     }
 
@@ -3505,7 +3497,6 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         specialNotes: '',
         qualityComment: '',
         engineeringComment: '',
-        completionConfirmers: '',
         continuedManagementRequired: false,
         managementUntil: '',
         relatedReviewCompleted: false,
