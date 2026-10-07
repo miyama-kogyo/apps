@@ -905,6 +905,46 @@
       .issued-card-preview .sign { gap:3px; }
       .issued-card-preview .sign div { padding:4px; }
     }
+
+    .workflow-comment { margin-top:16px; border-top:1px solid #d4ded7; padding-top:14px; scroll-margin-top:100px; }
+    .workflow-comment>label { display:block; font-size:14px; font-weight:700; margin-bottom:8px; }
+    .workflow-comment textarea { width:100%; resize:vertical; min-height:80px; border:1px solid #bdcbc2; border-radius:4px; padding:10px; font:inherit; font-size:16px; line-height:1.5; }
+    .workflow-comment-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .workflow-comment-actions>span { font-size:12px; color:#5d6b62; }
+    .workflow-comment-actions button { padding:8px 12px; font-size:13px; }
+    #detailModal.qr-workflow { background:#f1f4f3; padding:0; align-items:flex-start; }
+    #detailModal.qr-workflow .modal-content { max-width:760px!important; height:100dvh; max-height:100dvh; border-radius:0; box-shadow:none; }
+    .qr-workflow #detailDate,.qr-workflow #detailBadges,.qr-workflow #detailCardToolbar,.qr-workflow #detailActions { display:none!important; }
+    #detailModal.qr-workflow .modal-header { padding:10px 16px; align-items:center; }
+    .qr-workflow .modal-header h3 { font-size:18px; }
+    #detailModal.qr-workflow #detailBody { padding:12px 16px; }
+    .qr-basic { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .qr-basic>div { min-width:0; }
+    .qr-basic span { display:block; color:#66766b; font-size:11px; margin-bottom:3px; }
+    .qr-basic strong { font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+    .qr-basic-content { grid-column:1/-1; border-bottom:1px solid #d5dfd7; padding-bottom:10px; }
+    .qr-basic p { font-size:14px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .qr-workflow #approvalWorkflow.qr-mode { display:flex!important; flex-direction:column; border:0; padding:0; margin:0 16px 20px; }
+    .qr-mode .workflow-signoff { order:1; border:0; padding:0; margin:0 0 14px; display:flex; flex-direction:column; }
+    .qr-mode .stamp-heading { order:1; margin:0 0 8px; }
+    .qr-mode .workflow-stamps { order:2; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+    .qr-mode .stamp-action { order:3; margin:10px 0 0; padding:10px 0 0; }
+    .qr-mode .stamp-role { font-size:11px; gap:1px; }
+    .qr-mode .stamp-role small { font-size:10px; }
+    .qr-mode .stamp-seal { width:100%; min-height:64px; padding:6px 3px; margin:4px auto; border-radius:4px; }
+    .qr-mode .stamp-name { font-size:12px; }
+    .qr-mode .stamp-seal time { margin:4px 0 0; padding-top:3px; font-size:8px; }
+    .qr-mode .stamp-department { display:none; }
+    .qr-mode .stamp-action>div { flex-wrap:nowrap; }
+    .qr-mode .stamp-action input { flex:1; max-width:none; }
+    .qr-mode .stamp-action button { width:auto; flex-shrink:0; padding:8px 10px; font-size:13px; }
+    .qr-mode .workflow-checks { order:2; padding-top:12px; border-top:1px solid #d4ded7; }
+    .qr-mode .workflow-comment { order:3; }
+    .qr-mode .workflow-fold { order:4; }
+    .qr-mode .responder-checks h4,.qr-mode .checklist-source { display:none; }
+    .qr-mode .checklist-row { font-size:13px; }
+    .qr-mode .checks-heading h4 { font-size:15px; }
+    .qr-mode .stamp-heading strong { font-size:15px; }
   </style>
 </head>
 <body>
@@ -2739,6 +2779,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     let currentDetailItem = null;
+    const workflowCommentDrafts = new Map();
+    const workflowCommentSaves = new Set();
+
+    function isQrWorkflow(item){
+      return !!item?._id && new URLSearchParams(location.search).get('changepointId') === item._id;
+    }
 
     const APPROVAL_STAGES = ['draft', 'sender_approved', 'receiver_confirmed', 'approved'];
 
@@ -2797,6 +2843,11 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
     }
     function readStampName(){
+      if (currentDetailItem?._id && (workflowCommentSaves.has(currentDetailItem._id) ||
+          (workflowCommentDrafts.has(currentDetailItem._id) && workflowCommentDrafts.get(currentDetailItem._id).trim() !== (currentDetailItem.workflowComment || '').trim()))){
+        workflowNotice('所見コメントを保存してからスタンプを押してください。','comment');
+        return '';
+      }
       const input = document.getElementById('workflowStampName');
       const name = input?.value.trim() || '';
       if (!name){ alert('スタンプに残す氏名を入力してください'); input?.focus(); return ''; }
@@ -2819,6 +2870,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const actor = sameItem ? (box.querySelector('#workflowStampName')?.value ?? '') : (localStorage.getItem('changepointActorName') || '');
       box.dataset.itemId = item._id;
       box.dataset.status = approvalStatusOf(item);
+      box.classList.toggle('qr-mode',isQrWorkflow(item));
       box.style.display = 'block';
       const status = approvalStatusOf(item);
       const stage = APPROVAL_STAGES.indexOf(status);
@@ -2827,6 +2879,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const senderLocked = stage >= 1;
       const receiverEnabled = stage >= 1;
       const receiverLocked = stage >= 3;
+      const commentValue = workflowCommentDrafts.has(item._id) ? workflowCommentDrafts.get(item._id) : (item.workflowComment || '');
+      const commentSaving = workflowCommentSaves.has(item._id);
       const actions = {
         draft: ['発信部署の承認者', '承認スタンプを押す', 'approveSender()'],
         sender_approved: ['発生部署の対応者', '対応スタンプを押す', 'confirmReceiver()'],
@@ -2860,6 +2914,14 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.continuedManagementRequired ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('continuedManagementRequired',this.checked)"><span>継続管理が必要（期限まで完了前として管理）</span></label>
         <label class="workflow-check" style="margin-top:12px;"><input type="checkbox" ${item.relatedReviewCompleted ? 'checked' : ''} ${receiverLocked ? 'disabled' : ''} onchange="saveWorkflowField('relatedReviewCompleted',this.checked)"><span>品質保証部・生産技術部への回覧と所見確認が完了した（起票部署が該当部署の場合の省略を含む）</span></label>
         </details>
+        <section class="workflow-comment" data-workflow-section="comment">
+          <label for="workflowCommentText">所見コメント</label>
+          <textarea id="workflowCommentText" rows="3" maxlength="4000" ${receiverLocked || commentSaving ? 'disabled' : ''} oninput="setWorkflowCommentDraft(this.value)">${escapeHtml(commentValue)}</textarea>
+          <div class="workflow-comment-actions">
+            <span id="workflowCommentStatus" role="status">${item.workflowCommentBy ? escapeHtml(item.workflowCommentBy)+' / '+escapeHtml(stampDate(item.workflowCommentAt)) : ''}</span>
+            ${!receiverLocked ? `<button type="button" class="btn btn-secondary" id="btnSaveWorkflowComment" ${commentSaving ? 'disabled' : ''} onclick="saveWorkflowComment()">${commentSaving ? '保存中...' : 'コメントを保存'}</button>` : ''}
+          </div>
+        </section>
         <section class="workflow-signoff">
         <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
         ${next ? `<div class="stamp-action">
@@ -2873,6 +2935,46 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         </div>`).join('')}</div>
         </section>`;
     }
+
+    window.setWorkflowCommentDraft = function(value){
+      if (currentDetailItem?._id) workflowCommentDrafts.set(currentDetailItem._id,value);
+    };
+    window.saveWorkflowComment = async function(){
+      const item = currentDetailItem;
+      if (!item?._id || approvalStatusOf(item) === 'approved' || workflowCommentSaves.has(item._id)) return;
+      const input = document.getElementById('workflowCommentText');
+      const value = input.value.trim();
+      let who = (document.getElementById('workflowStampName')?.value || localStorage.getItem('changepointActorName') || '').trim();
+      if (!who) who = (prompt('コメントに記録する氏名を入力してください') || '').trim();
+      if (!who) return;
+      workflowCommentDrafts.set(item._id,value);
+      workflowCommentSaves.add(item._id);
+      const button = document.getElementById('btnSaveWorkflowComment');
+      input.disabled = true;
+      if (button){ button.disabled=true; button.textContent='保存中...'; }
+      try{
+        await updateDoc(doc(db,'changepoints',item._id), {workflowComment:value,workflowCommentBy:who,workflowCommentAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedBy:who});
+        workflowCommentDrafts.delete(item._id);
+        if (currentDetailItem?._id === item._id){
+          currentDetailItem = {...currentDetailItem,workflowComment:value,workflowCommentBy:who,workflowCommentAt:new Date()};
+          const message=document.getElementById('workflowCommentStatus');
+          if(message) message.textContent='保存しました / '+who;
+        }
+      }catch(error){
+        console.error(error);
+        if(currentDetailItem?._id === item._id){
+          const message=document.getElementById('workflowCommentStatus');
+          if(message) message.textContent='保存に失敗しました。もう一度保存してください。';
+        }
+      }finally{
+        workflowCommentSaves.delete(item._id);
+        if(currentDetailItem?._id === item._id){
+          const field=document.getElementById('workflowCommentText'),save=document.getElementById('btnSaveWorkflowComment');
+          if(field) field.disabled=approvalStatusOf(currentDetailItem)==='approved';
+          if(save){ save.disabled=approvalStatusOf(currentDetailItem)==='approved'; save.textContent='コメントを保存'; }
+        }
+      }
+    };
 
     async function saveChecklist(items){
       if (!currentDetailItem?._id) return;
@@ -3079,6 +3181,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const isAnomaly = (item._kind === 'anomaly') || (item.type === 'anomaly');
       const isCP = !isAnomaly;
       const isPlannedCP = isCP && (item.type === 'planned' || item.workflowManaged === true);
+      const qrMode = isPlannedCP && isQrWorkflow(item);
+      document.getElementById('detailModal').classList.toggle('qr-workflow',qrMode);
+      document.getElementById('detailClose').setAttribute('aria-label',qrMode ? '管理ボードへ戻る' : '閉じる');
       document.getElementById('detailCardToolbar').hidden = !isPlannedCP;
 
       if (isAnomaly){
@@ -3123,6 +3228,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         body += `<div class="detail-section"><div class="detail-section-title">📝 変化点内容</div><div class="detail-section-content">${escapeHtml(item.content || '-')}</div></div>`;
         if (item.document) body += `<div class="detail-section"><div class="detail-section-title">📎 関連資料</div><div class="detail-section-content">${escapeHtml(item.document)}</div></div>`;
         if (item.documentUrl) body += `<div class="detail-section"><div class="detail-section-title">📁 添付ファイル</div><div class="detail-section-content"><a href="${escapeHtml(item.documentUrl)}" target="_blank" style="color:#667eea;">ファイルを開く</a></div></div>`;
+      }
+      if (qrMode){
+        document.getElementById('detailTitle').textContent='チェック・承認';
+        body = `<div class="qr-basic"><div><span>実施日</span><strong>${escapeHtml(item.occurrenceDate || '未定')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div class="qr-basic-content"><span>変化点内容</span><p>${escapeHtml(item.content || '-')}</p></div></div>`;
       }
       document.getElementById('detailBody').innerHTML = body;
 
