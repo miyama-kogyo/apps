@@ -706,6 +706,7 @@
     .board-change-top,.board-change-meta { display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:#64736a; }
     .board-category { background:var(--category-color,#eee); border:1px solid #0002; padding:2px 6px; color:#283529; border-radius:2px; }
     .board-change-line { font-size:15px; font-weight:700; overflow-wrap:anywhere; }
+    .board-change-context { display:flex; flex-direction:column; gap:2px; }
     .board-change-serial { font-size:13px; color:#435a4a; overflow-wrap:anywhere; }
     .board-change-content { font-size:14px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
     .board-status { font-size:11px; color:#795522; background:#fff4dd; padding:3px 6px; border-radius:2px; }
@@ -738,21 +739,72 @@
     #approvalWorkflow { scroll-margin-top:100px; }
     .registration-result { margin:14px 0; padding:16px 0; border-block:1px solid #b5ccbd; display:flex; align-items:center; gap:12px; flex-wrap:wrap; color:#176349; }
     .registration-result[hidden] { display:none; }
+    .board-filter-toggle,.board-mobile-views { display:none; }
     @media(max-width:1100px){ .board-week { grid-template-columns:repeat(4,minmax(0,1fr)); } }
     @media(max-width:700px){
-      .board-shell { padding:18px 14px; }
-      .board-header h1 { font-size:21px; }
+      .board-shell { padding:12px; }
+      .board-header { gap:10px; }
+      .board-brand { gap:10px; }
+      .board-mark { width:32px; height:32px; font-size:20px; }
+      .board-header h1 { font-size:19px; }
+      .board-date { font-size:11px; margin-top:1px; }
       .board-header-actions { width:100%; gap:8px; flex-wrap:wrap; }
       #mainMenu .board-primary { flex:1; }
-      .board-nav { gap:0; }
-      #mainMenu .board-nav .menu-card,.board-nav-current { font-size:12px; padding:12px 8px; }
-      .board-toolbar { gap:10px; }
+      #mainMenu .board-header-actions button { padding:8px 10px; font-size:13px; }
+      #mainMenu .board-primary { min-width:170px; }
+      #btnActorName { max-width:100%; overflow-wrap:anywhere; }
+      .board-nav { gap:0; margin:8px 0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+      #mainMenu .board-nav .menu-card,.board-nav-current { font-size:11px; padding:10px 2px; text-align:center; }
+      .board-filter-toggle { display:flex; align-items:center; gap:8px; width:100%; min-height:40px; padding:6px 10px; background:transparent; border:1px solid #bdcac2; border-radius:4px; color:#36543f; font-size:13px; }
+      .board-filter-chevron { margin-left:auto; font-size:18px; }
+      .board-filter-toggle[aria-expanded="true"] .board-filter-chevron { transform:rotate(180deg); }
+      #boardFilters { display:none; gap:8px; padding:12px 0; }
+      #boardFilters.is-open { display:flex; }
       .board-filter { flex-basis:calc(50% - 10px); }
-      .board-summary { gap:14px; }
-      .board-summary strong { font-size:20px; }
-      .board-week { grid-template-columns:repeat(2,minmax(0,1fr)); }
-      .board-today,.board-card-grid { grid-template-columns:minmax(0,1fr); }
-      .board-section-heading>span { width:100%; }
+      .board-filter label { margin-bottom:4px; }
+      .board-filter input,.board-filter select { font-size:16px; }
+      .board-summary { display:none; }
+      .board-mobile-views { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; margin-top:10px; padding:3px; border-radius:4px; background:#dfe7e2; position:sticky; top:0; z-index:2; }
+      .board-mobile-views button { min-height:42px; min-width:0; padding:6px 2px; border:0; border-radius:3px; background:transparent; color:#50645a; font-size:14px; font-weight:600; }
+      .board-mobile-views button[aria-pressed="true"] { background:#fff; color:#176349; box-shadow:0 1px 3px #163b231a; }
+      .board-mobile-views span { font-size:12px; margin-left:3px; }
+      #mainMenu[data-board-view="today"] [data-board-panel]:not([data-board-panel="today"]),
+      #mainMenu[data-board-view="week"] [data-board-panel]:not([data-board-panel="week"]),
+      #mainMenu[data-board-view="carry"] [data-board-panel]:not([data-board-panel="carry"]) { display:none; }
+      .board-section { padding:12px 0; }
+      .board-section-heading { margin-bottom:10px; gap:4px; }
+      .board-section h2 { font-size:15px; }
+      .board-section-heading>span { font-size:11px; }
+      .board-section-heading h2 .board-count { display:none; }
+      .board-today,.board-card-grid { grid-template-columns:minmax(0,1fr); gap:10px; }
+      .board-lane { border-top-width:2px; }
+      .board-lane h3 { display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; font-size:14px; padding:8px 2px; }
+      .board-lane h3 small { margin:0; font-size:11px; }
+      .board-lane-body { gap:7px; }
+      #mainMenu .board-change { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:5px 8px; padding:9px 10px; }
+      .board-change-top,.board-change-content,.board-change-meta { grid-column:1/-1; }
+      .board-change-line { font-size:14px; }
+      .board-change-serial { font-size:12px; text-align:right; align-self:center; }
+      .board-change-content { font-size:13px; line-height:1.5; -webkit-line-clamp:2; }
+      .board-change-meta { font-size:10px; }
+      .board-change-context { flex-direction:row; flex-wrap:wrap; gap:4px; }
+      #topicsToday .board-change-context { display:none; }
+      #topicsToday .board-change-meta { justify-content:flex-end; }
+      #topicsWeek .board-change-date { display:none; }
+      .board-status { font-size:10px; padding:2px 5px; }
+      .board-week { grid-template-columns:minmax(0,1fr); gap:8px; }
+      .board-day { padding:6px; }
+      .board-day h3 { font-size:12px; padding:4px 2px 8px; }
+      .board-day .board-change { margin-bottom:6px; padding:9px 10px!important; }
+      .board-day .board-change:last-child { margin-bottom:0; }
+      .board-day .board-change-content { font-size:13px; }
+      .board-day.is-empty { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; }
+      .board-day.is-empty h3,.board-day.is-empty .board-empty { padding:0; font-size:11px; }
+      .board-legend { gap:12px; margin:0 0 8px; font-size:11px; }
+      .board-empty { padding:18px 8px; font-size:13px; }
+      .board-details { padding:12px 0; }
+      .board-details summary { font-size:13px; }
+      .board-footer { padding:14px 0 0; font-size:10px; }
       .detail-card-toolbar { padding:12px; }
     }
 
@@ -772,7 +824,7 @@
   <button id="signOutBtn">ログアウト</button>
 
   <!-- 現場管理ボード -->
-  <div id="mainMenu">
+  <div id="mainMenu" data-board-view="today">
     <div class="board-shell">
       <header class="board-header">
         <div class="board-brand"><span class="board-mark" aria-hidden="true">M</span><div><h1>変化点管理ボード</h1><div class="board-date" id="boardDate"></div></div></div>
@@ -784,7 +836,8 @@
         <button type="button" class="menu-card" data-screen="calendar">計画カレンダー</button>
         <button type="button" class="menu-card" data-screen="master">マスター管理</button>
       </nav>
-      <div class="board-toolbar">
+      <button type="button" id="boardFilterToggle" class="board-filter-toggle" aria-expanded="false" aria-controls="boardFilters">絞り込み <span id="boardFilterCount"></span><span class="board-filter-chevron" aria-hidden="true">⌄</span></button>
+      <div class="board-toolbar" id="boardFilters">
         <div class="board-filter"><label for="topicsDeptFilter">発生部署</label><select id="topicsDeptFilter"><option value="">すべての部署</option></select></div>
         <div class="board-filter"><label for="boardLineFilter">発生ライン</label><select id="boardLineFilter"><option value="">すべてのライン</option></select></div>
         <div class="board-filter"><label for="boardCategoryFilter">分類</label><select id="boardCategoryFilter"><option value="">すべての分類</option><option>人</option><option>設備</option><option>材料</option><option>方法</option><option>金型</option></select></div>
@@ -794,16 +847,21 @@
         <button type="button" id="boardReset" class="board-reset">条件を解除</button>
       </div>
       <div class="board-summary" id="boardSummary" aria-live="polite"></div>
-      <section class="board-section" aria-labelledby="boardTodayTitle">
+      <div class="board-mobile-views" role="group" aria-label="表示期間">
+        <button type="button" data-board-view="today" aria-pressed="true" aria-controls="boardTodayPanel">今日 <span id="boardMobileToday">0</span></button>
+        <button type="button" data-board-view="week" aria-pressed="false" aria-controls="boardWeekPanel">今週 <span id="boardMobileWeek">0</span></button>
+        <button type="button" data-board-view="carry" aria-pressed="false" aria-controls="boardCarryPanel">継続 <span id="boardMobileCarry">0</span></button>
+      </div>
+      <section id="boardTodayPanel" data-board-panel="today" class="board-section" aria-labelledby="boardTodayTitle">
         <div class="board-section-heading"><h2 id="boardTodayTitle">今日の変化点 <span id="boardTodayCount" class="board-count">0</span></h2><span id="boardTodayDate"></span></div>
         <div id="topicsToday" class="board-today"><div class="board-empty">変化点を読み込んでいます...</div></div>
       </section>
-      <section class="board-section board-week-section" aria-labelledby="boardWeekTitle">
+      <section id="boardWeekPanel" data-board-panel="week" class="board-section board-week-section" aria-labelledby="boardWeekTitle">
         <div class="board-section-heading"><h2 id="boardWeekTitle">今週の変化点 <span id="boardWeekCount" class="board-count">0</span></h2><span id="boardWeekRange"></span></div>
         <div class="board-legend" aria-label="カードの分類色"><span><i style="background:#fb923c"></i>人</span><span><i style="background:#4ade80"></i>設備</span><span><i style="background:#facc15"></i>材料</span><span><i style="background:#f9a8d4"></i>方法</span><span><i style="background:#fff"></i>金型</span></div>
         <div id="topicsWeek" class="board-week"></div>
       </section>
-      <section class="board-section board-followup" aria-labelledby="boardCarryTitle">
+      <section id="boardCarryPanel" data-board-panel="carry" class="board-section board-followup" aria-labelledby="boardCarryTitle">
         <div class="board-section-heading"><h2 id="boardCarryTitle">前日からの継続・未完了 <span id="boardCarryCount" class="board-count">0</span></h2><span>確認・承認待ちを含む</span></div>
         <div id="boardCarry" class="board-card-grid"></div>
       </section>
@@ -1932,6 +1990,18 @@
       const root = document.getElementById('mainMenu');
       if(root.dataset.boardBound) return;
       root.dataset.boardBound='true';
+      const filterToggle = document.getElementById('boardFilterToggle');
+      filterToggle.addEventListener('click',()=>{
+        const expanded = filterToggle.getAttribute('aria-expanded') !== 'true';
+        filterToggle.setAttribute('aria-expanded',String(expanded));
+        document.getElementById('boardFilters').classList.toggle('is-open',expanded);
+      });
+      root.querySelectorAll('button[data-board-view]').forEach(button=>{
+        button.addEventListener('click',()=>{
+          root.dataset.boardView=button.dataset.boardView;
+          root.querySelectorAll('button[data-board-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+        });
+      });
       ['topicsDeptFilter','boardLineFilter','boardCategoryFilter','boardTypeFilter','boardOpenOnly','boardSearch'].forEach(id=>{
         document.getElementById(id).addEventListener(id==='boardSearch'?'input':'change',()=>{
           if(id==='topicsDeptFilter') buildTopicsDeptOptions();
@@ -1960,7 +2030,7 @@
         <span class="board-change-line">${escapeHtml(p.lineName||'ライン未設定')}</span>
         <span class="board-change-serial">整理No. ${escapeHtml(p.serialNo||'未設定')}</span>
         <span class="board-change-content">${escapeHtml(p.content||'内容未登録')}</span>
-        <span class="board-change-meta"><span>${escapeHtml(p.department||'部署未設定')}<br>${escapeHtml(p.occurrenceDate||'日程未確定')}</span><span class="board-status ${boardCompleted(p)?'done':''}">${boardStatus(p)}</span></span>
+        <span class="board-change-meta"><span class="board-change-context"><span>${escapeHtml(p.department||'部署未設定')}</span><span class="board-change-date">${escapeHtml(p.occurrenceDate||'日程未確定')}</span></span><span class="board-status ${boardCompleted(p)?'done':''}">${boardStatus(p)}</span></span>
       </button>`;
     }
     function updateTopics(){
@@ -1983,6 +2053,11 @@
       const undecided=items.filter(p=>!p.occurrenceDate&&!boardCompleted(p));
       const set=(id,text)=>document.getElementById(id).textContent=text;
       const format=d=>d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+      const filterCount=[dept,line,category,type,keyword,openOnly].filter(Boolean).length;
+      set('boardFilterCount',filterCount ? filterCount+'条件' : '');
+      set('boardMobileToday',todayItems.length);
+      set('boardMobileWeek',weekItems.length);
+      set('boardMobileCarry',carry.length);
       set('boardDate',now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'}));
       set('boardTodayDate',format(now));
       set('boardWeekRange',format(days[0])+' ～ '+format(days[6]));
@@ -1996,7 +2071,7 @@
       ).join(''):'<div class="board-empty">該当する今日の変化点はありません</div>';
       document.getElementById('topicsWeek').innerHTML=days.map(d=>{
         const date=ymdLocal(d), list=weekItems.filter(p=>p.occurrenceDate===date);
-        return '<div class="board-day '+(date===today?'is-today':'')+'"><h3>'+format(d)+'<span class="board-count">'+list.length+'</span></h3>'+
+        return '<div class="board-day '+(date===today?'is-today ':'')+(list.length?'':'is-empty')+'"><h3>'+format(d)+'<span class="board-count">'+list.length+'</span></h3>'+
           (list.map(renderBoardCard).join('')||'<div class="board-empty">予定なし</div>')+'</div>';
       }).join('');
       [['boardCarry',carry],['boardFuture',future],['topicsUndecided',undecided]].forEach(([id,list])=>{
