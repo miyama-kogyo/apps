@@ -671,7 +671,6 @@
     .board-header,.board-brand,.board-header-actions,.board-nav,.board-toolbar,.board-section-heading { display:flex; align-items:center; gap:16px; }
     .board-header { justify-content:space-between; flex-wrap:wrap; }
     .board-brand { min-width:0; }
-    .board-mark { display:grid; place-items:center; width:42px; height:42px; flex-shrink:0; background:#176349; color:white; font-weight:800; font-size:24px; border-radius:4px; }
     .board-header h1 { font-size:25px; line-height:1.4; }
     .board-date { font-size:13px; color:#66736d; margin-top:4px; }
     #mainMenu button { font-family:inherit; cursor:pointer; }
@@ -745,7 +744,6 @@
       .board-shell { padding:12px; }
       .board-header { gap:10px; }
       .board-brand { gap:10px; }
-      .board-mark { width:32px; height:32px; font-size:20px; }
       .board-header h1 { font-size:19px; }
       .board-date { font-size:11px; margin-top:1px; }
       .board-header-actions { width:100%; gap:8px; flex-wrap:wrap; }
@@ -864,6 +862,49 @@
       .workflow-fold summary { font-size:13px; }
       .workflow-fold summary span { display:block; margin:4px 0 0 16px; }
     }
+
+    /* The daily board uses the same ticket markup as the printed original. */
+    #topicsToday { display:block; }
+    #topicsToday .board-lane { margin-bottom:18px; }
+    #topicsToday .board-lane-body { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr)); align-items:start; gap:16px; }
+    .board-issued-card { position:relative; min-width:0; background:white; }
+    #mainMenu .board-issued-card>.board-change { display:block; position:absolute; inset:0; width:100%; height:100%; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+    #mainMenu .board-issued-card>.board-change:hover { background:#17634904; }
+    #mainMenu .board-issued-card>.board-change:focus-visible { outline:3px solid #277da8; outline-offset:3px; }
+    .issued-card-preview .ticket { border:1px solid #333; border-top:8px solid var(--card-color); padding:12px; color:#202820; display:flex; flex-direction:column; gap:8px; }
+    .issued-card-preview header { display:flex; justify-content:space-between; gap:10px; border-bottom:2px solid #333; padding-bottom:8px; }
+    .issued-card-preview header strong { font-size:17px; margin-right:8px; }
+    .issued-card-preview header span:not(.qr-pending) { border:1px solid #555; padding:2px 6px; font-size:11px; }
+    .issued-card-preview header small { display:block; margin-top:6px; font-size:10px; line-height:1.5; }
+    .issued-card-preview .qr { display:flex; align-items:center; gap:5px; flex-shrink:0; }
+    .issued-card-preview .qr img,.issued-card-preview .qr-pending { width:68px; height:68px; object-fit:contain; }
+    .issued-card-preview .qr-pending { display:grid; place-items:center; font-size:9px; color:#718077; border:1px solid #d3dbd5; }
+    .issued-card-preview .qr b { max-width:46px; font-size:8px; line-height:1.5; }
+    .issued-card-preview .meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid #888; border-left:1px solid #888; }
+    .issued-card-preview .meta div { min-width:0; padding:5px; border-right:1px solid #888; border-bottom:1px solid #888; font-size:12px; overflow-wrap:anywhere; }
+    .issued-card-preview .meta b { display:block; font-size:9px; color:#5b665f; margin-bottom:2px; }
+    .issued-card-preview .content { border:1px solid #888; padding:7px; font-size:12px; }
+    .issued-card-preview .content p { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.5; }
+    .issued-card-preview table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:11px; }
+    .issued-card-preview th,.issued-card-preview td { border:1px solid #888; padding:5px; text-align:left; overflow-wrap:anywhere; line-height:1.5; }
+    .issued-card-preview th { background:#f4f6f4; font-size:10px; }
+    .issued-card-preview th:last-child,.issued-card-preview td:last-child { width:64px; text-align:center; }
+    .issued-card-preview td[colspan] { width:auto; text-align:left; }
+    .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
+    .issued-card-preview .sign { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
+    .issued-card-preview .sign div { border:1px solid #888; padding:5px; min-height:50px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
+    .issued-card-preview .sign strong { color:#a33832; }
+    .issued-card-preview footer { font-size:8px; text-align:right; color:#67756b; overflow-wrap:anywhere; }
+    @media(max-width:700px){
+      #topicsToday .board-lane-body { grid-template-columns:minmax(0,1fr); }
+      .issued-card-preview .ticket { padding:8px; gap:6px; }
+      .issued-card-preview header strong { font-size:15px; }
+      .issued-card-preview .qr b { display:none; }
+      .issued-card-preview .qr img,.issued-card-preview .qr-pending { width:60px; height:60px; }
+      .issued-card-preview .meta div { font-size:11px; }
+      .issued-card-preview .sign { gap:3px; }
+      .issued-card-preview .sign div { padding:4px; }
+    }
   </style>
 </head>
 <body>
@@ -883,7 +924,7 @@
   <div id="mainMenu" data-board-view="today">
     <div class="board-shell">
       <header class="board-header">
-        <div class="board-brand"><span class="board-mark" aria-hidden="true">M</span><div><h1>変化点管理ボード</h1><div class="board-date" id="boardDate"></div></div></div>
+        <div class="board-brand"><div><h1>変化点管理ボード</h1><div class="board-date" id="boardDate"></div></div></div>
         <div class="board-header-actions"><button type="button" id="btnActorName">利用者名を設定</button><button type="button" class="menu-card board-primary" data-screen="planned">＋ 変化点カードを発行</button></div>
       </header>
       <nav class="board-nav" aria-label="画面選択">
@@ -2123,8 +2164,9 @@
       const groups=new Map();
       todayItems.forEach(p=>{ const key=JSON.stringify([p.department||'',p.lineName||'']); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(p); });
       document.getElementById('topicsToday').innerHTML=groups.size?[...groups.values()].sort((a,b)=>String(a[0].lineName||'').localeCompare(String(b[0].lineName||''),'ja')).map(list=>
-        '<div class="board-lane"><h3><small>'+escapeHtml(list[0].department||'部署未設定')+'</small>'+escapeHtml(list[0].lineName||'ライン未設定')+'<span class="board-count">'+list.length+'件</span></h3><div class="board-lane-body">'+list.map(renderBoardCard).join('')+'</div></div>'
+        '<div class="board-lane"><h3><small>'+escapeHtml(list[0].department||'部署未設定')+'</small>'+escapeHtml(list[0].lineName||'ライン未設定')+'<span class="board-count">'+list.length+'件</span></h3><div class="board-lane-body">'+list.map(renderTodayCard).join('')+'</div></div>'
       ).join(''):'<div class="board-empty">該当する今日の変化点はありません</div>';
+      fillTodayCardQrs();
       document.getElementById('topicsWeek').innerHTML=days.map(d=>{
         const date=ymdLocal(d), list=weekItems.filter(p=>p.occurrenceDate===date);
         return '<div class="board-day '+(date===today?'is-today ':'')+(list.length?'':'is-empty')+'"><h3>'+format(d)+'<span class="board-count">'+list.length+'</span></h3>'+
@@ -2978,21 +3020,54 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       });
     }
 
-    window.printChangeCard = async function(){
-      if (!currentDetailItem || (currentDetailItem.type !== 'planned' && currentDetailItem.workflowManaged !== true)) return;
-      const item = currentDetailItem;
-      const items = getRecordChecklist(item);
-      const workflowUrl = buildWorkflowUrl(item._id);
-      let qrDataUrl = '';
-      try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
-      catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
+    function renderChangeTicket(item, copyLabel, keeper, qrDataUrl = ''){
+      const managed = item.type === 'planned' || item.workflowManaged === true;
+      const items = managed ? getRecordChecklist(item) : (Array.isArray(item.checklistItems) ? item.checklistItems : []);
+      const cardStatus = managed ? approvalStatusLabel(approvalStatusOf(item)) : boardStatus(item);
       const resultLabel = (x, role) => ({ok:'合格',ng:'NG',na:'該当なし','':'未判定'})[checklistResult(x, role)] || '未判定';
       const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
       const excludedCheckRows = (Array.isArray(item.excludedChecklistItems) ? item.excludedChecklistItems : []).map(x => `<tr><td colspan="3" style="background:#fffbeb;color:#92400e;">対象外：${escapeHtml(x.label || '-')}</td></tr>`).join('');
       const checks = activeCheckRows + excludedCheckRows;
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
-      const ticket = (copyLabel, keeper) => `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(approvalStatusLabel(approvalStatusOf(item)))} / カード色：${cardColorName}</small></div><div class="qr"><img src="${qrDataUrl}" alt="ワークフローQR"><b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div><div class="qr" data-card-qr="${escapeAttr(item._id || '')}"><img ${qrDataUrl ? `src="${qrDataUrl}"` : 'hidden'} alt="ワークフローQR">${qrDataUrl ? '' : '<span class="qr-pending">QR準備中</span>'}<b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>完了後確認者：</b>${escapeHtml(item.completionConfirmers || '未確認')} / <b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+
+    }
+
+    const todayCardQrCache = new Map();
+    function fillTodayCardQrs(){
+      document.querySelectorAll('#topicsToday [data-card-qr]').forEach(holder=>{
+        const id = holder.dataset.cardQr;
+        if (!id) return;
+        const url = buildWorkflowUrl(id);
+        if (!todayCardQrCache.has(url)){
+          todayCardQrCache.set(url, createQrDataUrl(url).catch(error=>{
+            todayCardQrCache.delete(url);
+            throw error;
+          }));
+        }
+        todayCardQrCache.get(url).then(src=>{
+          if (!holder.isConnected) return;
+          const img = holder.querySelector('img');
+          img.src = src; img.hidden = false;
+          holder.querySelector('.qr-pending')?.remove();
+        }).catch(()=>{
+          if (holder.isConnected && holder.querySelector('.qr-pending')) holder.querySelector('.qr-pending').textContent = 'QR読込失敗';
+        });
+      });
+    }
+    function renderTodayCard(item){
+      return '<article class="board-issued-card"><div class="issued-card-preview">'+renderChangeTicket(item,'原本','発信部署')+
+        '</div><button type="button" class="board-change" data-change-id="'+escapeAttr(item._id)+'" aria-label="'+escapeAttr((item.lineName||'ライン未設定')+' 整理No. '+(item.serialNo||'-')+' の変化点カードを開く')+'"></button></article>';
+    }
+    window.printChangeCard = async function(){
+      if (!currentDetailItem || (currentDetailItem.type !== 'planned' && currentDetailItem.workflowManaged !== true)) return;
+      const item = currentDetailItem;
+      const workflowUrl = buildWorkflowUrl(item._id);
+      let qrDataUrl = '';
+      try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
+      catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
+      const ticket = (copyLabel, keeper) => renderChangeTicket(item, copyLabel, keeper, qrDataUrl);
       const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:"Yu Gothic",sans-serif;color:#111}.ticket{height:137mm;border:1.5px solid #111;border-top:5mm solid var(--card-color);padding:3mm 6mm;display:flex;flex-direction:column;gap:2mm;page-break-inside:avoid}.cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}.ticket header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:1mm}.ticket header strong{font-size:17px;margin-right:10px}.ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}.ticket header small{display:block;margin-top:1mm}.qr{display:flex;align-items:center;gap:2mm;font-size:8px;max-width:42mm}.qr img{width:22mm;height:22mm;image-rendering:pixelated}.qr b{line-height:1.35}.meta{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #555}.meta div{padding:1mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-size:9px}.meta b{display:block;font-size:7px;color:#555}.content{border:1px solid #555;padding:1mm;font-size:9px}.content p{margin:.5mm 0 0;white-space:pre-wrap;min-height:5mm}table{width:100%;border-collapse:collapse;font-size:7px}th,td{border:1px solid #777;padding:.7mm;text-align:left}th:nth-child(3),th:nth-child(4),td:nth-child(3),td:nth-child(4){width:13mm;text-align:center}.review{font-size:7px;border:1px solid #777;padding:1mm}.sign{display:grid;grid-template-columns:repeat(4,1fr);gap:2mm;margin-top:auto}.sign div{border:1px solid #555;min-height:10mm;padding:1mm;font-size:7px}footer{text-align:right;font-size:7px}</style></head><body>${ticket('原本','発信部署')}<div class="cut">切り取り線</div>${ticket('コピー','発生部署')}<script>window.onload=()=>window.print();<\/script></body></html>`;
       const w = window.open('', '_blank');
       if (!w){ alert('印刷画面を開けません。ポップアップを許可してください'); return; }
