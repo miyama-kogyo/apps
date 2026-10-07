@@ -663,6 +663,99 @@
       .approval-columns{grid-template-columns:1fr;}
       .master-check-filter{grid-template-columns:1fr;}
     }
+
+    /* Factory board: neutral surfaces and category-colored paper cards. */
+    body { background:#f1f4f3; color:#24332f; }
+    #mainMenu { padding:0; }
+    .board-shell { max-width:1680px; margin:auto; padding:24px 32px; }
+    .board-header,.board-brand,.board-header-actions,.board-nav,.board-toolbar,.board-section-heading { display:flex; align-items:center; gap:16px; }
+    .board-header { justify-content:space-between; flex-wrap:wrap; }
+    .board-brand { min-width:0; }
+    .board-mark { display:grid; place-items:center; width:42px; height:42px; flex-shrink:0; background:#176349; color:white; font-weight:800; font-size:24px; border-radius:4px; }
+    .board-header h1 { font-size:25px; line-height:1.4; }
+    .board-date { font-size:13px; color:#66736d; margin-top:4px; }
+    #mainMenu button { font-family:inherit; cursor:pointer; }
+    #mainMenu .menu-card,#btnActorName,.board-reset { display:inline-flex; align-items:center; justify-content:center; width:auto; margin:0; padding:10px 14px; border:1px solid #c7d2cc; border-radius:4px; background:white; color:#30453b; box-shadow:none; transform:none; font-size:14px; font-weight:600; min-height:42px; }
+    #mainMenu .menu-card { transition:background-color .15s; }
+    #mainMenu .board-primary { background:#176349; border-color:#176349; color:white; min-width:185px; white-space:nowrap; }
+    .board-nav { border-bottom:1px solid #cbd5cf; margin:22px 0 18px; flex-wrap:wrap; gap:6px; }
+    #mainMenu .board-nav .menu-card { border:0; background:transparent; border-radius:0; color:#64716a; padding:12px 16px; }
+    .board-nav-current { border-bottom:3px solid #176349; padding:12px 16px; color:#176349; font-weight:700; font-size:14px; }
+    .board-toolbar { flex-wrap:wrap; align-items:flex-end; gap:12px; }
+    .board-filter { flex:1 1 140px; min-width:0; }
+    .board-filter label { display:block; font-size:12px; font-weight:600; color:#58665e; margin-bottom:6px; }
+    .board-filter select,.board-filter input { width:100%; height:40px; padding:8px 10px; border:1px solid #bdcac2; border-radius:4px; background:white; color:#24332f; font:inherit; font-size:14px; }
+    .board-search { flex-grow:1.5; }
+    .board-open-filter { display:flex; align-items:center; gap:7px; min-height:40px; font-size:13px; }
+    .board-open-filter input { accent-color:#176349; width:17px; height:17px; }
+    .board-summary { display:flex; gap:24px; flex-wrap:wrap; margin:22px 0 8px; padding:14px 0; border-block:1px solid #d2dbd5; color:#5c6b62; font-size:13px; }
+    .board-summary strong { font-size:22px; color:#253a2e; margin-left:8px; }
+    .board-section { padding:24px 0; border-bottom:1px solid #ced8d1; }
+    .board-section-heading { justify-content:space-between; flex-wrap:wrap; margin-bottom:16px; gap:8px; }
+    .board-section h2 { font-size:19px; }
+    .board-section-heading>span { font-size:13px; color:#627369; }
+    .board-count { display:inline-block; font-size:12px; border-radius:3px; background:#e1e8e3; padding:2px 7px; vertical-align:middle; margin-left:7px; }
+    .board-today { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; align-items:start; }
+    .board-lane { min-width:0; border-top:3px solid #70897b; }
+    .board-lane h3 { font-size:16px; padding:12px 4px; overflow-wrap:anywhere; }
+    .board-lane h3 small { display:block; font-size:12px; font-weight:400; color:#617066; margin-bottom:4px; }
+    .board-lane-body { display:grid; gap:10px; }
+    #mainMenu .board-change { width:100%; display:flex; flex-direction:column; gap:10px; padding:14px; text-align:left; border:1px solid #ccd5cf; border-left:5px solid var(--category-color,#d6ded8); border-radius:4px; background:white; color:#24332f; min-width:0; transition:border-color .15s,box-shadow .15s; }
+    #mainMenu .board-change:hover { border-color:#6b9b82; box-shadow:0 2px 6px #253e2d14; }
+    #mainMenu button:focus-visible,#mainMenu input:focus-visible,#mainMenu select:focus-visible { outline:3px solid #277da8; outline-offset:3px; }
+    .board-change-top,.board-change-meta { display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:#64736a; }
+    .board-category { background:var(--category-color,#eee); border:1px solid #0002; padding:2px 6px; color:#283529; border-radius:2px; }
+    .board-change-line { font-size:15px; font-weight:700; overflow-wrap:anywhere; }
+    .board-change-serial { font-size:13px; color:#435a4a; overflow-wrap:anywhere; }
+    .board-change-content { font-size:14px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+    .board-status { font-size:11px; color:#795522; background:#fff4dd; padding:3px 6px; border-radius:2px; }
+    .board-status.done { background:#e7f3eb; color:#296842; }
+    .board-week { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; align-items:start; }
+    .board-day { min-width:0; background:#e7ede9; padding:8px; border-radius:4px; }
+    .board-day.is-today { background:#d9eade; box-shadow:inset 0 3px #176349; }
+    .board-day h3 { font-size:14px; padding:6px 2px 12px; }
+    .board-day .board-change { margin-bottom:8px; padding:10px!important; }
+    .board-day .board-change-line { font-size:13px; }
+    .board-day .board-change-content { font-size:12px; }
+    .board-day .board-empty { padding:16px 2px; font-size:12px; border:0; background:transparent; }
+    .board-legend { display:flex; gap:16px; flex-wrap:wrap; margin:-4px 0 14px; font-size:12px; color:#5a6b60; }
+    .board-legend span { display:flex; gap:5px; align-items:center; }
+    .board-legend i { width:10px; height:10px; border:1px solid #b6c1b9; border-radius:2px; }
+    .board-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+    .board-empty { grid-column:1/-1; text-align:center; padding:24px; border:1px dashed #c7d2ca; color:#6d7b71; font-size:14px; }
+    .board-more { grid-column:1/-1; padding:10px; background:transparent; border:1px solid #bdcbc1; border-radius:4px; color:#36543f; }
+    .board-details { padding:18px 0; border-bottom:1px solid #cdd7d0; }
+    .board-details summary { cursor:pointer; font-size:15px; font-weight:600; }
+    .board-details[open] summary { margin-bottom:16px; }
+    .board-footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:22px 0 4px; font-size:12px; color:#7a867e; }
+    .app-header { background:#176349; }
+    .btn-primary { background:#176349; }
+    .modal-content { border-radius:8px; }
+    #detailModal .modal-header { position:sticky; top:0; z-index:3; background:white; border-bottom:1px solid #d9e1da; }
+    .detail-card-toolbar { display:flex; gap:8px; flex-wrap:wrap; padding:12px 24px; background:#eef4f0; }
+    .detail-card-toolbar button { border:1px solid #aabeb0; border-radius:4px; background:white; padding:9px 14px; color:#26513b; font:inherit; font-size:14px; cursor:pointer; }
+    .detail-card-toolbar[hidden] { display:none; }
+    #approvalWorkflow { scroll-margin-top:100px; }
+    .registration-result { margin:14px 0; padding:16px 0; border-block:1px solid #b5ccbd; display:flex; align-items:center; gap:12px; flex-wrap:wrap; color:#176349; }
+    .registration-result[hidden] { display:none; }
+    @media(max-width:1100px){ .board-week { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+    @media(max-width:700px){
+      .board-shell { padding:18px 14px; }
+      .board-header h1 { font-size:21px; }
+      .board-header-actions { width:100%; gap:8px; flex-wrap:wrap; }
+      #mainMenu .board-primary { flex:1; }
+      .board-nav { gap:0; }
+      #mainMenu .board-nav .menu-card,.board-nav-current { font-size:12px; padding:12px 8px; }
+      .board-toolbar { gap:10px; }
+      .board-filter { flex-basis:calc(50% - 10px); }
+      .board-summary { gap:14px; }
+      .board-summary strong { font-size:20px; }
+      .board-week { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .board-today,.board-card-grid { grid-template-columns:minmax(0,1fr); }
+      .board-section-heading>span { width:100%; }
+      .detail-card-toolbar { padding:12px; }
+    }
+
   </style>
 </head>
 <body>
@@ -678,73 +771,45 @@
 
   <button id="signOutBtn">ログアウト</button>
 
-  <!-- メインメニュー -->
+  <!-- 現場管理ボード -->
   <div id="mainMenu">
-    <div class="menu-container">
-      <div class="menu-header">
-        <h1>🔄 変化点管理システム</h1>
-        <button type="button" id="btnActorName">利用者名を設定</button>
+    <div class="board-shell">
+      <header class="board-header">
+        <div class="board-brand"><span class="board-mark" aria-hidden="true">M</span><div><h1>変化点管理ボード</h1><div class="board-date" id="boardDate"></div></div></div>
+        <div class="board-header-actions"><button type="button" id="btnActorName">利用者名を設定</button><button type="button" class="menu-card board-primary" data-screen="planned">＋ 変化点カードを発行</button></div>
+      </header>
+      <nav class="board-nav" aria-label="画面選択">
+        <span class="board-nav-current" aria-current="page">管理ボード</span>
+        <button type="button" class="menu-card" data-screen="timeline">履歴を検索</button>
+        <button type="button" class="menu-card" data-screen="calendar">計画カレンダー</button>
+        <button type="button" class="menu-card" data-screen="master">マスター管理</button>
+      </nav>
+      <div class="board-toolbar">
+        <div class="board-filter"><label for="topicsDeptFilter">発生部署</label><select id="topicsDeptFilter"><option value="">すべての部署</option></select></div>
+        <div class="board-filter"><label for="boardLineFilter">発生ライン</label><select id="boardLineFilter"><option value="">すべてのライン</option></select></div>
+        <div class="board-filter"><label for="boardCategoryFilter">分類</label><select id="boardCategoryFilter"><option value="">すべての分類</option><option>人</option><option>設備</option><option>材料</option><option>方法</option><option>金型</option></select></div>
+        <div class="board-filter"><label for="boardTypeFilter">区分</label><select id="boardTypeFilter"><option value="">計画・突発</option><option value="planned">計画</option><option value="sudden">突発</option></select></div>
+        <div class="board-filter board-search"><label for="boardSearch">整理No.・内容</label><input type="search" id="boardSearch" placeholder="検索" autocomplete="off"></div>
+        <label class="board-open-filter"><input type="checkbox" id="boardOpenOnly">未完了のみ</label>
+        <button type="button" id="boardReset" class="board-reset">条件を解除</button>
       </div>
-
-      <!-- トピックス（plannedのみ） -->
-      <div class="topics-card">
-        <h2>📢 トピックス（計画変化点）</h2>
-        <div class="topics-filters">
-          <label for="topicsDeptFilter">発生部署</label>
-          <select id="topicsDeptFilter">
-            <option value="">全て</option>
-          </select>
-        </div>
-        <div id="topicsOverdueBanner" class="overdue-banner" style="display:none;"></div>
-        <div class="topics-row">
-          <div class="topics-section today">
-            <h3>📅 今日の変化点</h3>
-            <div id="topicsToday"></div>
-          </div>
-
-          <div class="topics-section">
-            <h3>🗓 今週の変化点</h3>
-            <div id="topicsWeek"></div>
-          </div>
-
-          <div class="topics-section month">
-            <h3>📆 今月の変化点 <span style="font-size:.75rem;color:#888;font-weight:400;">（完了・中止を除く）</span></h3>
-            <div id="topicsMonth"></div>
-          </div>
-
-          <div class="topics-section undecided">
-            <h3>⚠️ 切り替え日未確定の変化点</h3>
-            <div id="topicsUndecided" class="topics-row two-columns"></div>
-            <div class="hint" style="margin-top:8px;color:#666;">
-              ※「切り替え日未確定」= 製造が「切り替え日」をまだ確定していない計画変化点
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- メニューカード -->
-      <div class="menu-cards">
-        <div class="menu-card" data-screen="timeline">
-          <div class="icon">📊</div>
-          <h3>タイムライン</h3>
-          <p>異常＋変化点を時系列で確認</p>
-        </div>
-        <div class="menu-card" data-screen="planned">
-          <div class="icon">📝</div>
-          <h3>計画変化点入力</h3>
-          <p>変化点情報を登録</p>
-        </div>
-        <div class="menu-card" data-screen="calendar">
-          <div class="icon">📆</div>
-          <h3>計画変化点カレンダー</h3>
-          <p>変化点予定を確認</p>
-        </div>
-        <div class="menu-card" data-screen="master">
-          <div class="icon">⚙️</div>
-          <h3>管理</h3>
-          <p>部署・ラインなどのマスタデータ管理</p>
-        </div>
-      </div>
+      <div class="board-summary" id="boardSummary" aria-live="polite"></div>
+      <section class="board-section" aria-labelledby="boardTodayTitle">
+        <div class="board-section-heading"><h2 id="boardTodayTitle">今日の変化点 <span id="boardTodayCount" class="board-count">0</span></h2><span id="boardTodayDate"></span></div>
+        <div id="topicsToday" class="board-today"><div class="board-empty">変化点を読み込んでいます...</div></div>
+      </section>
+      <section class="board-section board-week-section" aria-labelledby="boardWeekTitle">
+        <div class="board-section-heading"><h2 id="boardWeekTitle">今週の変化点 <span id="boardWeekCount" class="board-count">0</span></h2><span id="boardWeekRange"></span></div>
+        <div class="board-legend" aria-label="カードの分類色"><span><i style="background:#fb923c"></i>人</span><span><i style="background:#4ade80"></i>設備</span><span><i style="background:#facc15"></i>材料</span><span><i style="background:#f9a8d4"></i>方法</span><span><i style="background:#fff"></i>金型</span></div>
+        <div id="topicsWeek" class="board-week"></div>
+      </section>
+      <section class="board-section board-followup" aria-labelledby="boardCarryTitle">
+        <div class="board-section-heading"><h2 id="boardCarryTitle">前日からの継続・未完了 <span id="boardCarryCount" class="board-count">0</span></h2><span>確認・承認待ちを含む</span></div>
+        <div id="boardCarry" class="board-card-grid"></div>
+      </section>
+      <details class="board-details"><summary>来週以降の予定 <span id="boardFutureCount" class="board-count">0</span></summary><div id="boardFuture" class="board-card-grid"></div></details>
+      <details class="board-details"><summary>日程未確定 <span id="boardUndecidedCount" class="board-count">0</span></summary><div id="topicsUndecided" class="board-card-grid"></div></details>
+      <footer class="board-footer"><span>ミヤマ工業株式会社</span><span id="boardUpdated"></span></footer>
     </div>
   </div>
 
@@ -984,6 +1049,10 @@
           <div class="hint" style="margin-top:8px;">
               ※「CSV出力」「ワークフローQR」は、最後に登録した変化点の内容を出力します
           </div>
+          <div id="registrationResult" class="registration-result" hidden role="status">
+            <strong>変化点カードを登録しました</strong>
+            <button type="button" id="btnOpenLastCard" class="btn btn-primary">登録したカードを開く</button>
+          </div>
         </form>
 
         <div style="margin-top:30px;">
@@ -1105,6 +1174,10 @@
         <button class="modal-close" id="detailClose">&times;</button>
       </div>
       <div class="modal-badges" id="detailBadges"></div>
+      <div id="detailCardToolbar" class="detail-card-toolbar" hidden>
+        <button type="button" id="btnCardWorkflow">確認・承認へ</button>
+        <button type="button" id="btnCardPrint">カード印刷・QR</button>
+      </div>
       <div class="modal-body" id="detailBody"></div>
       <div id="detailActions" class="modal-actions" style="display:none;padding:16px 24px;border-top:1px solid #e0e0e0;gap:12px;flex-direction:column;">
         <div id="approvalWorkflow" class="approval-panel" style="display:none;"></div>
@@ -1345,6 +1418,7 @@
       return String(s || '').replace(/[\\\/:*?"<>|]/g,'_');
     }
     function setExportButtonEnabled(enabled){
+      document.getElementById('registrationResult').hidden = !enabled;
       const btnCSV = document.getElementById('btnExportLastPlannedCSV');
       const btnQR = document.getElementById('btnExportLastPlannedQR');
       if (btnCSV) { btnCSV.disabled = !enabled; btnCSV.classList.toggle('btn-disabled', !enabled); }
@@ -1622,11 +1696,14 @@
       updateActorNameButton();
     });
 
+    let boardScrollTop = 0;
     function showScreen(screen){
+      if (mainMenu.style.display !== 'none' && screen !== 'menu') boardScrollTop = window.scrollY;
       mainMenu.style.display = (screen === 'menu') ? 'block' : 'none';
       Object.entries(screens).forEach(([key, el]) => {
         el.style.display = (key === screen) ? 'block' : 'none';
       });
+      requestAnimationFrame(() => window.scrollTo(0, screen === 'menu' ? boardScrollTop : 0));
     }
 
     document.querySelectorAll('.menu-card').forEach(card => {
@@ -1645,7 +1722,17 @@
     });
 
     document.querySelectorAll('[data-back]').forEach(btn => {
+      btn.textContent = '← 管理ボード';
       btn.addEventListener('click', () => showScreen('menu'));
+    });
+    document.getElementById('btnCardWorkflow').addEventListener('click', () => {
+      document.getElementById('approvalWorkflow').scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+    document.getElementById('btnCardPrint').addEventListener('click', () => window.printChangeCard());
+    document.getElementById('btnOpenLastCard').addEventListener('click', () => {
+      if (!lastRegisteredPlanned) return;
+      const item = changepointData.find(p => p._id === lastRegisteredPlanned.docId) || { ...lastRegisteredPlanned, _id:lastRegisteredPlanned.docId };
+      showDetail(item);
     });
     async function initApp(){
       const now = new Date();
@@ -1813,244 +1900,110 @@
       document.getElementById('serialList2').innerHTML = optionsHtml;
     }
 
+
+    const boardLimits = { boardCarry:12, boardFuture:12, topicsUndecided:12 };
+    const boardColors = { '人':'#fb923c', '設備':'#4ade80', '材料':'#facc15', '方法':'#f9a8d4', '金型':'#ffffff' };
+    function boardCompleted(p){
+      return p.approvalStatus === 'approved' || p.switchStatus === 'completed' || p.switchState === 'completed' ||
+        !!p.activatedAt || !!p.effectiveAt || p.isActivated === true || p.effectiveStatus === 'active' || p.activationStatus === 'activated';
+    }
+    function boardCanceled(p){ return p.switchStatus === 'canceled' || p.switchState === 'canceled'; }
+    function boardTracked(p){ return p.type === 'planned' || p.workflowManaged === true || !!p.switchStatus || !!p.switchState || !!p.approvalStatus; }
+    function boardStatus(p){
+      if (boardCompleted(p)) return '完了';
+      if (p.switchStatus === 'postponed') return '延期';
+      if (p.workflowManaged || p.type === 'planned'){
+        return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 確認待ち', receiver_confirmed:'発生部署 承認待ち' })[approvalStatusOf(p)] || '未完了';
+      }
+      return boardTracked(p) ? '未完了' : '完了管理なし';
+    }
     function buildTopicsDeptOptions(){
-      const sel = document.getElementById('topicsDeptFilter');
-      if (!sel) return;
-      const current = sel.value || '';
-      const deptSel = sel.value || '';
-      let planned = changepointData.filter(p => (p.type === 'planned'));
-      if (deptSel){ planned = planned.filter(p => String(p.department||'') === String(deptSel)); }
-      const depts = Array.from(new Set(planned.map(p => (p.department || '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'ja'));
-      sel.innerHTML = '<option value="">全て</option>' + depts.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
-      if (depts.includes(current)) sel.value = current;
+      const update = (id, values, label) => {
+        const sel = document.getElementById(id), current = sel.value;
+        const choices = [...new Set(values.filter(Boolean).map(String))].sort((a,b)=>a.localeCompare(b,'ja'));
+        sel.innerHTML = '<option value="">'+label+'</option>' + choices.map(v=>'<option value="'+escapeAttr(v)+'">'+escapeHtml(v)+'</option>').join('');
+        if (choices.includes(current)) sel.value=current;
+      };
+      update('topicsDeptFilter', changepointData.map(p=>p.department), 'すべての部署');
+      const dept = document.getElementById('topicsDeptFilter').value;
+      update('boardLineFilter', changepointData.filter(p=>!dept || p.department===dept).map(p=>p.lineName), 'すべてのライン');
     }
     function setupTopicsDeptFilter(){
-      const sel = document.getElementById('topicsDeptFilter');
-      if (!sel) return;
-      if (sel._bound) return;
-      sel.addEventListener('change', () => updateTopics());
-      sel._bound = true;
-    }
-
-    function updateTopics(){
-      const todayDate = new Date();
-      const today = ymdLocal(todayDate);
-
-      const day = todayDate.getDay();
-      const diffToMon = (day === 0) ? -6 : (1 - day);
-      const mon = new Date(todayDate); mon.setDate(todayDate.getDate() + diffToMon);
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      const weekStart = ymdLocal(mon);
-      const weekEnd = ymdLocal(sun);
-
-      const deptSel = (document.getElementById('topicsDeptFilter') ? document.getElementById('topicsDeptFilter').value : '') || '';
-
-      let planned = changepointData.filter(p => (p.type === 'planned'));
-      if (deptSel){ planned = planned.filter(p => String(p.department||'') === String(deptSel)); }
-
-      const isLegacyCompleted = (p) => {
-        return !!p.activatedAt || !!p.effectiveAt || (p.isActivated === true) || (p.effectiveStatus === 'active') || (p.activationStatus === 'activated');
-      };
-      const getSwitchStatus = (p) => (p.switchStatus || p.switchState || ((p.occurrenceDate ? 'scheduled' : 'undecided'))) || ((p.occurrenceDate ? 'scheduled' : 'undecided'));
-      const getSwitchDate = (p) => (p.occurrenceDate || '');
-
-      const todayItems = planned
-        .filter(p => p.occurrenceDate === today)
-        .sort((a,b) => String(a.occurrenceTime||'').localeCompare(String(b.occurrenceTime||'')));
-
-      const weekItems = planned
-        .filter(p => { const d = String(p.occurrenceDate || ''); return d && d >= weekStart && d <= weekEnd; })
-        .sort((a,b) => String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||'')) || String(a.occurrenceTime||'').localeCompare(String(b.occurrenceTime||'')));
-
-      const undecidedItems = planned
-        .filter(p => !isLegacyCompleted(p))
-        .filter(p => {
-          const st = getSwitchStatus(p);
-          const sd = getSwitchDate(p);
-          if (sd) return false;
-          if (st === 'completed' || st === 'canceled') return false;
-          return true;
-        })
-        .sort((a,b) => String(a.department||'').localeCompare(String(b.department||''),'ja') || String(a.category||'').localeCompare(String(b.category||''),'ja'));
-
-      // ▼ 今月の変化点：完了・中止を除外
-      const currentYear = todayDate.getFullYear();
-      const currentMonth = todayDate.getMonth() + 1;
-      const mStart = `${currentYear}-${String(currentMonth).padStart(2,'0')}-01`;
-      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
-      const mEnd = `${currentYear}-${String(currentMonth).padStart(2,'0')}-${String(lastDayOfMonth).padStart(2,'0')}`;
-
-      const monthItems = planned
-        .filter(p => {
-          const d = String(p.occurrenceDate || '');
-          return d && d >= mStart && d <= mEnd;
-        })
-        // ★ 完了・中止を除外
-        .filter(p => {
-          const st = p.switchStatus || '';
-          return st !== 'completed' && st !== 'canceled';
-        })
-        .sort((a,b) => String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||'')));
-
-      const isOverdue = (p) => {
-        const st = getSwitchStatus(p);
-        if (st === 'completed' || st === 'canceled') return false;
-        if (isLegacyCompleted(p)) return false;
-        const d = String(getSwitchDate(p) || '');
-        return !!d && d < today;
-      };
-      const overdueItems = planned
-        .filter(p => isOverdue(p))
-        .sort((a,b) => String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||'')) || String(a.lineName||'').localeCompare(String(b.lineName||''),'ja'));
-
-      const renderItems = (items, withDate=false) => items.map(item => {
-        const switchStatus = item.switchStatus || '';
-        const proposalDate = getProposalDate(item);
-        let statusBadge = '';
-        let statusActions = '';
-        if (switchStatus === 'completed') {
-          statusBadge = '<span class="status-badge completed">✅ 完了</span>';
-        } else if (switchStatus === 'canceled') {
-          statusBadge = '<span class="status-badge canceled">⛔ 中止</span>';
-        } else if (switchStatus === 'postponed') {
-          statusBadge = '<span class="status-badge postponed">⏩ 延期</span>';
-        } else if (item.occurrenceDate) {
-          statusBadge = '<span class="status-badge planned">📋 切替え日確定済</span>';
-        } else {
-          statusBadge = '<span class="status-badge planned">📝 計画中</span>';
-        }
-        if (switchStatus !== 'completed' && switchStatus !== 'canceled') {
-          statusActions = `
-            <div class="status-actions" onclick="event.stopPropagation();">
-              ${!item.occurrenceDate ? `<button class="status-btn btn-decide-date" onclick="decideSwitchDateQuick('${escapeAttr(item._id)}')">📅 切替え日決定</button>` : ''}
-              ${item.occurrenceDate ? `<button class="status-btn btn-complete" onclick="showDetailById('${escapeAttr(item._id)}')">✅ 確認・完了</button>` : ''}
-              ${item.occurrenceDate ? `<button class="status-btn btn-postpone" onclick="postponeSwitchQuick('${escapeAttr(item._id)}')">⏩ 延期</button>` : ''}
-              <button class="status-btn btn-cancel" onclick="cancelSwitchQuick('${escapeAttr(item._id)}')">⛔ 中止</button>
-            </div>
-          `;
-        }
-        return `
-        <div class="topics-item" data-id="${escapeAttr(item._id)}">
-          <div class="time">📅 ${withDate ? escapeHtml(item.occurrenceDate || '日付未定') + (item.occurrenceTime ? ' ⏰ ' + escapeHtml(item.occurrenceTime) : '') : '⏰ ' + escapeHtml(item.occurrenceTime || '時刻未定')}${(typeof isOverdue === "function" && isOverdue(item)) ? `<span class="pill overdue" style="background:#fff;color:#c92a2a;margin-left:8px;">期限超過</span>` : ``}${statusBadge}</div>
-          ${proposalDate ? `<div class="proposal-date">起案日: ${escapeHtml(proposalDate)}</div>` : ''}
-          <div class="lines">
-            <strong style="font-size:1.15rem;">🏭 ${escapeHtml(item.department || '-')}</strong>
-            ${' <strong style="font-size:1.15rem;">｜ 🔧 ' + escapeHtml(item.lineName || '-') + '</strong>'}
-            ${item.serialNo ? ' <strong style="font-size:1.15rem;">｜ 📋 No.' + escapeHtml(item.serialNo) + '</strong>' : ''}
-          </div>
-          <div style="margin-top:8px;">
-            <span class="category">${escapeHtml(item.category || '-')}</span>
-            <span class="content">${escapeHtml((item.content || '').slice(0, 40))}${(item.content || '').length > 40 ? '...' : ''}</span>
-          </div>
-          ${statusActions}
-        </div>
-        `;
-      }).join('');
-
-      document.getElementById('topicsToday').innerHTML =
-        todayItems.length ? renderItems(todayItems, false) : '<div class="topics-empty">今日の変化点はありません</div>';
-
-      document.getElementById('topicsWeek').innerHTML =
-        weekItems.length ? renderItems(weekItems, true) : '<div class="topics-empty">今週の変化点はありません</div>';
-
-      // ▼ 今月の変化点：固定高さスクロールテーブル
-      const renderMonthTable = (items) => {
-        if (!items.length) return '<div class="topics-empty">今月の変化点はありません<br><span style="font-size:.8rem;color:#aaa;">（完了・中止を除く）</span></div>';
-        return `
-          <div class="month-table-wrap">
-            <table class="month-table">
-              <thead>
-                <tr>
-                  <th style="width:82px;">日付</th>
-                  <th style="width:90px;">部署</th>
-                  <th style="width:90px;">ライン</th>
-                  <th style="width:72px;">整理No.</th>
-                  <th>変化点内容</th>
-                  <th style="width:72px;">状態</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(item => {
-                  const st = item.switchStatus || '';
-                  let stLabel = '';
-                  if (st === 'postponed') stLabel = '<span style="color:#e65100;font-weight:700;font-size:.75rem;">⏩延期</span>';
-                  else if (item.occurrenceDate) stLabel = '<span style="color:#1565c0;font-weight:700;font-size:.75rem;">📋確定済</span>';
-                  else stLabel = '<span style="color:#888;font-size:.75rem;">未確定</span>';
-                  return `
-                  <tr data-id="${escapeAttr(item._id)}" onclick="(function(id){const item=changepointData.find(p=>p._id===id);if(item)showDetail(item);})(this.dataset.id)" style="cursor:pointer;">
-                    <td class="date-col">${escapeHtml(item.occurrenceDate || '-')}</td>
-                    <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(item.department||'')}">${escapeHtml(item.department || '-')}</td>
-                    <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(item.lineName||'')}">${escapeHtml(item.lineName || '-')}</td>
-                    <td>${escapeHtml(item.serialNo || '-')}</td>
-                    <td class="content-col" title="${escapeAttr(item.content || '')}">${escapeHtml((item.content || '-').slice(0,30))}${(item.content||'').length>30?'…':''}</td>
-                    <td>${stLabel}</td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-          <div style="margin-top:6px;font-size:.75rem;color:#999;text-align:right;">${items.length}件（完了・中止除く）</div>
-        `;
-      };
-
-      document.getElementById('topicsMonth').innerHTML = renderMonthTable(monthItems);
-
-      document.getElementById('topicsUndecided').innerHTML =
-        undecidedItems.length ? renderItems(undecidedItems, true) : '<div class="topics-empty">切り替え日未確定の変化点はありません</div>';
-
-      // ▼ 警告バナー
-      const banner = document.getElementById('topicsOverdueBanner');
-      if (banner){
-        if (overdueItems.length){
-          const listHtml = overdueItems.slice(0, 8).map(item => {
-            const switchStatus = item.switchStatus || '';
-            const proposalDate = getProposalDate(item);
-            let statusBadge = '';
-            let statusActions = '';
-            if (switchStatus === 'completed') { statusBadge = '<span class="status-badge completed">✅ 完了</span>'; }
-            else if (switchStatus === 'canceled') { statusBadge = '<span class="status-badge canceled">⛔ 中止</span>'; }
-            else if (switchStatus === 'postponed') { statusBadge = '<span class="status-badge postponed">⏩ 延期</span>'; }
-            else { statusBadge = '<span class="status-badge planned">📋 切替え日確定済</span>'; }
-            if (switchStatus !== 'completed' && switchStatus !== 'canceled') {
-              statusActions = `
-                <div class="status-actions" onclick="event.stopPropagation();">
-                  <button class="status-btn btn-complete" onclick="completeSwitchQuick('${escapeAttr(item._id)}')">✅ 確認・完了</button>
-                  <button class="status-btn btn-postpone" onclick="postponeSwitchQuick('${escapeAttr(item._id)}')">⏩ 延期</button>
-                  <button class="status-btn btn-cancel" onclick="cancelSwitchQuick('${escapeAttr(item._id)}')">⛔ 中止</button>
-                </div>
-              `;
-            }
-            return `
-            <div class="topics-item" data-id="${escapeAttr(item._id)}">
-              <div class="time">📅 ${escapeHtml(item.occurrenceDate || '-')}<span class="pill overdue" style="background:#fff;color:#c92a2a;margin-left:8px;">期限超過</span>${statusBadge}</div>
-              ${proposalDate ? `<div class="proposal-date">起案日: ${escapeHtml(proposalDate)}</div>` : ''}
-              <div class="lines"><strong style="font-size:1.15rem;">🏭 ${escapeHtml(item.department || '-')}</strong>${' <strong style="font-size:1.15rem;">｜ 🔧 ' + escapeHtml(item.lineName || '-') + '</strong>'}${item.serialNo ? ' <strong style="font-size:1.15rem;">｜ 📋 No.' + escapeHtml(item.serialNo) + '</strong>' : ''}</div>
-              <div style="margin-top:8px;">
-                <span class="category">${escapeHtml(item.category || '-')}</span>
-                <span class="content">${escapeHtml((item.content || '').slice(0, 34))}${(item.content || '').length > 34 ? '...' : ''}</span>
-              </div>
-              ${statusActions}
-            </div>
-            `;
-          }).join('');
-          banner.style.display = 'block';
-          banner.innerHTML = `
-            <h3>⚠️ 切り替え日を過ぎています（未完了） <span class="pill overdue">${overdueItems.length}件</span></h3>
-            <div class="overdue-list">${listHtml}</div>
-            <div style="margin-top:8px;font-size:.8rem;color:#7a1c1c;">※切り替え完了（または延期／中止）を入力してください。</div>
-          `;
-        } else {
-          banner.style.display = 'none';
-          banner.innerHTML = '';
-        }
-      }
-
-      document.querySelectorAll('.topics-item').forEach(el => {
-        el.addEventListener('click', () => {
-          const item = changepointData.find(p => p._id === el.dataset.id);
-          if (item) showDetail(item);
+      const root = document.getElementById('mainMenu');
+      if(root.dataset.boardBound) return;
+      root.dataset.boardBound='true';
+      ['topicsDeptFilter','boardLineFilter','boardCategoryFilter','boardTypeFilter','boardOpenOnly','boardSearch'].forEach(id=>{
+        document.getElementById(id).addEventListener(id==='boardSearch'?'input':'change',()=>{
+          if(id==='topicsDeptFilter') buildTopicsDeptOptions();
+          Object.keys(boardLimits).forEach(k=>boardLimits[k]=12);
+          updateTopics();
         });
       });
+      document.getElementById('boardReset').addEventListener('click',()=>{
+        ['topicsDeptFilter','boardLineFilter','boardCategoryFilter','boardTypeFilter','boardSearch'].forEach(id=>document.getElementById(id).value='');
+        document.getElementById('boardOpenOnly').checked=false;
+        Object.keys(boardLimits).forEach(k=>boardLimits[k]=12);
+        buildTopicsDeptOptions(); updateTopics();
+      });
+      root.addEventListener('click',e=>{
+        const card=e.target.closest('button[data-change-id]');
+        if(card){ const item=changepointData.find(p=>p._id===card.dataset.changeId); if(item) showDetail(item); }
+        const more=e.target.closest('button[data-board-more]');
+        if(more){ boardLimits[more.dataset.boardMore]+=12; updateTopics(); }
+      });
+      setInterval(()=>{ if(root.style.display!=='none') updateTopics(); },60000);
+    }
+    function renderBoardCard(p){
+      const color=boardColors[p.category] || '#d6ded8';
+      return `<button type="button" class="board-change" data-change-id="${escapeAttr(p._id)}" style="--category-color:${color}">
+        <span class="board-change-top"><span><span class="board-category">${escapeHtml(p.category||'未分類')}</span> ${p.type==='planned'?'計画':'突発'}</span><span>${escapeHtml(p.occurrenceTime||'')}</span></span>
+        <span class="board-change-line">${escapeHtml(p.lineName||'ライン未設定')}</span>
+        <span class="board-change-serial">整理No. ${escapeHtml(p.serialNo||'未設定')}</span>
+        <span class="board-change-content">${escapeHtml(p.content||'内容未登録')}</span>
+        <span class="board-change-meta"><span>${escapeHtml(p.department||'部署未設定')}<br>${escapeHtml(p.occurrenceDate||'日程未確定')}</span><span class="board-status ${boardCompleted(p)?'done':''}">${boardStatus(p)}</span></span>
+      </button>`;
+    }
+    function updateTopics(){
+      const now=new Date(), today=ymdLocal(now), mon=new Date(now);
+      mon.setDate(now.getDate()-((now.getDay()+6)%7));
+      const days=Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+      const weekStart=ymdLocal(days[0]),weekEnd=ymdLocal(days[6]);
+      const value=id=>document.getElementById(id).value;
+      const dept=value('topicsDeptFilter'),line=value('boardLineFilter'),category=value('boardCategoryFilter'),type=value('boardTypeFilter');
+      const keyword=value('boardSearch').normalize('NFKC').toLowerCase().trim();
+      const openOnly=document.getElementById('boardOpenOnly').checked;
+      const items=changepointData.filter(p=>!boardCanceled(p) && (!dept||p.department===dept) && (!line||p.lineName===line) &&
+        (!category||p.category===category) && (!type||p.type===type) && (!openOnly||(boardTracked(p)&&!boardCompleted(p))) &&
+        (!keyword||[p.serialNo,p.content,p.lineName,p.department].join(' ').normalize('NFKC').toLowerCase().includes(keyword)))
+        .sort((a,b)=>String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||''))||String(a.occurrenceTime||'').localeCompare(String(b.occurrenceTime||'')));
+      const todayItems=items.filter(p=>p.occurrenceDate===today);
+      const weekItems=items.filter(p=>p.occurrenceDate>=weekStart&&p.occurrenceDate<=weekEnd);
+      const carry=items.filter(p=>boardTracked(p)&&p.occurrenceDate&&p.occurrenceDate<today&&!boardCompleted(p));
+      const future=items.filter(p=>p.occurrenceDate>weekEnd&&!boardCompleted(p));
+      const undecided=items.filter(p=>!p.occurrenceDate&&!boardCompleted(p));
+      const set=(id,text)=>document.getElementById(id).textContent=text;
+      const format=d=>d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+      set('boardDate',now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'}));
+      set('boardTodayDate',format(now));
+      set('boardWeekRange',format(days[0])+' ～ '+format(days[6]));
+      [['boardTodayCount',todayItems],['boardWeekCount',weekItems],['boardCarryCount',carry],['boardFutureCount',future],['boardUndecidedCount',undecided]].forEach(([id,list])=>set(id,list.length+'件'));
+      document.getElementById('boardSummary').innerHTML=
+        '<span>今日<strong>'+todayItems.length+'</strong> 件</span><span>今週<strong>'+weekItems.length+'</strong> 件</span><span>継続・未完了<strong>'+carry.length+'</strong> 件</span><span>日程未確定<strong>'+undecided.length+'</strong> 件</span>';
+      const groups=new Map();
+      todayItems.forEach(p=>{ const key=JSON.stringify([p.department||'',p.lineName||'']); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(p); });
+      document.getElementById('topicsToday').innerHTML=groups.size?[...groups.values()].sort((a,b)=>String(a[0].lineName||'').localeCompare(String(b[0].lineName||''),'ja')).map(list=>
+        '<div class="board-lane"><h3><small>'+escapeHtml(list[0].department||'部署未設定')+'</small>'+escapeHtml(list[0].lineName||'ライン未設定')+'<span class="board-count">'+list.length+'件</span></h3><div class="board-lane-body">'+list.map(renderBoardCard).join('')+'</div></div>'
+      ).join(''):'<div class="board-empty">該当する今日の変化点はありません</div>';
+      document.getElementById('topicsWeek').innerHTML=days.map(d=>{
+        const date=ymdLocal(d), list=weekItems.filter(p=>p.occurrenceDate===date);
+        return '<div class="board-day '+(date===today?'is-today':'')+'"><h3>'+format(d)+'<span class="board-count">'+list.length+'</span></h3>'+
+          (list.map(renderBoardCard).join('')||'<div class="board-empty">予定なし</div>')+'</div>';
+      }).join('');
+      [['boardCarry',carry],['boardFuture',future],['topicsUndecided',undecided]].forEach(([id,list])=>{
+        document.getElementById(id).innerHTML=list.length?list.slice(0,boardLimits[id]).map(renderBoardCard).join('')+
+          (list.length>boardLimits[id]?'<button type="button" class="board-more" data-board-more="'+id+'">続きを表示（残り'+(list.length-boardLimits[id])+'件）</button>':''):'<div class="board-empty">該当する変化点はありません</div>';
+      });
+      set('boardUpdated','表示更新 '+now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}));
     }
 
     window.decideSwitchDateQuick = async function(id) {
@@ -2882,13 +2835,14 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const isAnomaly = (item._kind === 'anomaly') || (item.type === 'anomaly');
       const isCP = !isAnomaly;
       const isPlannedCP = isCP && (item.type === 'planned' || item.workflowManaged === true);
+      document.getElementById('detailCardToolbar').hidden = !isPlannedCP;
 
       if (isAnomaly){
         document.getElementById('detailTitle').textContent = `整理No: ${item.serialNo || '-'}　${item.lineName || ''}`;
         document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
       } else {
         const t = (item.type === 'planned') ? '計画変化点' : '突発変化点';
-        document.getElementById('detailTitle').textContent = `${t}（${item.category || ''}）`;
+        document.getElementById('detailTitle').textContent = `変化点カード / ${t}（${item.category || ''}）`;
         document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
       }
 
@@ -3010,15 +2964,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const bodyEl   = document.getElementById('detailBody');
       const badgesEl = document.getElementById('detailBadges');
       const dateEl   = document.getElementById('detailDate');
-      if (isUndecidedOnly){
-        if (bodyEl){ bodyEl.innerHTML = ''; bodyEl.style.display = 'none'; }
-        if (badgesEl) badgesEl.style.display = 'none';
-        if (dateEl) dateEl.style.display = 'none';
-      } else {
-        if (bodyEl) bodyEl.style.display = '';
-        if (badgesEl) badgesEl.style.display = '';
-        if (dateEl) dateEl.style.display = '';
-      }
+      if (bodyEl) bodyEl.style.display = '';
+      if (badgesEl) badgesEl.style.display = '';
+      if (dateEl) dateEl.style.display = '';
 
       document.getElementById('detailModal').classList.add('active');
     }
