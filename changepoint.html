@@ -910,9 +910,14 @@
     .department-approver span { white-space:pre-line; }
     .department-actions { display:flex; flex-wrap:wrap; gap:6px; }
     .distribution-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px 16px; }
-    .distribution-option { display:flex; align-items:center; gap:8px; min-height:40px; margin:0; overflow-wrap:anywhere; }
+    .distribution-options .distribution-option { display:flex; align-items:center; gap:6px; min-height:40px; margin:0; overflow-wrap:anywhere; }
+    .distribution-option span { min-width:0; }
     .distribution-option input { flex:0 0 auto; width:18px; height:18px; margin:0; }
     .distribution-option small { display:block; color:#765016; font-size:12px; }
+    @media(max-width:520px){
+      .distribution-options { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+      .distribution-option small { font-size:11px; }
+    }
     .issued-card-preview td[colspan] { width:auto; text-align:left; }
     .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
     .issued-card-preview .sign { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
