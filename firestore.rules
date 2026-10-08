@@ -159,7 +159,7 @@ service cloud.firestore {
         && request.resource.data.schemaVersion == resource.data.schemaVersion
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if false;
+      allow delete: if isSignedIn();
     }
     // 変化点管理システムは画面操作なしの匿名認証を使用する。
     match /changepoints/{docId} {

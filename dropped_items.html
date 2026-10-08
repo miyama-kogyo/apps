@@ -171,7 +171,7 @@
     .detail-media{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
     .detail-media a{display:block;aspect-ratio:1;border-radius:6px;overflow:hidden;background:#152328}
     .detail-media img,.detail-media video{width:100%;height:100%;object-fit:cover}
-    .detail-actions{display:flex;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+    .detail-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
     .edit-card{width:min(760px,100%)}
     .edit-form{padding:18px}
     .edit-media-note{color:var(--muted);font-size:.76rem;line-height:1.5}
@@ -180,6 +180,12 @@
     .edit-media-item img,.edit-media-item video{width:100%;height:100%;object-fit:cover}
     .edit-media-item .preview-remove{z-index:1}
     .edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+    .delete-card{width:min(520px,100%)}
+    .delete-body{padding:22px}
+    .delete-warning{margin:0;color:var(--muted);line-height:1.65}
+    .delete-target{margin:16px 0 0;padding:14px;border:1px solid #e2c5c3;border-left:4px solid var(--danger);border-radius:6px;background:#fff7f6}
+    .delete-target strong{display:block;font-size:1.05rem;margin-bottom:4px;overflow-wrap:anywhere}
+    .delete-target span{color:var(--muted);font-size:.82rem}
     #page-dashboard .page-heading h2{font-size:1.65rem}
     #page-dashboard .page-heading p{font-size:1rem}
     #page-dashboard .metric-label{font-size:.92rem}
@@ -446,13 +452,26 @@
       </form>
     </div>
   </div>
+  <div class="modal" id="deleteModal" aria-hidden="true">
+    <div class="modal-card delete-card">
+      <div class="modal-head"><h3>登録データを削除</h3><button class="icon-btn" id="closeDeleteModal" type="button" title="閉じる"><i data-lucide="x"></i></button></div>
+      <div class="delete-body">
+        <p class="delete-warning">このデータを削除します。削除後は元に戻せず、登録された写真・動画も削除されます。</p>
+        <div class="delete-target" id="deleteTarget"></div>
+        <div class="edit-actions">
+          <button class="btn btn-secondary" id="cancelDelete" type="button">キャンセル</button>
+          <button class="btn btn-danger" id="confirmDelete" type="button"><i data-lucide="trash-2"></i>削除する</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
     import { getAuth, signInAnonymously, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
     import {
-      getFirestore, collection, addDoc, doc, getDocs, onSnapshot, updateDoc,
+      getFirestore, collection, addDoc, deleteDoc, doc, getDocs, onSnapshot, updateDoc,
       serverTimestamp, Timestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
     import {
@@ -474,7 +493,7 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
     const state = {
-      departments: [], items: [], files: [], editFiles: [], editMedia: [], editItemId: '', charts: {}, activePage: 'entry',
+      departments: [], items: [], files: [], editFiles: [], editMedia: [], editItemId: '', deleteItemId: '', charts: {}, activePage: 'entry',
       dashboardDepartments: new Set()
     };
 
@@ -568,6 +587,10 @@
       $('editMediaCapture').addEventListener('change', e => addEditFiles(e.target.files));
       $('editMediaSelect').addEventListener('change', e => addEditFiles(e.target.files));
       $('editForm').addEventListener('submit', saveEdit);
+      $('closeDeleteModal').addEventListener('click', closeDelete);
+      $('cancelDelete').addEventListener('click', closeDelete);
+      $('confirmDelete').addEventListener('click', confirmDelete);
+      $('deleteModal').addEventListener('click', e => { if(e.target === $('deleteModal')) closeDelete(); });
       $('dashboardDeptButton').addEventListener('click', event => {
         event.stopPropagation();
         const panel = $('dashboardDeptPanel');
@@ -597,7 +620,7 @@
         $('dashboardDeptPanel').classList.remove('open');
         $('dashboardDeptButton').setAttribute('aria-expanded', 'false');
       });
-      document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeDetail(); closeEdit(); } });
+      document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeDetail(); closeEdit(); closeDelete(); } });
     }
 
     function loadDashboardDepartmentSelection(){
@@ -875,6 +898,47 @@
       }
     }
 
+    function openDelete(itemId){
+      const item = state.items.find(row => row.id === itemId);
+      if(!item){ showToast('削除するデータが見つかりません', true); return; }
+      closeDetail();
+      state.deleteItemId = item.id;
+      $('deleteTarget').innerHTML = `<strong>${esc(item.serialNo || '整理No・部品名未設定')}</strong><span>${esc(item.department)} / ${fmtDateTime(item)} / ${quantity(item)}個</span>`;
+      $('deleteModal').classList.add('open');
+      $('deleteModal').setAttribute('aria-hidden','false');
+      document.body.style.overflow = 'hidden';
+      refreshIcons();
+    }
+
+    function closeDelete(){
+      if(!$('deleteModal').classList.contains('open')) return;
+      $('deleteModal').classList.remove('open');
+      $('deleteModal').setAttribute('aria-hidden','true');
+      state.deleteItemId = '';
+      $('deleteTarget').innerHTML = '';
+      document.body.style.overflow = '';
+    }
+
+    async function confirmDelete(){
+      const item = state.items.find(row => row.id === state.deleteItemId);
+      if(!item){ closeDelete(); showToast('削除するデータが見つかりません', true); return; }
+      const button = $('confirmDelete');
+      button.disabled = true; button.innerHTML = '<span>削除中...</span>';
+      try{
+        await deleteDoc(doc(db, 'droppedItems', item.id));
+        const media = Array.isArray(item.media) ? item.media.filter(file => file.path) : [];
+        const cleanup = await Promise.allSettled(media.map(file => deleteObject(storageRef(storage, file.path))));
+        const failedCleanup = cleanup.filter(result => result.status === 'rejected').length;
+        closeDelete();
+        showToast(failedCleanup ? 'データを削除しました（一部添付ファイルの後片付けに失敗しました）' : '登録データを削除しました', failedCleanup > 0);
+      }catch(error){
+        console.error(error);
+        showToast(`削除できませんでした: ${error.code || error.message}`, true);
+      }finally{
+        button.disabled = false; button.innerHTML = '<i data-lucide="trash-2"></i>削除する'; refreshIcons();
+      }
+    }
+
     function renderAll(){
       updateSerialOptions(); renderDashboard(); renderAnalysis();
     }
@@ -960,8 +1024,9 @@
 
     function openDetail(title,rows){
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
       document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
+      document.querySelectorAll('[data-delete-item]').forEach(btn => btn.addEventListener('click', () => openDelete(btn.dataset.deleteItem)));
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();
     }
     function closeDetail(){ $('detailModal').classList.remove('open'); $('detailModal').setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
