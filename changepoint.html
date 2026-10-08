@@ -555,7 +555,9 @@
     }
     .confirm-modal-content {
       background-color: white;
-      margin: 10% auto;
+      margin: 5dvh auto;
+      max-height: 90dvh;
+      overflow-y: auto;
       padding: 30px;
       border-radius: 15px;
       width: 90%;
@@ -889,6 +891,18 @@
     .issued-card-preview th,.issued-card-preview td { border:1px solid #888; padding:5px; text-align:left; overflow-wrap:anywhere; line-height:1.5; }
     .issued-card-preview th { background:#f4f6f4; font-size:10px; }
     .issued-card-preview th:last-child,.issued-card-preview td:last-child { width:72px; text-align:center; white-space:nowrap; }
+    .card-qrs { display:flex; gap:10px; flex-shrink:0; }
+    .issued-card-preview .card-qrs .qr { display:flex; flex-direction:column; gap:3px; width:68px; }
+    .issued-card-preview .card-qrs .qr b { max-width:none; font-size:10px; text-align:center; }
+    #productionDateModal .modal-content { max-width:540px; }
+    #productionDateForm { display:grid; gap:14px; }
+    #productionDateForm[hidden] { display:none; }
+    #productionDateInfo { margin-bottom:18px; }
+    #productionDateInfo p { white-space:pre-wrap; overflow-wrap:anywhere; }
+    #productionDateStatus { min-height:1.5em; margin:0; white-space:pre-wrap; }
+    #productionDateStatus[data-error="true"] { color:#b42318; }
+    #productionDateForm input { min-width:0; width:100%; font-size:16px; }
+    #planDateUndecided { width:auto; }
     .issued-card-preview td[colspan] { width:auto; text-align:left; }
     .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
     .issued-card-preview .sign { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
@@ -1188,8 +1202,9 @@
               <div class="hint">保存先:serialNo</div>
             </div>
             <div class="form-group">
-              <label>実施予定日・実施日<span class="required">*</span></label>
+              <label>実施予定日・実施日</label>
               <input type="date" id="planDate">
+              <label><input type="checkbox" id="planDateUndecided"> 切替え日未確定</label>
               <div class="hint">計画は予定日、突発は実施日を入力</div>
             </div>
           </div>
@@ -1418,6 +1433,21 @@
     </div>
   </div>
 
+  <div id="productionDateModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header"><h3>次回生産予定日</h3><button type="button" class="modal-close" id="productionDateClose" aria-label="閉じる">&times;</button></div>
+      <div class="modal-body">
+        <div id="productionDateInfo"></div>
+        <form id="productionDateForm">
+          <div class="form-group"><label for="productionDateInput">次回生産予定日（切替え予定日）<span class="required">*</span></label><input type="date" id="productionDateInput" required></div>
+          <div class="form-group"><label for="productionDateActor">入力者名<span class="required">*</span></label><input type="text" id="productionDateActor" maxlength="80" required autocomplete="name"></div>
+          <button type="submit" class="btn btn-primary" id="productionDateSave">保存する</button>
+        </form>
+        <p id="productionDateStatus" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
   <!-- 編集モーダル -->
   <div id="editModal" class="modal">
     <div class="modal-content" style="max-width:700px;">
@@ -1472,7 +1502,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
     import {
       getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc,
-      query, orderBy, onSnapshot, serverTimestamp
+      query, orderBy, onSnapshot, serverTimestamp, runTransaction
     } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
     import {
       getAuth, signInAnonymously, onAuthStateChanged,
@@ -1942,6 +1972,8 @@
       setupMasterTabs();
       setupFilterMode();
       document.getElementById('planDate').value = '';
+      document.getElementById('planDateUndecided').checked = false;
+      updatePlanDateMode();
       document.getElementById('planTime').value = '';
       setExportButtonEnabled(false);
       const kwEl = document.getElementById('filterKeyword');
@@ -2080,6 +2112,12 @@
 
     function openLinkedChangepointIfReady(){
       if (linkedChangepointOpened) return;
+      const productionId = new URLSearchParams(window.location.search).get('productionDateId');
+      if (productionId){
+        linkedChangepointOpened = true;
+        openProductionDate(changepointData.find(x => x._id === productionId));
+        return;
+      }
       const id = new URLSearchParams(window.location.search).get('changepointId');
       if (!id) return;
       const item = changepointData.find(x => x._id === id);
@@ -2409,8 +2447,10 @@
     }
 
     function setupPlannedForm(){
+      document.getElementById('planDateUndecided').addEventListener('change', updatePlanDateMode);
       document.getElementById('planCategory').addEventListener('change', () => { plannedExcludedChecklist = new Map(); renderPlanChecklistPreview(); });
       document.getElementById('planType').addEventListener('change', (e) => {
+        updatePlanDateMode();
         if (e.target.value === 'sudden' && !document.getElementById('planDate').value) document.getElementById('planDate').value = ymdLocal(new Date());
       });
       document.getElementById('btnAddPlanCustomCheck').addEventListener('click', () => {
@@ -2450,7 +2490,7 @@
         if (!department){ alert('変化点発生部署を選択してください'); return; }
         if (!lineName){ alert('対象ライン名を入力してください'); return; }
         if (!processName){ alert('工程名・作業内容を入力してください'); return; }
-        if (!occurrenceDate){ alert('実施予定日・実施日を入力してください'); return; }
+        if (!occurrenceDate && !(type === 'planned' && document.getElementById('planDateUndecided').checked)){ alert('実施予定日・実施日を入力するか、切替え日未確定を選択してください'); return; }
         if (!buildRecordChecklist(category).length){ alert('少なくとも1件のチェック項目を対象として残してください'); return; }
         if (!content.trim()){ alert('変化点内容を入力してください'); return; }
         showConfirmDialog();
@@ -2480,7 +2520,7 @@
         <div class="confirm-item"><div class="confirm-label">工程名・作業内容</div><div class="confirm-value">${escapeHtml(processName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点内容</div><div class="confirm-value">${escapeHtml(content)}</div></div>
-        <div class="confirm-item"><div class="confirm-label">実施予定日・実施日</div><div class="confirm-value">${escapeHtml(occurrenceDate)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">実施予定日・実施日</div><div class="confirm-value">${escapeHtml(occurrenceDate || '未確定')}</div></div>
         <div class="confirm-item"><div class="confirm-label">チェック項目</div><div class="confirm-value">対象 ${buildRecordChecklist(category).length}件 / 対象外 ${plannedExcludedChecklist.size}件</div></div>
       `;
       document.getElementById('confirmModal').style.display = 'block';
@@ -2546,6 +2586,84 @@
       return url.href;
     }
 
+    function buildProductionDateUrl(docId){
+      const url = new URL(WORKFLOW_APP_URL);
+      url.searchParams.set('productionDateId', docId);
+      return url.href;
+    }
+
+    function updatePlanDateMode(){
+      const checkbox = document.getElementById('planDateUndecided');
+      checkbox.disabled = document.getElementById('planType').value !== 'planned';
+      if (checkbox.disabled) checkbox.checked = false;
+      const date = document.getElementById('planDate');
+      date.disabled = checkbox.checked;
+      if (checkbox.checked) date.value = '';
+    }
+
+    let productionDateItem = null;
+    let productionDateSaving = false;
+    function openProductionDate(item){
+      productionDateItem = item || null;
+      const available = item && (item.type === 'planned' || item.workflowManaged === true);
+      const locked = !available || boardCompleted(item) || boardCanceled(item);
+      document.getElementById('productionDateInfo').innerHTML = available ? `<div class="qr-basic"><div><span>ライン</span><strong>${escapeHtml(item.lineName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>現在の予定日</span><strong>${escapeHtml(item.occurrenceDate || '未確定')}</strong></div></div><p>${escapeHtml(item.content || '-')}</p>` : '';
+      document.getElementById('productionDateForm').hidden = !available;
+      document.getElementById('productionDateInput').value = item?.occurrenceDate || '';
+      document.getElementById('productionDateActor').value = localStorage.getItem('changepointActorName') || '';
+      ['productionDateInput','productionDateActor','productionDateSave'].forEach(id => document.getElementById(id).disabled = locked);
+      const status = document.getElementById('productionDateStatus');
+      status.dataset.error = String(!available);
+      status.textContent = !available ? '対象の変化点が見つかりません。カードを確認してください。' : locked ? '完了・中止済みのため生産予定日は変更できません。' : item.productionDateUpdatedBy ? `最終入力：${item.productionDateUpdatedBy} / ${stampDate(item.productionDateUpdatedAt)}` : '';
+      document.getElementById('productionDateModal').classList.add('active');
+    }
+
+    async function saveProductionDateRecord(id, date, who, expectedDate){
+      if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date+'T00:00:00Z')) || new Date(date+'T00:00:00Z').toISOString().slice(0,10) !== date) throw new Error('有効な生産予定日を入力してください。');
+      if (!who.trim() || who.trim().length > 80) throw new Error('入力者名を80文字以内で入力してください。');
+      return runTransaction(db, async transaction => {
+        const ref = doc(db,'changepoints',id);
+        const snapshot = await transaction.get(ref);
+        if (!snapshot.exists()) throw new Error('対象の変化点が見つかりません。');
+        const latest = snapshot.data();
+        if (!(latest.type === 'planned' || latest.workflowManaged === true) || boardCompleted(latest) || boardCanceled(latest)) throw new Error('完了・中止済み、または対象外のため変更できません。');
+        if ((latest.occurrenceDate || '') !== (expectedDate || '')) throw new Error('別の担当者が予定日を変更しました。画面を開き直して確認してください。');
+        transaction.update(ref, {occurrenceDate:date,switchStatus:'scheduled',productionDateUpdatedBy:who.trim(),productionDateUpdatedAt:serverTimestamp(),updatedBy:who.trim(),updatedAt:serverTimestamp()});
+        return {...latest,_id:id,occurrenceDate:date,switchStatus:'scheduled',productionDateUpdatedBy:who.trim(),productionDateUpdatedAt:new Date()};
+      });
+    }
+
+    document.getElementById('productionDateClose').addEventListener('click', () => {
+      if (!productionDateSaving) document.getElementById('productionDateModal').classList.remove('active');
+    });
+    document.getElementById('productionDateForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      if (productionDateSaving || !productionDateItem) return;
+      const item = productionDateItem;
+      const date = document.getElementById('productionDateInput').value;
+      const who = document.getElementById('productionDateActor').value.trim();
+      const status = document.getElementById('productionDateStatus');
+      productionDateSaving = true;
+      ['productionDateInput','productionDateActor','productionDateSave'].forEach(id => document.getElementById(id).disabled = true);
+      status.dataset.error = 'false';
+      status.textContent = '保存中...';
+      try{
+        const saved = await saveProductionDateRecord(item._id,date,who,item.occurrenceDate);
+        localStorage.setItem('changepointActorName',who);
+        updateActorNameButton();
+        openProductionDate(saved);
+        status.textContent = `保存しました：${date} / ${who}`;
+      }catch(error){
+        console.error(error);
+        status.dataset.error = 'true';
+        status.textContent = `保存できませんでした。${error.message || '通信を確認して再度お試しください。'}`;
+      }finally{
+        productionDateSaving = false;
+        const locked = boardCompleted(productionDateItem) || boardCanceled(productionDateItem);
+        ['productionDateInput','productionDateActor','productionDateSave'].forEach(id => document.getElementById(id).disabled = locked);
+      }
+    });
+
     async function executeRegistration(){
       const type = document.getElementById('planType').value || 'planned';
       const planneddepartment = document.getElementById('planDepartment').value || '';
@@ -2563,7 +2681,7 @@
       const excludedChecklistItems = Array.from(plannedExcludedChecklist.values()).map(x => ({ masterId:x.masterId, category:x.category, label:x.label, criteria:x.criteria || '', source:x.source || 'master', owner:'both', excludedBy:createdBy, excludedAtLocal:new Date().toISOString() }));
       const issuedDate = ymdLocal(new Date());
       const data = { type, workflowManaged: true, planneddepartment, department, category, lineName, processName, serialNo, content, issuedDate,
-        occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null,
+        occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null, switchStatus: occurrenceDate ? 'scheduled' : 'undecided',
         document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', specialHandlingStatus: '', relatedReviewCompleted: false,
         continuedManagementRequired: false, managementUntil: '', createdBy,
         createdAt: serverTimestamp() };
@@ -2586,6 +2704,8 @@
         alert('変化点カードを登録しました');
         document.getElementById('plannedForm').reset();
         document.getElementById('planDate').value = '';
+        document.getElementById('planDateUndecided').checked = false;
+        updatePlanDateMode();
         plannedCustomChecklist = [];
         plannedExcludedChecklist = new Map();
         renderPlanCustomChecklist();
@@ -3114,7 +3234,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       });
     }
 
-    function renderChangeTicket(item, copyLabel, keeper, qrDataUrl = ''){
+    function renderChangeTicket(item, copyLabel, keeper, qrDataUrl = '', productionQrDataUrl = ''){
       const managed = item.type === 'planned' || item.workflowManaged === true;
       const items = managed ? getRecordChecklist(item) : (Array.isArray(item.checklistItems) ? item.checklistItems : []);
       const cardStatus = managed ? approvalStatusLabel(approvalStatusOf(item)) : boardStatus(item);
@@ -3123,7 +3243,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const checks = activeCheckRows;
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
-      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div><div class="qr" data-card-qr="${escapeAttr(item._id || '')}"><img ${qrDataUrl ? `src="${qrDataUrl}"` : 'hidden'} alt="ワークフローQR">${qrDataUrl ? '' : '<span class="qr-pending">QR準備中</span>'}<b>QRで確認・チェック・完了</b></div></header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      const qr = (kind, src, alt, label) => `<div class="qr" data-card-qr="${escapeAttr(item._id || '')}" data-qr-kind="${kind}"><img ${src ? `src="${src}"` : 'hidden'} alt="${alt}">${src ? '' : '<span class="qr-pending">QR準備中</span>'}<b>${label}</b></div>`;
+      const cardQrs = `<div class="card-qrs">${qr('workflow',qrDataUrl,'ワークフローQR','チェック・承認')}${qr('production',productionQrDataUrl,'生産日入力QR','生産日入力・変更')}</div>`;
+      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
 
     }
 
@@ -3132,7 +3254,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       document.querySelectorAll('#topicsToday [data-card-qr]').forEach(holder=>{
         const id = holder.dataset.cardQr;
         if (!id) return;
-        const url = buildWorkflowUrl(id);
+        const url = holder.dataset.qrKind === 'production' ? buildProductionDateUrl(id) : buildWorkflowUrl(id);
         if (!todayCardQrCache.has(url)){
           todayCardQrCache.set(url, createQrDataUrl(url).catch(error=>{
             todayCardQrCache.delete(url);
@@ -3158,24 +3280,29 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const item = currentDetailItem;
       const workflowUrl = buildWorkflowUrl(item._id);
       let qrDataUrl = '';
-      try{ qrDataUrl = await createQrDataUrl(workflowUrl); }
+      let productionQrDataUrl = '';
+      try{
+        qrDataUrl = await createQrDataUrl(workflowUrl);
+        productionQrDataUrl = await createQrDataUrl(buildProductionDateUrl(item._id));
+      }
       catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
-      const ticket = (copyLabel, keeper) => renderChangeTicket(item, copyLabel, keeper, qrDataUrl);
+      const ticket = (copyLabel, keeper) => renderChangeTicket(item, copyLabel, keeper, qrDataUrl, productionQrDataUrl);
       const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>
         @page{size:A4 portrait;margin:8mm}
         *{box-sizing:border-box}
         body{width:194mm;margin:0;font-family:"Yu Gothic","Meiryo",sans-serif;color:#111}
-        .ticket{--print-size:14px;height:137mm;border:1.5px solid #111;border-top:3mm solid var(--card-color);padding:2mm 3mm;display:flex;flex-direction:column;gap:1.2mm;font-size:var(--print-size);line-height:1.3;overflow-wrap:anywhere;page-break-inside:avoid}
+        .ticket{--print-size:14px;position:relative;height:137mm;border:1.5px solid #111;border-top:3mm solid var(--card-color);padding:2mm 3mm;display:flex;flex-direction:column;gap:1.2mm;font-size:var(--print-size);line-height:1.3;overflow-wrap:anywhere;page-break-inside:avoid}
         .ticket>*{flex-shrink:0;min-width:0}
         .cut{height:4mm;border-top:1px dashed #555;text-align:center;font-size:9px;color:#555}
-        .ticket header{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm;border-bottom:2px solid #111;padding-bottom:1mm}
+        .ticket header{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm;border-bottom:2px solid #111;padding-bottom:1mm;margin-right:59mm;min-height:11mm}
         .ticket header strong{font-size:22px;margin-right:10px}
         .ticket header span{border:1px solid #111;padding:2px 8px;font-weight:700}
         .ticket header small{display:block;margin-top:1mm;font-size:.8em}
-        .qr{display:flex;align-items:center;gap:2mm;font-size:10px;width:43mm;flex-shrink:0}
+        .card-qrs{position:absolute;top:2mm;right:3mm;display:flex;gap:3mm;flex-shrink:0}
+        .qr{display:flex;flex-direction:column;align-items:center;gap:1mm;font-size:10px;width:26mm;flex-shrink:0}
         .qr img{width:22mm;height:22mm;flex-shrink:0;image-rendering:pixelated}
-        .qr b{line-height:1.35}
-        .meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #555}
+        .qr b{line-height:1.35;white-space:nowrap}
+        .meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #555;margin-right:59mm;min-height:24mm}
         .meta div{padding:.8mm 1mm;border-right:1px solid #aaa;border-bottom:1px solid #aaa;font-weight:600}
         .meta b{display:inline-block;margin-right:1.5mm;font-size:.8em;font-weight:400;color:#333}
         .content{border:1px solid #555;padding:1mm}
@@ -3457,7 +3584,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         <div class="form-group"><label>整理No</label><input type="text" id="editSerialNo" value="${escapeAttr(item.serialNo || '')}"></div>
         <div class="form-group"><label>変化点内容</label><textarea id="editContent" style="min-height:120px;">${escapeHtml(item.content || '')}</textarea></div>
         <div class="form-row">
-          <div class="form-group"><label>発生日</label><input type="date" id="editDate" value="${item.occurrenceDate || ''}"></div>
+          <div class="form-group"><label>実施予定日・実施日（計画は未確定可）</label><input type="date" id="editDate" value="${item.occurrenceDate || ''}"></div>
           <div class="form-group"><label>発生時刻</label><input type="time" id="editTime" value="${item.occurrenceTime || ''}"></div>
         </div>
         <div class="form-row">
@@ -3508,7 +3635,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       } else {
         updates.excludedChecklistItems = Array.isArray(original.excludedChecklistItems) ? original.excludedChecklistItems : [];
       }
-      if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || !updates.occurrenceDate){ alert('発信部署、発生部署、分類、ライン、工程、内容、実施日は必須です'); return; }
+      if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || (original.type !== 'planned' && !updates.occurrenceDate)){ alert('発信部署、発生部署、分類、ライン、工程、内容、突発の実施日は必須です'); return; }
+      if (!updates.occurrenceDate){ updates.occurrenceDate = null; updates.switchStatus = 'undecided'; }
       try { await updateDoc(doc(db, 'changepoints', id), updates); alert('保存しました。内容変更のため承認状態を未承認に戻しました'); document.getElementById('editModal').classList.remove('active'); }
       catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
     });
