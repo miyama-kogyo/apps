@@ -171,6 +171,32 @@
     .detail-media{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:10px}
     .detail-media a{display:block;aspect-ratio:1;border-radius:6px;overflow:hidden;background:#152328}
     .detail-media img,.detail-media video{width:100%;height:100%;object-fit:cover}
+    .detail-actions{display:flex;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+    .edit-card{width:min(760px,100%)}
+    .edit-form{padding:18px}
+    .edit-media-note{color:var(--muted);font-size:.76rem;line-height:1.5}
+    .edit-media-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:10px}
+    .edit-media-item{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#e7eaec}
+    .edit-media-item img,.edit-media-item video{width:100%;height:100%;object-fit:cover}
+    .edit-media-item .preview-remove{z-index:1}
+    .edit-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+    #page-dashboard .page-heading h2{font-size:1.65rem}
+    #page-dashboard .page-heading p{font-size:1rem}
+    #page-dashboard .metric-label{font-size:.92rem}
+    #page-dashboard .metric-value{font-size:2.35rem}
+    #page-dashboard .metric-sub{font-size:.88rem}
+    #page-dashboard .section-header h3{font-size:1.18rem}
+    #page-dashboard .full-screen-note{font-size:.86rem}
+    #page-dashboard .dept-name{font-size:1.05rem}
+    #page-dashboard .dept-number{font-size:1.32rem}
+    #page-dashboard .dept-number small{font-size:.78rem}
+    #page-dashboard .serial-chip{font-size:.82rem}
+    #page-dashboard .recent-serial{font-size:1.05rem}
+    #page-dashboard .recent-meta{font-size:.88rem}
+    #page-dashboard .cause-tag{font-size:.78rem}
+    #page-dashboard .dashboard-qr-copy{font-size:.86rem}
+    #page-dashboard .dashboard-qr-copy strong{font-size:.96rem}
+    #page-dashboard .dept-picker-btn{font-size:.94rem}
     .full-screen-note{font-size:.75rem;color:var(--muted)}
     svg{width:19px;height:19px;stroke-width:2}
     @media (max-width:1050px){
@@ -367,13 +393,66 @@
       <div class="modal-body"><div class="detail-grid" id="detailList"></div></div>
     </div>
   </div>
+  <div class="modal" id="editModal" aria-hidden="true">
+    <div class="modal-card edit-card">
+      <div class="modal-head"><h3>登録内容を編集</h3><button class="icon-btn" id="closeEditModal" type="button" title="閉じる"><i data-lucide="x"></i></button></div>
+      <form class="edit-form" id="editForm">
+        <div class="form-grid">
+          <div class="field">
+            <label for="editOccurredAt">発生日時 <span class="required">*</span></label>
+            <input type="datetime-local" id="editOccurredAt" required>
+          </div>
+          <div class="field">
+            <label for="editDepartment">部署 <span class="required">*</span></label>
+            <select id="editDepartment" required></select>
+          </div>
+          <div class="field">
+            <label for="editSerialNo">整理Noまたは部品名 <span class="required">*</span></label>
+            <input id="editSerialNo" list="editSerialSuggestions" maxlength="60" autocomplete="off" required>
+            <datalist id="editSerialSuggestions"></datalist>
+            <small class="field-hint" id="editSerialSuggestionHint"></small>
+          </div>
+          <div class="field">
+            <label for="editQuantity">個数 <span class="required">*</span></label>
+            <input type="number" id="editQuantity" min="1" max="9999" inputmode="numeric" required>
+          </div>
+          <div class="field full">
+            <label for="editCause">原因 <span class="required">*</span></label>
+            <select id="editCause" required>
+              <option value="作業">作業</option><option value="設備">設備</option><option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="editComment">コメント</label>
+            <textarea id="editComment" maxlength="1000" placeholder="発生状況、場所、応急処置など"></textarea>
+          </div>
+          <div class="field full">
+            <span class="field-label">状況写真・動画</span>
+            <span class="edit-media-note">既存ファイルを外したり、新しい写真・動画を追加できます（合計6件まで）。</span>
+            <div class="edit-media-list" id="editMediaList"></div>
+            <div class="media-actions">
+              <label class="btn btn-secondary" for="editMediaCapture"><i data-lucide="camera"></i>撮影する</label>
+              <label class="btn btn-secondary" for="editMediaSelect"><i data-lucide="images"></i>端末から選ぶ</label>
+            </div>
+            <input class="media-input" id="editMediaCapture" type="file" accept="image/*,video/*" capture="environment">
+            <input class="media-input" id="editMediaSelect" type="file" accept="image/*,video/*" multiple>
+            <div class="upload-progress" id="editUploadProgress"><span></span></div>
+          </div>
+        </div>
+        <div class="edit-actions">
+          <button class="btn btn-secondary" id="cancelEdit" type="button">キャンセル</button>
+          <button class="btn btn-primary" id="saveEditBtn" type="submit"><i data-lucide="save"></i>変更を保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
     import { getAuth, signInAnonymously, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
     import {
-      getFirestore, collection, addDoc, getDocs, onSnapshot,
+      getFirestore, collection, addDoc, doc, getDocs, onSnapshot, updateDoc,
       serverTimestamp, Timestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
     import {
@@ -395,7 +474,7 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
     const state = {
-      departments: [], items: [], files: [], charts: {}, activePage: 'entry',
+      departments: [], items: [], files: [], editFiles: [], editMedia: [], editItemId: '', charts: {}, activePage: 'entry',
       dashboardDepartments: new Set()
     };
 
@@ -482,6 +561,13 @@
       $('fullscreenBtn').addEventListener('click', toggleFullscreen);
       $('closeModal').addEventListener('click', closeDetail);
       $('detailModal').addEventListener('click', e => { if(e.target === $('detailModal')) closeDetail(); });
+      $('closeEditModal').addEventListener('click', closeEdit);
+      $('cancelEdit').addEventListener('click', closeEdit);
+      $('editModal').addEventListener('click', e => { if(e.target === $('editModal')) closeEdit(); });
+      $('editDepartment').addEventListener('change', updateEditSerialSuggestions);
+      $('editMediaCapture').addEventListener('change', e => addEditFiles(e.target.files));
+      $('editMediaSelect').addEventListener('change', e => addEditFiles(e.target.files));
+      $('editForm').addEventListener('submit', saveEdit);
       $('dashboardDeptButton').addEventListener('click', event => {
         event.stopPropagation();
         const panel = $('dashboardDeptPanel');
@@ -511,7 +597,7 @@
         $('dashboardDeptPanel').classList.remove('open');
         $('dashboardDeptButton').setAttribute('aria-expanded', 'false');
       });
-      document.addEventListener('keydown', e => { if(e.key === 'Escape') closeDetail(); });
+      document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeDetail(); closeEdit(); } });
     }
 
     function loadDashboardDepartmentSelection(){
@@ -563,15 +649,9 @@
       const input = $('quantity'); input.value = Math.min(9999, Math.max(1, (Number(input.value)||1)+delta));
     }
 
-    function updateEntrySerialSuggestions(){
-      const department = $('department').value;
-      if (!department) {
-        $('serialSuggestions').innerHTML = '';
-        $('serialSuggestionHint').textContent = '部署を選択すると過去の入力候補を表示します';
-        return;
-      }
+    function serialSuggestionsFor(department){
       const seen = new Set();
-      const suggestions = state.items
+      return state.items
         .filter(item => item.department === department && String(item.serialNo || '').trim())
         .sort((a,b) => parseDate(b) - parseDate(a))
         .map(item => String(item.serialNo).trim())
@@ -582,10 +662,27 @@
           return true;
         })
         .slice(0, 50);
-      $('serialSuggestions').innerHTML = suggestions.map(value => `<option value="${esc(value)}"></option>`).join('');
-      $('serialSuggestionHint').textContent = suggestions.length
+    }
+
+    function updateSerialSuggestionList(department, listId, hintId){
+      if (!department) {
+        $(listId).innerHTML = '';
+        $(hintId).textContent = '部署を選択すると過去の入力候補を表示します';
+        return;
+      }
+      const suggestions = serialSuggestionsFor(department);
+      $(listId).innerHTML = suggestions.map(value => `<option value="${esc(value)}"></option>`).join('');
+      $(hintId).textContent = suggestions.length
         ? `この部署の過去入力から${suggestions.length}件を候補表示しています`
         : 'この部署には過去の入力候補がありません';
+    }
+
+    function updateEntrySerialSuggestions(){
+      updateSerialSuggestionList($('department').value, 'serialSuggestions', 'serialSuggestionHint');
+    }
+
+    function updateEditSerialSuggestions(){
+      updateSerialSuggestionList($('editDepartment').value, 'editSerialSuggestions', 'editSerialSuggestionHint');
     }
 
     function addFiles(fileList){
@@ -611,7 +708,7 @@
       refreshIcons();
     }
 
-    async function uploadMedia(file, index, total){
+    async function uploadMedia(file, index, total, progressId='uploadProgress'){
       const ext = (file.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g,'').slice(0,8);
       const path = `dropped-items/${auth.currentUser.uid}/${Date.now()}_${crypto.randomUUID()}.${ext}`;
       const ref = storageRef(storage, path);
@@ -619,7 +716,7 @@
       return new Promise((resolve,reject) => task.on('state_changed', snap => {
         const own = snap.bytesTransferred / snap.totalBytes;
         const percent = ((index + own) / total) * 100;
-        $('uploadProgress').querySelector('span').style.width = `${percent}%`;
+        $(progressId).querySelector('span').style.width = `${percent}%`;
       }, reject, async () => resolve({
         url: await getDownloadURL(task.snapshot.ref), path, type:file.type.startsWith('video/') ? 'video' : 'image', name:file.name.slice(0,120)
       })));
@@ -664,6 +761,120 @@
       }
     }
 
+    function addEditFiles(fileList){
+      for(const file of [...fileList]){
+        if(state.editMedia.length + state.editFiles.length >= 6){ showToast('添付できるファイルは合計6件までです', true); break; }
+        if(!file.type.startsWith('image/') && !file.type.startsWith('video/')){ showToast(`${file.name}は対象外です`, true); continue; }
+        if(file.type.startsWith('video/') && file.size > 50*1024*1024){ showToast(`${file.name}は50MBを超えています`, true); continue; }
+        if(file.type.startsWith('image/') && file.size > 15*1024*1024){ showToast(`${file.name}は15MBを超えています`, true); continue; }
+        state.editFiles.push({file, preview:URL.createObjectURL(file)});
+      }
+      $('editMediaCapture').value = ''; $('editMediaSelect').value = ''; renderEditMedia();
+    }
+
+    function renderEditMedia(){
+      const existing = state.editMedia.map((file,index) => {
+        const url = safeUrl(file.url);
+        if(!url) return '';
+        const media = file.type === 'video'
+          ? `<video src="${esc(url)}" controls preload="metadata"></video>`
+          : `<img src="${esc(url)}" alt="登録済み写真">`;
+        return `<div class="edit-media-item">${media}<button type="button" class="preview-remove" data-remove-edit-existing="${index}" title="このファイルを外す"><i data-lucide="x"></i></button></div>`;
+      }).join('');
+      const added = state.editFiles.map((entry,index) => `
+        <div class="edit-media-item">
+          ${entry.file.type.startsWith('video/') ? `<video src="${entry.preview}" muted playsinline></video>` : `<img src="${entry.preview}" alt="追加する写真">`}
+          <button type="button" class="preview-remove" data-remove-edit-new="${index}" title="追加を取り消す"><i data-lucide="x"></i></button>
+        </div>`).join('');
+      $('editMediaList').innerHTML = existing + added || '<span class="edit-media-note">写真・動画は登録されていません。</span>';
+      document.querySelectorAll('[data-remove-edit-existing]').forEach(btn => btn.addEventListener('click', () => {
+        state.editMedia.splice(Number(btn.dataset.removeEditExisting), 1); renderEditMedia();
+      }));
+      document.querySelectorAll('[data-remove-edit-new]').forEach(btn => btn.addEventListener('click', () => {
+        const [removed] = state.editFiles.splice(Number(btn.dataset.removeEditNew), 1);
+        if(removed) URL.revokeObjectURL(removed.preview);
+        renderEditMedia();
+      }));
+      refreshIcons();
+    }
+
+    function openEdit(itemId){
+      const item = state.items.find(row => row.id === itemId);
+      if(!item){ showToast('編集するデータが見つかりません', true); return; }
+      closeDetail();
+      state.editFiles.forEach(entry => URL.revokeObjectURL(entry.preview));
+      state.editFiles = [];
+      state.editItemId = item.id;
+      state.editMedia = Array.isArray(item.media) ? item.media.map(file => ({...file})) : [];
+      const departments = state.departments.includes(item.department) ? state.departments : [item.department, ...state.departments].filter(Boolean);
+      $('editDepartment').innerHTML = departments.map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join('');
+      $('editDepartment').value = item.department || '';
+      $('editOccurredAt').value = localDateTimeValue(parseDate(item));
+      $('editSerialNo').value = item.serialNo || '';
+      $('editQuantity').value = quantity(item) || 1;
+      $('editCause').value = ['作業','設備','その他'].includes(item.cause) ? item.cause : 'その他';
+      $('editComment').value = item.comment || '';
+      updateEditSerialSuggestions();
+      renderEditMedia();
+      $('editModal').classList.add('open');
+      $('editModal').setAttribute('aria-hidden','false');
+      document.body.style.overflow = 'hidden';
+      refreshIcons();
+    }
+
+    function closeEdit(){
+      if(!$('editModal').classList.contains('open')) return;
+      $('editModal').classList.remove('open');
+      $('editModal').setAttribute('aria-hidden','true');
+      state.editFiles.forEach(entry => URL.revokeObjectURL(entry.preview));
+      state.editFiles = []; state.editMedia = []; state.editItemId = '';
+      $('editForm').reset(); $('editMediaList').innerHTML = '';
+      document.body.style.overflow = '';
+    }
+
+    async function saveEdit(event){
+      event.preventDefault();
+      const original = state.items.find(row => row.id === state.editItemId);
+      const occurred = new Date($('editOccurredAt').value);
+      const department = $('editDepartment').value;
+      const serialNo = $('editSerialNo').value.trim();
+      const quantityValue = Number($('editQuantity').value);
+      const cause = $('editCause').value;
+      const comment = $('editComment').value.trim();
+      if(!original){ showToast('編集するデータが見つかりません', true); return; }
+      if(!department || !serialNo){ showToast('部署と整理Noまたは部品名を入力してください', true); return; }
+      if(Number.isNaN(occurred.getTime())){ showToast('発生日時を確認してください', true); return; }
+      if(!Number.isInteger(quantityValue) || quantityValue < 1 || quantityValue > 9999){ showToast('個数は1～9999で入力してください', true); return; }
+      if(!['作業','設備','その他'].includes(cause)){ showToast('原因を選択してください', true); return; }
+      if(state.editMedia.length + state.editFiles.length > 6){ showToast('添付できるファイルは合計6件までです', true); return; }
+
+      const button = $('saveEditBtn');
+      const uploaded = [];
+      button.disabled = true; button.innerHTML = '<span>保存中...</span>';
+      $('editUploadProgress').style.display = state.editFiles.length ? 'block' : 'none';
+      try{
+        for(let i=0;i<state.editFiles.length;i++) uploaded.push(await uploadMedia(state.editFiles[i].file, i, state.editFiles.length, 'editUploadProgress'));
+        const media = [...state.editMedia, ...uploaded];
+        await updateDoc(doc(db, 'droppedItems', original.id), {
+          department, serialNo, quantity:quantityValue, cause, comment, media,
+          occurredAt:Timestamp.fromDate(occurred), dateKey:localDateKey(occurred),
+          updatedAt:serverTimestamp(), updatedBy:auth.currentUser.uid
+        });
+        const keptPaths = new Set(state.editMedia.map(file => file.path).filter(Boolean));
+        const removed = (Array.isArray(original.media) ? original.media : []).filter(file => file.path && !keptPaths.has(file.path));
+        await Promise.allSettled(removed.map(file => deleteObject(storageRef(storage, file.path))));
+        closeEdit();
+        showToast('登録内容を更新しました');
+      }catch(error){
+        console.error(error);
+        await Promise.allSettled(uploaded.map(file => deleteObject(storageRef(storage, file.path))));
+        showToast(`更新できませんでした: ${error.code || error.message}`, true);
+      }finally{
+        button.disabled = false; button.innerHTML = '<i data-lucide="save"></i>変更を保存';
+        $('editUploadProgress').style.display = 'none'; $('editUploadProgress').querySelector('span').style.width = '0'; refreshIcons();
+      }
+    }
+
     function renderAll(){
       updateSerialOptions(); renderDashboard(); renderAnalysis();
     }
@@ -702,9 +913,9 @@
     function renderDepartmentChart(labels,todayMap,yesterdayMap,todayRows,yesterdayRows){
       makeChart('department',$('departmentChart'),{
         type:'bar',data:{labels,datasets:[
-          {label:'本日',data:labels.map(x=>todayMap[x]||0),backgroundColor:'#4b5359',borderRadius:3},
-          {label:'前日',data:labels.map(x=>yesterdayMap[x]||0),backgroundColor:'#aab0b4',borderRadius:3}
-        ]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=labels[els[0].index];openDetail(`${dept}：本日・前日`,[...todayRows,...yesterdayRows].filter(r=>r.department===dept));},plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}},x:{ticks:{autoSkip:false,maxRotation:35,minRotation:0}}}}
+          {label:'本日',data:labels.map(x=>todayMap[x]||null),backgroundColor:'#4b5359',borderRadius:3,skipNull:true},
+          {label:'前日',data:labels.map(x=>yesterdayMap[x]||null),backgroundColor:'#aab0b4',borderRadius:3,skipNull:true}
+        ]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=labels[els[0].index];openDetail(`${dept}：本日・前日`,[...todayRows,...yesterdayRows].filter(r=>r.department===dept));},plugins:{legend:{position:'top',labels:{font:{size:15},padding:18}}},scales:{y:{beginAtZero:true,ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},x:{ticks:{autoSkip:false,maxRotation:35,minRotation:0,font:{size:14}}}}}
       });
     }
 
@@ -749,7 +960,8 @@
 
     function openDetail(title,rows){
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}</article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
+      document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();
     }
     function closeDetail(){ $('detailModal').classList.remove('open'); $('detailModal').setAttribute('aria-hidden','true'); document.body.style.overflow=''; }

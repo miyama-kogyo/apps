@@ -131,7 +131,35 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.schemaVersion == 1;
-      allow update, delete: if false;
+      allow update: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'department', 'serialNo', 'quantity', 'cause', 'comment',
+          'media', 'occurredAt', 'dateKey', 'createdAt', 'createdBy',
+          'schemaVersion', 'updatedAt', 'updatedBy'
+        ])
+        && request.resource.data.department is string
+        && request.resource.data.department.size() > 0
+        && request.resource.data.department.size() <= 100
+        && request.resource.data.serialNo is string
+        && request.resource.data.serialNo.size() > 0
+        && request.resource.data.serialNo.size() <= 60
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 9999
+        && request.resource.data.cause in ['作業', '設備', 'その他']
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000
+        && request.resource.data.media is list
+        && request.resource.data.media.size() <= 6
+        && request.resource.data.occurredAt is timestamp
+        && request.resource.data.dateKey is string
+        && request.resource.data.dateKey.size() == 10
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
     }
     // 変化点管理システムは画面操作なしの匿名認証を使用する。
     match /changepoints/{docId} {
