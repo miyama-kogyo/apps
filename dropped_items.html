@@ -559,6 +559,8 @@
         bindEvents();
         renderDashboardDepartmentPicker();
         renderInputQr();
+        const requestedScreen = new URLSearchParams(location.search).get('screen');
+        if(['entry','dashboard','analysis'].includes(requestedScreen)) showPage(requestedScreen);
         $('comparisonDate').max = localDateKey(new Date());
         $('comparisonDate').value = localDateKey(previousWeekday(new Date()));
         subscribeItems();
