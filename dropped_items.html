@@ -252,6 +252,9 @@
     .dept-column-head span:nth-child(2),.dept-column-head span:nth-child(3){text-align:right}
     #page-dashboard .serial-breakdown{min-width:0}
     #page-dashboard .serial-chip{border-radius:4px;overflow-wrap:anywhere;max-width:100%}
+    #page-dashboard .serial-chip-item{display:inline-flex;align-items:center;gap:8px;padding:6px 8px;background:#f1f3f4;border:1px solid #dce1e4;font-size:.9rem;line-height:1.4}
+    .serial-chip-name{min-width:0;overflow-wrap:anywhere;font-weight:600}
+    .serial-chip-count{flex-shrink:0;white-space:nowrap;border-left:1px solid #bcc5ca;padding-left:8px;color:#202428;font-weight:900;font-variant-numeric:tabular-nums}
     #page-dashboard .recent-panel{margin-top:24px;border-top:1px solid var(--line);padding-top:18px}
     #page-dashboard .recent-list{padding:12px 0;grid-template-columns:repeat(4,minmax(0,1fr))}
     #page-dashboard .recent-serial{min-width:0;overflow-wrap:anywhere}
@@ -1055,7 +1058,7 @@
       renderDepartmentChart(departments,todayRows,comparisonRows,todayKey,comparisonKey);
       $('departmentList').innerHTML = departments.length ? departments.map(dept => {
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
-        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,count])=>`<span class="serial-chip">${esc(name)} ${count}</span>`).join('');
+        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,count])=>`<span class="serial-chip serial-chip-item"><span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></span>`).join('');
         return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">本日0件</span>'}</span></button>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${shortDateLabel(todayKey)}・${shortDateLabel(comparisonKey)}`,[...todayRows,...comparisonRows].filter(r=>r.department===btn.dataset.dept))));
