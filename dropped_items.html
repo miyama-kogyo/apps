@@ -1052,7 +1052,7 @@
       const departments = state.departments.filter(name => state.dashboardDepartments.has(name));
       const todayByDept = groupSum(todayRows,r=>r.department), comparisonByDept = groupSum(comparisonRows,r=>r.department);
       departments.sort((a,b)=>(todayByDept[b]||0)-(todayByDept[a]||0) || a.localeCompare(b,'ja'));
-      renderDepartmentChart(departments,todayByDept,comparisonByDept,todayRows,comparisonRows,todayKey,comparisonKey);
+      renderDepartmentChart(departments,todayRows,comparisonRows,todayKey,comparisonKey);
       $('departmentList').innerHTML = departments.length ? departments.map(dept => {
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,count])=>`<span class="serial-chip">${esc(name)} ${count}</span>`).join('');
@@ -1068,12 +1068,50 @@
       state.charts[key]?.destroy(); state.charts[key] = new Chart(canvas,config); return state.charts[key];
     }
 
-    function renderDepartmentChart(labels,todayMap,comparisonMap,todayRows,comparisonRows,todayKey,comparisonKey){
+    function renderDepartmentChart(labels,todayRows,comparisonRows,todayKey,comparisonKey){
+      const causes = ['設備','作業','その他'];
+      const colors = ['#527f98','#b18b46','#8b9298'];
+      const causeOf = row => causes.includes(row.cause) ? row.cause : 'その他';
+      const periods = [
+        {name:'本日',key:todayKey,rows:todayRows},
+        {name:'比較日',key:comparisonKey,rows:comparisonRows}
+      ];
+      const datasets = periods.flatMap((period,periodIndex) => causes.map((cause,causeIndex) => {
+        const totals = groupSum(period.rows.filter(row=>causeOf(row)===cause),row=>row.department);
+        return {
+          label:`${period.name} ${shortDateLabel(period.key)} / ${cause}`,
+          data:labels.map(dept=>totals[dept]||0),
+          stack:period.name,backgroundColor:colors[causeIndex],
+          borderColor:'#fff',borderWidth:1,maxBarThickness:44,
+          periodIndex,causeIndex
+        };
+      }));
       makeChart('department',$('departmentChart'),{
-        type:'bar',data:{labels,datasets:[
-          {label:`本日 ${shortDateLabel(todayKey)}`,data:labels.map(x=>todayMap[x]||null),backgroundColor:'#4b5359',borderRadius:3,skipNull:true},
-          {label:`比較日 ${shortDateLabel(comparisonKey)}`,data:labels.map(x=>comparisonMap[x]||null),backgroundColor:'#aab0b4',borderRadius:3,skipNull:true}
-        ]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=labels[els[0].index];openDetail(`${dept}：${shortDateLabel(todayKey)}・${shortDateLabel(comparisonKey)}`,[...todayRows,...comparisonRows].filter(r=>r.department===dept));},plugins:{legend:{position:'top',labels:{font:{size:15},padding:18}}},scales:{y:{beginAtZero:true,ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},x:{ticks:{autoSkip:false,maxRotation:35,minRotation:0,font:{size:14}}}}}
+        type:'bar',data:{labels,datasets},
+        options:{responsive:true,maintainAspectRatio:false,
+          onClick:(_,elements)=>{
+            if(!elements.length)return;
+            const hit=elements[0],dataset=datasets[hit.datasetIndex];
+            const period=periods[dataset.periodIndex],cause=causes[dataset.causeIndex],dept=labels[hit.index];
+            openDetail(`${dept}：${period.key.replaceAll('-','/')} / ${cause}`,
+              period.rows.filter(row=>row.department===dept&&causeOf(row)===cause));
+          },
+          plugins:{
+            subtitle:{display:true,text:`左：本日 ${shortDateLabel(todayKey)}　右：比較日 ${shortDateLabel(comparisonKey)}`,font:{size:14},padding:{bottom:12}},
+            legend:{position:'top',labels:{font:{size:15},padding:18,
+              generateLabels:chart=>causes.map((cause,index)=>({text:cause,fillStyle:colors[index],strokeStyle:colors[index],hidden:!chart.isDatasetVisible(index),datasetIndex:index}))
+            },onClick:(_,item,legend)=>{
+              const chart=legend.chart,visible=!chart.isDatasetVisible(item.datasetIndex);
+              [item.datasetIndex,item.datasetIndex+causes.length].forEach(index=>chart.setDatasetVisibility(index,visible));
+              chart.update();
+            }},
+            tooltip:{callbacks:{label:context=>`${context.dataset.label}：${context.parsed.y}個`}}
+          },
+          scales:{
+            y:{stacked:true,beginAtZero:true,ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},
+            x:{stacked:true,ticks:{autoSkip:false,maxRotation:35,minRotation:0,font:{size:14}}}
+          }
+        }
       });
     }
 
