@@ -6,33 +6,35 @@
   <link rel="icon" href="data:,">
   <title>落下品管理</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <style>
     :root{
-      --bg:#f2f5f6;--surface:#fff;--ink:#172126;--muted:#64747b;--line:#d7e0e3;
-      --brand:#087f6b;--brand-dark:#075e52;--accent:#f0b429;--danger:#c2413b;
-      --work:#2878b5;--equipment:#8b5aa3;--other:#68747a;--shadow:0 5px 18px rgba(18,38,46,.09);
+      --bg:#f4f5f6;--surface:#fff;--ink:#202428;--muted:#6d757b;--line:#dfe3e6;
+      --brand:#4b5359;--brand-dark:#30363b;--accent:#a4abb0;--danger:#ae4b47;
+      --work:#657782;--equipment:#7d7484;--other:#858c91;--shadow:0 4px 16px rgba(32,36,40,.07);
     }
     *{box-sizing:border-box}
     html{background:var(--bg)}
     body{margin:0;color:var(--ink);background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;letter-spacing:0;min-height:100vh}
     button,input,select,textarea{font:inherit;letter-spacing:0}
     button{cursor:pointer}
-    .app-header{position:sticky;top:0;z-index:40;background:#183036;color:#fff;border-bottom:4px solid var(--accent)}
+    .app-header{position:sticky;top:0;z-index:40;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(32,36,40,.06)}
     .header-inner{max-width:1500px;margin:auto;padding:12px 18px;display:flex;align-items:center;gap:18px}
     .brand{display:flex;align-items:center;gap:10px;min-width:210px}
-    .brand-mark{display:grid;place-items:center;width:38px;height:38px;background:var(--accent);color:#183036;border-radius:6px}
+    .brand-mark{display:grid;place-items:center;width:38px;height:38px;background:#30363b;color:#fff;border-radius:6px}
     .brand h1{font-size:1.12rem;margin:0;line-height:1.2}
-    .brand small{display:block;color:#c6d4d7;font-size:.72rem;margin-top:2px}
+    .brand small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
     .main-nav{display:flex;gap:4px;flex:1}
-    .nav-btn{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 16px;border:1px solid transparent;border-radius:6px;background:transparent;color:#dbe5e7;font-weight:700}
-    .nav-btn.active{background:#fff;color:#183036}
+    .nav-btn{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 16px;border:1px solid transparent;border-radius:6px;background:transparent;color:#626b71;font-weight:700}
+    .nav-btn:hover{background:#f3f4f5;color:var(--ink)}
+    .nav-btn.active{background:#eceff1;color:var(--ink);border-color:#d8dde0}
     .header-actions{display:flex;align-items:center;gap:8px}
-    .connection{display:flex;align-items:center;gap:7px;font-size:.78rem;color:#c6d4d7;white-space:nowrap}
+    .connection{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--muted);white-space:nowrap}
     .connection-dot{width:9px;height:9px;border-radius:50%;background:#94a3a8}
     .connection.online .connection-dot{background:#32d296;box-shadow:0 0 0 3px rgba(50,210,150,.18)}
-    .icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:transparent;color:inherit;text-decoration:none}
-    .icon-btn:hover{background:rgba(255,255,255,.1)}
+    .icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;border:1px solid #cfd5d8;border-radius:6px;background:#fff;color:#4c555b;text-decoration:none}
+    .icon-btn:hover{background:#f1f3f4;color:var(--ink)}
     .page{display:none;max-width:1500px;margin:auto;padding:20px}
     .page.active{display:block}
     .page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
@@ -47,8 +49,11 @@
     .field label,.field-label{font-weight:800;font-size:.86rem;color:#35474e}
     .required{color:var(--danger)}
     .field input,.field select,.field textarea{width:100%;border:2px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:12px;min-height:48px}
+    .field input[type="datetime-local"]{display:block;width:100%;max-width:100%;min-width:0;min-inline-size:0;-webkit-min-logical-width:0}
+    .field input[type="datetime-local"]::-webkit-date-and-time-value{min-width:0;text-align:left}
+    .field input[type="datetime-local"]::-webkit-calendar-picker-indicator{flex:0 0 auto;margin:0}
     .field textarea{min-height:104px;resize:vertical;line-height:1.55}
-    .field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px rgba(8,127,107,.12)}
+    .field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px rgba(75,83,89,.12)}
     .quantity-control{display:grid;grid-template-columns:48px 1fr 48px;gap:8px}
     .quantity-control button{border:1px solid var(--line);border-radius:6px;background:#edf3f4;color:var(--ink);font-size:1.25rem;font-weight:900}
     .quantity-control input{text-align:center;font-size:1.25rem;font-weight:900}
@@ -56,13 +61,13 @@
     .cause-option{position:relative}
     .cause-option input{position:absolute;opacity:0;pointer-events:none}
     .cause-option label{display:flex;align-items:center;justify-content:center;gap:7px;min-height:48px;padding:8px;border:2px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
-    .cause-option input:checked+label{border-color:var(--brand);background:#e7f6f2;color:var(--brand-dark)}
+    .cause-option input:checked+label{border-color:#636b70;background:#eef0f1;color:#252a2e}
     .media-zone{border:2px dashed #9aabb0;border-radius:8px;padding:18px;text-align:center;background:#f8fafb}
-    .media-zone.dragover{border-color:var(--brand);background:#e7f6f2}
+    .media-zone.dragover{border-color:#626a70;background:#eef0f1}
     .media-actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:10px}
     .media-input{display:none}
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border:0;border-radius:6px;font-weight:800}
-    .btn-primary{background:var(--brand);color:#fff}
+    .btn-primary{background:#3f464b;color:#fff}
     .btn-primary:hover{background:var(--brand-dark)}
     .btn-secondary{background:#e8eef0;color:#26383f;border:1px solid #cbd6d9}
     .btn-danger{background:#fff0ef;color:var(--danger);border:1px solid #e9bab7}
@@ -78,7 +83,7 @@
     .entry-guide h3{margin:0 0 12px;font-size:1rem}
     .guide-step{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
     .guide-step:first-of-type{border-top:0}
-    .step-no{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#183036;color:#fff;font-weight:900;font-size:.8rem}
+    .step-no{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#3f464b;color:#fff;font-weight:900;font-size:.8rem}
     .guide-step strong{display:block;font-size:.88rem;margin-bottom:3px}
     .guide-step span{color:var(--muted);font-size:.8rem;line-height:1.5}
     .metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
@@ -88,6 +93,27 @@
     .metric-label{font-size:.78rem;font-weight:800;color:var(--muted)}
     .metric-value{font-size:2rem;font-weight:900;line-height:1.15;margin-top:6px;font-variant-numeric:tabular-nums}
     .metric-sub{font-size:.78rem;color:var(--muted);margin-top:4px}
+    .dashboard-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+    .dashboard-qr{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:var(--shadow)}
+    .dashboard-qr-code{width:82px;height:82px;flex:0 0 82px;padding:4px;background:#fff}
+    .dashboard-qr-code img,.dashboard-qr-code canvas{display:block;width:74px!important;height:74px!important}
+    .dashboard-qr-copy{font-size:.76rem;line-height:1.45;color:var(--muted)}
+    .dashboard-qr-copy strong{display:block;color:var(--ink);font-size:.86rem;margin-bottom:2px}
+    .dept-picker{position:relative}
+    .dept-picker-btn{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:9px 12px;border:1px solid #b8c7cb;border-radius:6px;background:#fff;color:#24373e;font-weight:800}
+    .dept-picker-btn:hover,.dept-picker-btn[aria-expanded="true"]{border-color:var(--brand);color:var(--brand-dark);background:#f1faf8}
+    .picker-count{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:#3f464b;color:#fff;font-size:.72rem}
+    .dept-picker-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:340px;max-height:420px;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:0 16px 38px rgba(18,38,46,.2);display:none}
+    .dept-picker-panel.open{display:block}
+    .picker-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+    .picker-toolbar strong{font-size:.86rem}
+    .picker-actions{display:flex;gap:5px}
+    .picker-action{border:0;background:#e8eef0;color:#30444b;border-radius:5px;padding:5px 8px;font-size:.72rem;font-weight:800}
+    .dept-check-list{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+    .dept-check{display:flex;align-items:center;gap:8px;min-width:0;padding:9px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:.82rem;font-weight:800;cursor:pointer}
+    .dept-check:has(input:checked){border-color:var(--brand);background:#eaf7f4;color:var(--brand-dark)}
+    .dept-check input{width:18px;height:18px;accent-color:var(--brand);flex:0 0 auto}
+    .dept-check span{overflow-wrap:anywhere}
     .dashboard-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(420px,.85fr);gap:16px;align-items:start}
     .section-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid var(--line)}
     .section-header h3{margin:0;font-size:1rem}
@@ -120,17 +146,18 @@
     .rank-label{font-weight:800;overflow-wrap:anywhere}
     .rank-value{font-weight:900;font-variant-numeric:tabular-nums}
     .empty{padding:40px 18px;text-align:center;color:var(--muted)}
-    .loading-screen{position:fixed;inset:0;z-index:100;background:#f2f5f6;display:grid;place-items:center}
+    .loading-screen{position:fixed;inset:0;z-index:100;background:#f4f5f6;display:grid;place-items:center}
     .loading-box{text-align:center}
     .spinner{width:42px;height:42px;border:4px solid #cbd7da;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .toast{position:fixed;right:18px;bottom:18px;z-index:120;max-width:360px;padding:13px 16px;border-radius:6px;background:#183036;color:#fff;box-shadow:var(--shadow);transform:translateY(20px);opacity:0;pointer-events:none;transition:.22s}
+    .toast{position:fixed;right:18px;bottom:18px;z-index:120;max-width:360px;padding:13px 16px;border-radius:6px;background:#30363b;color:#fff;box-shadow:var(--shadow);transform:translateY(20px);opacity:0;pointer-events:none;transition:.22s}
     .toast.show{transform:none;opacity:1}
     .toast.error{background:#8f2f2a}
     .modal{position:fixed;inset:0;z-index:90;background:rgba(10,22,27,.72);display:none;align-items:center;justify-content:center;padding:18px}
     .modal.open{display:flex}
     .modal-card{width:min(1080px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:8px;box-shadow:0 22px 60px rgba(0,0,0,.3)}
-    .modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:#183036;color:#fff}
+    .modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:#30363b;color:#fff}
+    .modal-head .icon-btn{background:transparent;border-color:#747c81;color:#fff}
     .modal-head h3{margin:0;font-size:1rem}
     .modal-body{padding:14px}
     .detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -153,7 +180,8 @@
       .main-nav{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);order:3}.nav-btn{padding:8px 4px;font-size:.78rem}.connection{display:none}
       .page{padding:12px}.page-heading{align-items:flex-start}.page-heading p{font-size:.8rem}.page-heading h2{font-size:1.25rem}
       .page-heading>.full-screen-note{display:none}
-      .input-layout{grid-template-columns:1fr}.entry-guide{display:none}.entry-panel{padding:14px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}
+      .dashboard-heading-actions>.full-screen-note{display:none}.dashboard-heading-actions{width:100%;justify-content:stretch}.dashboard-qr{flex:1}.dashboard-qr-code{width:74px;height:74px;flex-basis:74px}.dashboard-qr-code img,.dashboard-qr-code canvas{width:66px!important;height:66px!important}.dept-picker{width:100%}.dept-picker-btn{width:100%;justify-content:center}.dept-picker-panel{position:fixed;left:12px;right:12px;top:138px;width:auto;max-height:calc(100vh - 155px)}
+      .input-layout{grid-template-columns:1fr}.entry-guide{display:none}.entry-panel{padding:14px;min-width:0;overflow:hidden}.form-grid{grid-template-columns:minmax(0,1fr)}.field.full{grid-column:auto}.field input[type="datetime-local"]{font-size:16px;padding-right:8px}
       .cause-options{grid-template-columns:repeat(3,minmax(0,1fr))}.cause-option label{font-size:.82rem;padding:6px 2px}
       .metric-grid{grid-template-columns:1fr 1fr;gap:8px}.metric{padding:12px}.metric-value{font-size:1.55rem}
       .chart-wrap{height:300px;padding:8px}.dept-row{grid-template-columns:1fr 65px 65px}.serial-breakdown{grid-column:1/-1}.recent-list{grid-template-columns:1fr}
@@ -204,8 +232,8 @@
               <select id="department" required><option value="">読み込み中...</option></select>
             </div>
             <div class="field">
-              <label for="serialNo">整理No <span class="required">*</span></label>
-              <input id="serialNo" maxlength="60" autocomplete="off" placeholder="例：A-1234" required>
+              <label for="serialNo">整理Noまたは部品名 <span class="required">*</span></label>
+              <input id="serialNo" maxlength="60" autocomplete="off" placeholder="例：A-1234 / ブラケット" required>
             </div>
             <div class="field">
               <label for="quantity">個数 <span class="required">*</span></label>
@@ -248,7 +276,7 @@
         </form>
         <aside class="panel entry-guide">
           <h3>入力のポイント</h3>
-          <div class="guide-step"><span class="step-no">1</span><div><strong>部署・整理Noを確認</strong><span>部署は異常履歴アプリと共通です。</span></div></div>
+          <div class="guide-step"><span class="step-no">1</span><div><strong>部署・整理Noまたは部品名を確認</strong><span>部署は異常履歴アプリと共通です。</span></div></div>
           <div class="guide-step"><span class="step-no">2</span><div><strong>落下した実数を入力</strong><span>まとめて発見した場合は、その合計個数を登録します。</span></div></div>
           <div class="guide-step"><span class="step-no">3</span><div><strong>状況を撮影</strong><span>発生場所や落下状態が分かる写真・動画を残します。</span></div></div>
           <div class="guide-step"><span class="step-no">4</span><div><strong>原因を一次分類</strong><span>詳細が不明な場合は「その他」を選び、コメントへ記録します。</span></div></div>
@@ -257,9 +285,30 @@
     </section>
 
     <section class="page" id="page-dashboard">
-      <div class="page-heading">
+      <div class="page-heading dashboard-heading">
         <div><h2>本日・前日の状況</h2><p id="dashboardDateLabel"></p></div>
-        <span class="full-screen-note">大型モニターでは右上の全画面ボタンを利用できます</span>
+        <div class="dashboard-heading-actions">
+          <div class="dashboard-qr">
+            <div class="dashboard-qr-code" id="inputQr" aria-label="スマホ入力用QRコード"></div>
+            <div class="dashboard-qr-copy"><strong>スマホ入力</strong>QRを読み取って<br>入力画面を開く</div>
+          </div>
+          <div class="dept-picker" id="dashboardDeptPicker">
+            <button class="dept-picker-btn" id="dashboardDeptButton" type="button" aria-expanded="false">
+              <i data-lucide="list-filter"></i>表示部署 <span class="picker-count" id="dashboardDeptCount">0</span><i data-lucide="chevron-down"></i>
+            </button>
+            <div class="dept-picker-panel" id="dashboardDeptPanel">
+              <div class="picker-toolbar">
+                <strong>ダッシュボードに表示</strong>
+                <div class="picker-actions">
+                  <button class="picker-action" id="selectAllDashboardDepts" type="button">全選択</button>
+                  <button class="picker-action" id="clearDashboardDepts" type="button">全解除</button>
+                </div>
+              </div>
+              <div class="dept-check-list" id="dashboardDeptList"></div>
+            </div>
+          </div>
+          <span class="full-screen-note">大型モニターでは右上の全画面ボタンを利用できます</span>
+        </div>
       </div>
       <div class="metric-grid">
         <div class="panel metric"><div class="metric-label">本日の落下品</div><div class="metric-value" id="todayTotal">0</div><div class="metric-sub">個</div></div>
@@ -273,7 +322,7 @@
           <div class="chart-wrap"><canvas id="departmentChart"></canvas></div>
         </section>
         <section class="panel">
-          <div class="section-header"><h3>部署別・整理No内訳</h3><span class="full-screen-note">本日 / 前日</span></div>
+          <div class="section-header"><h3>部署別・整理Noまたは部品名内訳</h3><span class="full-screen-note">本日 / 前日</span></div>
           <div class="dept-list" id="departmentList"></div>
         </section>
       </div>
@@ -284,12 +333,12 @@
     </section>
 
     <section class="page" id="page-analysis">
-      <div class="page-heading"><div><h2>傾向分析</h2><p>期間・部署・整理Noを切り替えて発生傾向を確認します。</p></div></div>
+      <div class="page-heading"><div><h2>傾向分析</h2><p>期間・部署・整理Noまたは部品名を切り替えて発生傾向を確認します。</p></div></div>
       <div class="panel filters">
         <div class="field"><label for="dateFrom">開始日</label><input type="date" id="dateFrom"></div>
         <div class="field"><label for="dateTo">終了日</label><input type="date" id="dateTo"></div>
         <div class="field"><label for="analysisDepartment">部署</label><select id="analysisDepartment"><option value="">すべての部署</option></select></div>
-        <div class="field"><label for="analysisSerial">整理No</label><select id="analysisSerial"><option value="">すべての整理No</option></select></div>
+        <div class="field"><label for="analysisSerial">整理Noまたは部品名</label><select id="analysisSerial"><option value="">すべての整理No・部品名</option></select></div>
       </div>
       <div class="analysis-grid">
         <section class="panel">
@@ -302,7 +351,7 @@
         </section>
       </div>
       <section class="panel recent-panel">
-        <div class="section-header"><h3>整理No別ランキング</h3><span class="full-screen-note">集計期間内の落下品合計</span></div>
+        <div class="section-header"><h3>整理No・部品名別ランキング</h3><span class="full-screen-note">集計期間内の落下品合計</span></div>
         <div class="ranking-list" id="serialRanking"></div>
       </section>
     </section>
@@ -342,7 +391,8 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
     const state = {
-      departments: [], items: [], files: [], charts: {}, activePage: 'entry'
+      departments: [], items: [], files: [], charts: {}, activePage: 'entry',
+      dashboardDepartments: new Set()
     };
 
     const $ = id => document.getElementById(id);
@@ -381,7 +431,10 @@
         await setPersistence(auth, browserLocalPersistence);
         if (!auth.currentUser) await signInAnonymously(auth);
         await loadDepartments();
+        loadDashboardDepartmentSelection();
         bindEvents();
+        renderDashboardDepartmentPicker();
+        renderInputQr();
         subscribeItems();
         $('occurredAt').value = localDateTimeValue(new Date());
         const to = new Date(); const from = new Date(); from.setDate(from.getDate()-29);
@@ -424,7 +477,71 @@
       $('fullscreenBtn').addEventListener('click', toggleFullscreen);
       $('closeModal').addEventListener('click', closeDetail);
       $('detailModal').addEventListener('click', e => { if(e.target === $('detailModal')) closeDetail(); });
+      $('dashboardDeptButton').addEventListener('click', event => {
+        event.stopPropagation();
+        const panel = $('dashboardDeptPanel');
+        const open = panel.classList.toggle('open');
+        $('dashboardDeptButton').setAttribute('aria-expanded', String(open));
+      });
+      $('dashboardDeptPanel').addEventListener('click', event => event.stopPropagation());
+      $('dashboardDeptList').addEventListener('change', event => {
+        if (!event.target.matches('input[data-dashboard-dept]')) return;
+        const dept = event.target.dataset.dashboardDept;
+        if (event.target.checked) state.dashboardDepartments.add(dept);
+        else state.dashboardDepartments.delete(dept);
+        saveDashboardDepartmentSelection();
+        renderDashboardDepartmentPicker();
+        renderDashboard();
+      });
+      $('selectAllDashboardDepts').addEventListener('click', () => {
+        state.dashboardDepartments = new Set(state.departments);
+        saveDashboardDepartmentSelection(); renderDashboardDepartmentPicker(); renderDashboard();
+      });
+      $('clearDashboardDepts').addEventListener('click', () => {
+        state.dashboardDepartments.clear();
+        saveDashboardDepartmentSelection(); renderDashboardDepartmentPicker(); renderDashboard();
+      });
+      document.addEventListener('click', event => {
+        if ($('dashboardDeptPicker').contains(event.target)) return;
+        $('dashboardDeptPanel').classList.remove('open');
+        $('dashboardDeptButton').setAttribute('aria-expanded', 'false');
+      });
       document.addEventListener('keydown', e => { if(e.key === 'Escape') closeDetail(); });
+    }
+
+    function loadDashboardDepartmentSelection(){
+      try{
+        const saved = JSON.parse(localStorage.getItem('droppedItems.dashboardDepartments'));
+        state.dashboardDepartments = Array.isArray(saved)
+          ? new Set(saved.filter(name => state.departments.includes(name)))
+          : new Set(state.departments);
+      }catch{
+        state.dashboardDepartments = new Set(state.departments);
+      }
+    }
+
+    function saveDashboardDepartmentSelection(){
+      localStorage.setItem('droppedItems.dashboardDepartments', JSON.stringify([...state.dashboardDepartments]));
+    }
+
+    function renderDashboardDepartmentPicker(){
+      $('dashboardDeptCount').textContent = state.dashboardDepartments.size;
+      $('dashboardDeptList').innerHTML = state.departments.map(name => `
+        <label class="dept-check">
+          <input type="checkbox" data-dashboard-dept="${esc(name)}" ${state.dashboardDepartments.has(name) ? 'checked' : ''}>
+          <span>${esc(name)}</span>
+        </label>`).join('') || '<div class="empty">部署マスターがありません</div>';
+    }
+
+    function renderInputQr(){
+      const target = 'https://miyama-kogyo.github.io/apps/dropped_items.html?screen=entry';
+      const holder = $('inputQr');
+      holder.innerHTML = '';
+      if (window.QRCode) {
+        new window.QRCode(holder, {text:target,width:74,height:74,colorDark:'#202428',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
+      } else {
+        holder.innerHTML = `<a href="${target}" title="スマホ入力を開く"><i data-lucide="external-link"></i></a>`;
+      }
     }
 
     function showPage(page){
@@ -524,15 +641,16 @@
     function renderDashboard(){
       const today = new Date(); const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
       const todayKey = localDateKey(today), yesterdayKey = localDateKey(yesterday);
-      const todayRows = byDate(state.items,todayKey), yesterdayRows = byDate(state.items,yesterdayKey);
+      const dashboardItems = state.items.filter(row => state.dashboardDepartments.has(row.department));
+      const todayRows = byDate(dashboardItems,todayKey), yesterdayRows = byDate(dashboardItems,yesterdayKey);
       const todayTotal = sumQty(todayRows), yesterdayTotal = sumQty(yesterdayRows), diff = todayTotal-yesterdayTotal;
       $('todayTotal').textContent = todayTotal.toLocaleString('ja-JP');
       $('yesterdayTotal').textContent = yesterdayTotal.toLocaleString('ja-JP');
       $('dayDifference').textContent = `${diff>0?'+':''}${diff.toLocaleString('ja-JP')}`;
       $('differenceNote').textContent = diff>0 ? '個増加' : diff<0 ? '個減少' : '個（同数）';
       $('activeDepartments').textContent = new Set(todayRows.map(row=>row.department).filter(Boolean)).size;
-      $('dashboardDateLabel').textContent = `${todayKey.replaceAll('-','/')} と ${yesterdayKey.replaceAll('-','/')} の比較`;
-      const departments = [...new Set([...state.departments,...todayRows.map(r=>r.department),...yesterdayRows.map(r=>r.department)].filter(Boolean))];
+      $('dashboardDateLabel').textContent = `${todayKey.replaceAll('-','/')} と ${yesterdayKey.replaceAll('-','/')} の比較・${state.dashboardDepartments.size}部署表示`;
+      const departments = state.departments.filter(name => state.dashboardDepartments.has(name));
       const todayByDept = groupSum(todayRows,r=>r.department), yesterdayByDept = groupSum(yesterdayRows,r=>r.department);
       departments.sort((a,b)=>(todayByDept[b]||0)-(todayByDept[a]||0) || a.localeCompare(b,'ja'));
       renderDepartmentChart(departments,todayByDept,yesterdayByDept,todayRows,yesterdayRows);
@@ -540,9 +658,9 @@
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,count])=>`<span class="serial-chip">${esc(name)} ${count}</span>`).join('');
         return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>本日</small></span><span class="dept-number">${yesterdayByDept[dept]||0}<small>前日</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">本日0件</span>'}</span></button>`;
-      }).join('') : '<div class="empty">部署データがありません</div>';
+      }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：本日・前日`,[...todayRows,...yesterdayRows].filter(r=>r.department===btn.dataset.dept))));
-      const recent = state.items.slice(0,12);
+      const recent = dashboardItems.slice(0,12);
       $('recentList').innerHTML = recent.length ? recent.map(item=>`<button class="recent-item" data-item="${item.id}"><div class="recent-top"><span class="recent-serial">${esc(item.serialNo)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div><div class="recent-meta">${esc(item.department)} / ${quantity(item)}個<br>${fmtDateTime(item)}</div></button>`).join('') : '<div class="empty">登録データがありません</div>';
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
     }
@@ -554,8 +672,8 @@
     function renderDepartmentChart(labels,todayMap,yesterdayMap,todayRows,yesterdayRows){
       makeChart('department',$('departmentChart'),{
         type:'bar',data:{labels,datasets:[
-          {label:'本日',data:labels.map(x=>todayMap[x]||0),backgroundColor:'#087f6b',borderRadius:3},
-          {label:'前日',data:labels.map(x=>yesterdayMap[x]||0),backgroundColor:'#f0b429',borderRadius:3}
+          {label:'本日',data:labels.map(x=>todayMap[x]||0),backgroundColor:'#4b5359',borderRadius:3},
+          {label:'前日',data:labels.map(x=>yesterdayMap[x]||0),backgroundColor:'#aab0b4',borderRadius:3}
         ]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=labels[els[0].index];openDetail(`${dept}：本日・前日`,[...todayRows,...yesterdayRows].filter(r=>r.department===dept));},plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}},x:{ticks:{autoSkip:false,maxRotation:35,minRotation:0}}}}
       });
     }
@@ -564,7 +682,7 @@
       const dept = $('analysisDepartment')?.value || '';
       const current = $('analysisSerial')?.value || '';
       const serials = [...new Set(state.items.filter(row=>!dept||row.department===dept).map(row=>row.serialNo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true}));
-      $('analysisSerial').innerHTML = `<option value="">すべての整理No</option>${serials.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('')}`;
+      $('analysisSerial').innerHTML = `<option value="">すべての整理No・部品名</option>${serials.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('')}`;
       if(serials.includes(current)) $('analysisSerial').value = current;
     }
 
@@ -585,9 +703,9 @@
       const rows=filteredAnalysisRows(), labels=dateKeys($('dateFrom').value,$('dateTo').value), byDay=groupSum(rows,r=>r.dateKey);
       const selectedSerial=$('analysisSerial').value;
       $('trendTitle').textContent=selectedSerial ? `${selectedSerial} の落下品数推移` : '落下品数の推移';
-      makeChart('trend',$('trendChart'),{type:'line',data:{labels:labels.map(x=>x.slice(5).replace('-','/')),datasets:[{label:'落下品数',data:labels.map(x=>byDay[x]||0),borderColor:'#087f6b',backgroundColor:'rgba(8,127,107,.12)',fill:true,tension:.25,pointRadius:3,pointHoverRadius:6}]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const key=labels[els[0].index];openDetail(`${key.replaceAll('-','/')} の詳細`,rows.filter(r=>r.dateKey===key));},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
+      makeChart('trend',$('trendChart'),{type:'line',data:{labels:labels.map(x=>x.slice(5).replace('-','/')),datasets:[{label:'落下品数',data:labels.map(x=>byDay[x]||0),borderColor:'#4b5359',backgroundColor:'rgba(75,83,89,.12)',fill:true,tension:.25,pointRadius:3,pointHoverRadius:6}]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const key=labels[els[0].index];openDetail(`${key.replaceAll('-','/')} の詳細`,rows.filter(r=>r.dateKey===key));},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
       const deptMap=groupSum(rows,r=>r.department),deptRanking=Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
-      makeChart('ranking',$('rankingChart'),{type:'bar',data:{labels:deptRanking.map(x=>x[0]),datasets:[{label:'落下品数',data:deptRanking.map(x=>x[1]),backgroundColor:deptRanking.map((_,i)=>i===0?'#c2413b':'#2878b5'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=deptRanking[els[0].index][0];openDetail(`${dept} の詳細`,rows.filter(r=>r.department===dept));},plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
+      makeChart('ranking',$('rankingChart'),{type:'bar',data:{labels:deptRanking.map(x=>x[0]),datasets:[{label:'落下品数',data:deptRanking.map(x=>x[1]),backgroundColor:deptRanking.map((_,i)=>i===0?'#3f464b':'#9ba2a7'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=deptRanking[els[0].index][0];openDetail(`${dept} の詳細`,rows.filter(r=>r.department===dept));},plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
       const serialRanking=Object.entries(groupSum(rows,r=>r.serialNo)).sort((a,b)=>b[1]-a[1]);
       $('serialRanking').innerHTML=serialRanking.length?serialRanking.slice(0,20).map(([serial,count],i)=>`<button class="rank-row" data-rank-serial="${esc(serial)}" style="width:100%;border:0;background:#fff;text-align:left"><span class="rank-no">${i+1}</span><span class="rank-label">${esc(serial)}</span><span class="rank-value">${count.toLocaleString('ja-JP')}個</span></button>`).join(''):'<div class="empty">対象期間のデータがありません</div>';
       document.querySelectorAll('[data-rank-serial]').forEach(btn=>btn.addEventListener('click',()=>openDetail(`${btn.dataset.rankSerial} の詳細`,rows.filter(r=>r.serialNo===btn.dataset.rankSerial))));
@@ -601,7 +719,7 @@
 
     function openDetail(title,rows){
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}</article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}</article>`).join(''):'<div class="empty">該当データがありません</div>';
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();
     }
     function closeDetail(){ $('detailModal').classList.remove('open'); $('detailModal').setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
