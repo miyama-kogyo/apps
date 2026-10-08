@@ -1071,10 +1071,11 @@
     function renderDepartmentChart(labels,todayRows,comparisonRows,todayKey,comparisonKey){
       const causes = ['設備','作業','その他'];
       const colors = ['#527f98','#b18b46','#8b9298'];
+      const comparisonName = comparisonKey === localDateKey(previousWeekday(new Date(`${todayKey}T12:00:00`))) ? '前日' : '比較日';
       const causeOf = row => causes.includes(row.cause) ? row.cause : 'その他';
       const periods = [
         {name:'本日',key:todayKey,rows:todayRows},
-        {name:'比較日',key:comparisonKey,rows:comparisonRows}
+        {name:comparisonName,key:comparisonKey,rows:comparisonRows}
       ];
       const datasets = periods.flatMap((period,periodIndex) => causes.map((cause,causeIndex) => {
         const totals = groupSum(period.rows.filter(row=>causeOf(row)===cause),row=>row.department);
@@ -1088,6 +1089,32 @@
       }));
       makeChart('department',$('departmentChart'),{
         type:'bar',data:{labels,datasets},
+        plugins:[{
+          id:'periodLabels',
+          afterDatasetsDraw(chart){
+            const {ctx,chartArea}=chart;
+            if(!chartArea || !labels.length)return;
+            const vertical=(chartArea.right-chartArea.left)/labels.length < (comparisonName==='比較日'?100:65);
+            ctx.save();
+            ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillStyle='#30363b';
+            periods.forEach((period,periodIndex)=>{
+              const visible=datasets.map((dataset,index)=>({dataset,index}))
+                .filter(({dataset,index})=>dataset.periodIndex===periodIndex&&chart.isDatasetVisible(index));
+              if(!visible.length)return;
+              labels.forEach((_,index)=>{
+                const bars=visible.map(({index:datasetIndex})=>chart.getDatasetMeta(datasetIndex).data[index]);
+                const x=bars[0].x;
+                const top=Math.min(...bars.map(bar=>bar.y));
+                const height=vertical?period.name.length*14:14;
+                const bottom=Math.max(chartArea.top+height,top-6);
+                if(vertical){
+                  [...period.name].forEach((char,i)=>ctx.fillText(char,x,bottom-(period.name.length-1-i)*14));
+                }else ctx.fillText(period.name,x,bottom);
+              });
+            });
+            ctx.restore();
+          }
+        }],
         options:{responsive:true,maintainAspectRatio:false,
           onClick:(_,elements)=>{
             if(!elements.length)return;
@@ -1097,7 +1124,7 @@
               period.rows.filter(row=>row.department===dept&&causeOf(row)===cause));
           },
           plugins:{
-            subtitle:{display:true,text:`左：本日 ${shortDateLabel(todayKey)}　右：比較日 ${shortDateLabel(comparisonKey)}`,font:{size:14},padding:{bottom:12}},
+            subtitle:{display:true,text:`本日 ${shortDateLabel(todayKey)} / ${comparisonName} ${shortDateLabel(comparisonKey)}`,font:{size:14},padding:{bottom:12}},
             legend:{position:'top',labels:{font:{size:15},padding:18,
               generateLabels:chart=>causes.map((cause,index)=>({text:cause,fillStyle:colors[index],strokeStyle:colors[index],hidden:!chart.isDatasetVisible(index),datasetIndex:index}))
             },onClick:(_,item,legend)=>{
@@ -1108,7 +1135,7 @@
             tooltip:{callbacks:{label:context=>`${context.dataset.label}：${context.parsed.y}個`}}
           },
           scales:{
-            y:{stacked:true,beginAtZero:true,ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},
+            y:{stacked:true,beginAtZero:true,grace:'20%',ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},
             x:{stacked:true,ticks:{autoSkip:false,maxRotation:35,minRotation:0,font:{size:14}}}
           }
         }
