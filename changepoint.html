@@ -903,6 +903,11 @@
     #productionDateStatus[data-error="true"] { color:#b42318; }
     #productionDateForm input { min-width:0; width:100%; font-size:16px; }
     #planDateUndecided { width:auto; }
+    #masterDepartment .master-table { table-layout:fixed; }
+    #masterDepartment .master-table td { overflow-wrap:anywhere; }
+    .department-approver { display:grid; gap:3px; font-size:12px; }
+    .department-approver b { font-size:14px; }
+    .department-actions { display:flex; flex-wrap:wrap; gap:6px; }
     .issued-card-preview td[colspan] { width:auto; text-align:left; }
     .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
     .issued-card-preview .sign { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
@@ -1341,7 +1346,7 @@
             <button class="btn btn-primary" id="btnAddDept">追加</button>
           </div>
           <table class="master-table">
-            <thead><tr><th>部署名</th><th style="width:120px;">操作</th></tr></thead>
+            <thead><tr><th style="width:25%;">部署名</th><th>メール送信先</th><th style="width:100px;">操作</th></tr></thead>
             <tbody id="deptTableBody"></tbody>
           </table>
         </div>
@@ -2682,7 +2687,7 @@
       const issuedDate = ymdLocal(new Date());
       const data = { type, workflowManaged: true, planneddepartment, department, category, lineName, processName, serialNo, content, issuedDate,
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null, switchStatus: occurrenceDate ? 'scheduled' : 'undecided',
-        document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', specialHandlingStatus: '', relatedReviewCompleted: false,
+        document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', approvalRequestedAt: serverTimestamp(), specialHandlingStatus: '', relatedReviewCompleted: false,
         continuedManagementRequired: false, managementUntil: '', createdBy,
         createdAt: serverTimestamp() };
       try{
@@ -2787,7 +2792,7 @@
 
     function renderMasterTables(){
       document.getElementById('deptTableBody').innerHTML = deptDocs.map(d =>
-        `<tr><td>${escapeHtml(d.name || '')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></td></tr>`
+        `<tr><td>${escapeHtml(d.name || '')}</td><td><div class="department-approver"><b>承認依頼先：${escapeHtml(d.approverName || '未設定')}</b><span>${escapeHtml(d.approverEmail || '')}</span><b>生産日・承認完了の通知先</b><span>${escapeHtml(d.notificationEmail || '未設定')}</span></div></td><td><div class="department-actions"><button class="btn btn-sm" onclick="editDepartmentApprover('${escapeAttr(d.id)}')">承認先</button><button class="btn btn-sm" onclick="editDepartmentNotification('${escapeAttr(d.id)}')">通知先</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></div></td></tr>`
       ).join('');
       document.getElementById('lineTableBody').innerHTML = lineDocs.map(d =>
         `<tr><td>${escapeHtml(d.name || '')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteMaster('line', '${escapeAttr(d.id)}')">削除</button></td></tr>`
@@ -2797,6 +2802,35 @@
         `<tr><td><span class="approval-status-badge">${escapeHtml(d.category)}</span></td><td>${escapeHtml(d.name || '')}</td><td>${escapeHtml(d.criteria || '未設定')}</td><td style="display:flex;gap:6px;"><button class="btn btn-sm" style="background:#1976d2;color:#fff;" onclick="editChecklistMaster('${escapeAttr(d.id)}')">変更</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('changeChecklist', '${escapeAttr(d.id)}')">削除</button></td></tr>`
       ).join('') : '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px;">チェック項目は未登録です</td></tr>';
     }
+
+    window.editDepartmentApprover = async function(id){
+      const item = deptDocs.find(x => x.id === id);
+      if (!item) return;
+      const name = prompt(`${item.name}の承認者名`, item.approverName || '');
+      if (name === null) return;
+      const email = prompt('承認依頼先メールアドレス（1件。空欄で解除）', item.approverEmail || '');
+      if (email === null) return;
+      const address = email.trim();
+      if (address && !/^[^\s@,;<>]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(address)){ alert('正しいメールアドレスを1件入力してください'); return; }
+      if (address && !name.trim()){ alert('承認者名を入力してください'); return; }
+      try{
+        await updateDoc(doc(db,'masters','department','items',id), {approverName:address ? name.trim() : '',approverEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
+        await loadMasters(); renderMasterTables();
+      }catch(error){ console.error(error); alert('承認依頼先の保存に失敗しました'); }
+    };
+
+    window.editDepartmentNotification = async function(id){
+      const item = deptDocs.find(x => x.id === id);
+      if (!item) return;
+      const email = prompt(`${item.name}の生産日・承認完了の通知先メールアドレス（1件。空欄で解除）`, item.notificationEmail || '');
+      if (email === null) return;
+      const address = email.trim();
+      if (address && !/^[^\s@,;<>]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(address)){ alert('正しいメールアドレスを1件入力してください'); return; }
+      try{
+        await updateDoc(doc(db,'masters','department','items',id), {notificationEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
+        await loadMasters(); renderMasterTables();
+      }catch(error){ console.error(error); alert('通知先の保存に失敗しました'); }
+    };
 
     window.deleteMaster = async function(type, id){
       if (!confirm('削除しますか？')) return;
@@ -3196,8 +3230,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const who = readStampName();
       if (!who || !confirm(`${who} さんの発生部署対応スタンプを登録しますか？`)) return;
       try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:new Date() };
+        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:serverTimestamp(), approvalRequestedAt:serverTimestamp() });
+        currentDetailItem = { ...currentDetailItem, approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:new Date(), approvalRequestedAt:new Date() };
         renderApprovalWorkflow(currentDetailItem);
       }catch(e){ console.error(e); alert('確認の登録に失敗しました'); }
     };
@@ -3614,6 +3648,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         lot: document.getElementById('editLot').value,
         document: document.getElementById('editDocument').value,
         approvalStatus: 'draft',
+        approvalRequestedAt: serverTimestamp(),
         senderApprovedBy: null,
         senderApprovedAt: null,
         receiverConfirmedBy: null,
