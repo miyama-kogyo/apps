@@ -122,6 +122,93 @@ function notificationStreams() {
   ];
 }
 
+function reminderCalendar(now) {
+  return {day:Utilities.formatDate(now,'Asia/Tokyo','yyyy-MM-dd'),
+    hour:Number(Utilities.formatDate(now,'Asia/Tokyo','HH')),
+    weekday:Number(Utilities.formatDate(now,'Asia/Tokyo','u'))};
+}
+
+function activeReminderDay() {
+  const props = notifierProperties(), calendar = reminderCalendar(new Date());
+  if (props.getProperty('REMINDERS_ENABLED') !== 'true' || !props.getProperty('REMINDERS_START_DAY') ||
+      calendar.day < props.getProperty('REMINDERS_START_DAY') || calendar.hour < 9 ||
+      (props.getProperty('REMINDER_WEEKDAYS_ONLY') === 'true' && calendar.weekday > 5)) return '';
+  return calendar.day;
+}
+
+function enableDailyOverdueReminders() {
+  verifyNotifierOwner();
+  const props = notifierProperties();
+  if (props.getProperty('ENABLED') !== 'true') throw new Error('既存の自動配信を先に開始してください。');
+  if (!allowedRecipients().length) throw new Error('送信許可リストが未設定です。');
+  if (!props.getProperty('REMINDERS_START_DAY')) props.setProperty('REMINDERS_START_DAY',reminderCalendar(new Date(Date.now()+86400000)).day);
+  if (!props.getProperty('REMINDER_WEEKDAYS_ONLY')) props.setProperty('REMINDER_WEEKDAYS_ONLY','true');
+  props.setProperty('REMINDERS_ENABLED','true');
+}
+
+function disableDailyOverdueReminders() {
+  verifyNotifierOwner();
+  notifierProperties().setProperty('REMINDERS_ENABLED','false');
+}
+
+function overdueReminderStage(item, day) {
+  if (!item || !(item.type === 'planned' || item.workflowManaged === true)) return '';
+  if (['completed','canceled'].includes(item.switchStatus) || ['completed','canceled'].includes(item.switchState) ||
+      item.activatedAt || item.effectiveAt || item.isActivated || item.effectiveStatus === 'active' || item.activationStatus === 'activated') return '';
+  const date = item.occurrenceDate;
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= day) return '';
+  const parsed = new Date(date+'T00:00:00Z');
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0,10) !== date) return '';
+  return ['draft','sender_approved','receiver_confirmed'].includes(item.approvalStatus) ? item.approvalStatus : '';
+}
+
+function overdueReminderQuery(cursor) {
+  const query = {
+    from:[{collectionId:'changepoints'}],
+    where:{fieldFilter:{field:{fieldPath:'approvalStatus'},op:'IN',value:{arrayValue:{values:['draft','sender_approved','receiver_confirmed'].map(x=>({stringValue:x}))}}}},
+    orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:NOTIFIER.batchSize
+  };
+  if (cursor) query.startAt = {before:false,values:[{referenceValue:cursor}]};
+  return query;
+}
+
+function previewOverdueReminders() {
+  verifyNotifierOwner();
+  const day = reminderCalendar(new Date()).day;
+  const rows = firestoreRead(':runQuery',{structuredQuery:overdueReminderQuery('')});
+  const items = rows.filter(r=>r.document).map(r=>decodeDocument(r.document));
+  console.log(JSON.stringify({day:day,scanned:items.length,overdue:items.filter(item=>overdueReminderStage(item,day)).map(item=>({id:item._name.split('/').pop(),stage:item.approvalStatus,date:item.occurrenceDate})),more:items.length===NOTIFIER.batchSize}));
+}
+
+function collectOverdueReminders() {
+  const day = activeReminderDay();
+  if (!day) return;
+  const props = notifierProperties(), state = props.getProperties();
+  const jobs = Object.keys(state).filter(k=>k.startsWith('job_')).map(k=>JSON.parse(state[k]));
+  let count = jobs.length;
+  if (count >= NOTIFIER.maxJobs) return;
+  let scan = JSON.parse(props.getProperty('REMINDER_SCAN') || 'null');
+  if (!scan || scan.day !== day) scan = {day:day,name:'',done:false};
+  if (scan.done) return;
+  const rows = firestoreRead(':runQuery',{structuredQuery:overdueReminderQuery(scan.name)}).filter(r=>r.document);
+  for (const row of rows) {
+    const item = decodeDocument(row.document);
+    const uncertain = jobs.some(job=>job.kind==='overdue_reminder' && job.document===item._name && ['sending','uncertain'].includes(job.state));
+    if (overdueReminderStage(item,day) && !uncertain) {
+      const key = notificationKey({...item,reminderDay:day},'overdue_reminder','reminderDay');
+      if (!props.getProperty(key)) {
+        if (count >= NOTIFIER.maxJobs) return;
+        props.setProperty(key,JSON.stringify({document:item._name,kind:'overdue_reminder',reminderDay:day,stage:item.approvalStatus,state:'pending',createdAt:new Date().toISOString()}));
+        count++;
+      }
+    }
+    scan.name = item._name;
+    props.setProperty('REMINDER_SCAN',JSON.stringify(scan));
+  }
+  scan.done = rows.length < NOTIFIER.batchSize;
+  props.setProperty('REMINDER_SCAN',JSON.stringify(scan));
+}
+
 function isResultNotificationCurrent(item, kind) {
   if (!item || !(item.type === 'planned' || item.workflowManaged === true)) return false;
   if (item.switchStatus === 'canceled' || item.switchState === 'canceled') return false;
@@ -172,6 +259,16 @@ function collectNotificationStream(stream) {
 
 function resolveRecipient(item, departments, kind) {
   if (kind === 'distribution') return resolveDistributionRecipient(item,departments);
+  if (kind === 'overdue_reminder') {
+    if (item.approvalStatus !== 'sender_approved') return resolveRecipient(item,departments,'approval_request');
+    const matches = departments.filter(d=>d.name===item.department);
+    if (matches.length !== 1) throw new Error('対応者の部署が未登録、または重複しています。');
+    const emails = parseDepartmentEmails(matches[0].distributionEmail);
+    if (!emails.length) throw new Error('発生部署の展開先アドレスが未設定です: '+item.department);
+    const allowed = allowedRecipients();
+    if (emails.some(email=>!allowed.includes(email))) throw new Error('許可されていない対応者宛先が含まれています。');
+    return {email:emails.join(','),emails:emails,name:item.department+' 対応者',department:item.department};
+  }
   const resultNotification = kind && kind !== 'approval_request';
   const department = resultNotification || item.approvalStatus === 'draft' ? item.planneddepartment : item.department;
   const matches = departments.filter(d => d.name === department);
@@ -216,6 +313,21 @@ function distributionMessage(item, recipient) {
       '変化点カード:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()),
       '','変化点カードを印刷して現場リーダーへ渡してください。',
       '','変化点管理アプリからの自動通知です。'].join('\n')
+  };
+}
+
+function overdueReminderMessage(item, recipient) {
+  const labels = {draft:'発信部署の承認待ち',sender_approved:'発生部署の対応・チェック待ち',receiver_confirmed:'発生部署の最終承認待ち'};
+  return {
+    to:recipient.email,name:'変化点管理',
+    subject:('【変化点 状況確認】予定日超過 / '+(item.lineName || '-')+' / 整理No '+(item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180),
+    body:[recipient.name+' 様','','予定日を過ぎています。現在の状況を確認し、下記リンクから処理をお願いします。','',
+      '現在の状態: '+labels[item.approvalStatus],'予定日: '+item.occurrenceDate,
+      'ライン: '+(item.lineName || '-'),'工程: '+(item.processName || '-'),'整理No: '+(item.serialNo || '-'),
+      '発信部署: '+(item.planneddepartment || '-'),'発生部署: '+(item.department || '-'),
+      '','変化点内容:',String(item.content || '').slice(0,4000),'','チェック・承認画面を開く:',
+      NOTIFIER.appUrl+'?changepointId='+encodeURIComponent(item._name.split('/').pop()),
+      '','変化点管理アプリからの状況確認です。未完了の間は1日1回お知らせします。'].join('\n')
   };
 }
 
@@ -273,8 +385,10 @@ function processApprovalJobs() {
       const doc = firestoreRead(job.document.slice(prefix.length));
       const item = doc ? decodeDocument(doc) : null;
       const kind = job.kind || 'approval_request';
-      const matches = kind === 'approval_request' ? item && notificationStage(item) === job.stage : isResultNotificationCurrent(item,kind);
-      if (!matches || item[job.timestampField || 'approvalRequestedAt'] !== job.requestedAt) {
+      const reminder = kind === 'overdue_reminder';
+      const matches = reminder ? activeReminderDay() === job.reminderDay && overdueReminderStage(item,job.reminderDay)
+        : kind === 'approval_request' ? item && notificationStage(item) === job.stage : isResultNotificationCurrent(item,kind);
+      if (!matches || (!reminder && item[job.timestampField || 'approvalRequestedAt'] !== job.requestedAt)) {
         job.state = 'skipped'; job.finishedAt = new Date().toISOString();
         props.setProperty(key, JSON.stringify(job)); continue;
       }
@@ -285,7 +399,9 @@ function processApprovalJobs() {
         continue;
       }
       const message = kind === 'approval_request' ? approvalMessage(item, recipient)
-        : kind === 'distribution' ? distributionMessage(item,recipient) : resultMessage(item,recipient,kind);
+        : kind === 'distribution' ? distributionMessage(item,recipient)
+        : reminder ? overdueReminderMessage(item,recipient) : resultMessage(item,recipient,kind);
+      if (reminder) { job.stage = item.approvalStatus; job.occurrenceDate = item.occurrenceDate; }
       job.state = 'sending'; job.recipient = recipient.email;
       job.attemptedAt = new Date().toISOString();
       delete job.error;
@@ -311,9 +427,12 @@ function processApprovalJobs() {
 
 function pruneNotificationJobs() {
   const props = notifierProperties(), state = props.getProperties();
+  const today = reminderCalendar(new Date()).day;
   // The cursor prevents repeats after removal. Keep unresolved jobs for manual review.
   Object.keys(state).filter(k => k.startsWith('job_')).forEach(key => {
     const job = JSON.parse(state[key]);
+    // Unsent reminders expire daily; the next scan rechecks the current stage and date.
+    if (job.kind === 'overdue_reminder' && job.reminderDay < today && job.state === 'pending') { props.deleteProperty(key); return; }
     if (['sent','skipped'].includes(job.state) && Date.parse(job.finishedAt) < Date.now() - 86400000) props.deleteProperty(key);
   });
 }
@@ -327,6 +446,13 @@ function pollApprovalNotifications() {
   try {
     pruneNotificationJobs();
     collectApprovalRequests();
+    try {
+      collectOverdueReminders();
+      props.deleteProperty('REMINDER_LAST_ERROR');
+    } catch (error) {
+      props.setProperty('REMINDER_LAST_ERROR',String(error.message || error).slice(0,500));
+      console.error('状況確認の取得を保留しました: '+error.message);
+    }
     processApprovalJobs();
     props.setProperty('LAST_SUCCESS_AT', new Date().toISOString());
     props.deleteProperty('LAST_ERROR');
@@ -340,6 +466,7 @@ function showNotificationStatus() {
   verifyNotifierOwner();
   const state = notifierProperties().getProperties();
   console.log(JSON.stringify({enabled:state.ENABLED,start:state.START_AT,lastRun:state.LAST_SUCCESS_AT,error:state.LAST_ERROR,
+    reminders:{enabled:state.REMINDERS_ENABLED,startDay:state.REMINDERS_START_DAY,hour:'09:00 Asia/Tokyo',weekdaysOnly:state.REMINDER_WEEKDAYS_ONLY,scan:state.REMINDER_SCAN,error:state.REMINDER_LAST_ERROR},
     jobs:Object.keys(state).filter(k => k.startsWith('job_')).map(key => ({key:key,details:JSON.parse(state[key])}))},null,2));
 }
 
