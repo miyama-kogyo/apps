@@ -101,6 +101,10 @@
     .dashboard-qr-code img,.dashboard-qr-code canvas{display:block;width:74px!important;height:74px!important}
     .dashboard-qr-copy{font-size:.76rem;line-height:1.45;color:var(--muted)}
     .dashboard-qr-copy strong{display:block;color:var(--ink);font-size:.86rem;margin-bottom:2px}
+    .compare-date-control{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:var(--shadow)}
+    .compare-date-control label{font-size:.82rem;font-weight:900;white-space:nowrap}
+    .compare-date-control input{width:142px;min-height:40px;padding:7px 8px;border:1px solid #cfd5d8;border-radius:6px;background:#fff;color:var(--ink);font-weight:700}
+    .compare-date-control .icon-btn{width:40px;height:40px;flex:0 0 40px}
     .dept-picker{position:relative}
     .dept-picker-btn{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:9px 12px;border:1px solid #b8c7cb;border-radius:6px;background:#fff;color:#24373e;font-weight:800}
     .dept-picker-btn:hover,.dept-picker-btn[aria-expanded="true"]{border-color:var(--brand);color:var(--brand-dark);background:#f1faf8}
@@ -214,7 +218,7 @@
       .main-nav{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);order:3}.nav-btn{padding:8px 4px;font-size:.78rem}.connection{display:none}
       .page{padding:12px}.page-heading{align-items:flex-start}.page-heading p{font-size:.8rem}.page-heading h2{font-size:1.25rem}
       .page-heading>.full-screen-note{display:none}
-      .dashboard-heading-actions>.full-screen-note{display:none}.dashboard-heading-actions{width:100%;justify-content:stretch}.dashboard-qr{flex:1}.dashboard-qr-code{width:74px;height:74px;flex-basis:74px}.dashboard-qr-code img,.dashboard-qr-code canvas{width:66px!important;height:66px!important}.dept-picker{width:100%}.dept-picker-btn{width:100%;justify-content:center}.dept-picker-panel{position:fixed;left:12px;right:12px;top:138px;width:auto;max-height:calc(100vh - 155px)}
+      .dashboard-heading{flex-direction:column;align-items:stretch}.dashboard-heading-actions>.full-screen-note{display:none}.dashboard-heading-actions{width:100%;justify-content:stretch}.dashboard-qr{flex:1}.dashboard-qr-code{width:74px;height:74px;flex-basis:74px}.dashboard-qr-code img,.dashboard-qr-code canvas{width:66px!important;height:66px!important}.compare-date-control{width:100%}.compare-date-control input{flex:1;width:auto;min-width:0}.dept-picker{width:100%}.dept-picker-btn{width:100%;justify-content:center}.dept-picker-panel{position:fixed;left:12px;right:12px;top:138px;width:auto;max-height:calc(100vh - 155px)}
       .input-layout{grid-template-columns:1fr}.entry-guide{display:none}.entry-panel{padding:14px;min-width:0;overflow:hidden}.form-grid{grid-template-columns:minmax(0,1fr)}.field.full{grid-column:auto}.field input[type="datetime-local"]{font-size:16px;padding-right:8px}
       .cause-options{grid-template-columns:repeat(3,minmax(0,1fr))}.cause-option label{font-size:.82rem;padding:6px 2px}
       .metric-grid{grid-template-columns:1fr 1fr;gap:8px}.metric{padding:12px}.metric-value{font-size:1.55rem}
@@ -322,11 +326,16 @@
 
     <section class="page" id="page-dashboard">
       <div class="page-heading dashboard-heading">
-        <div><h2>本日・前日の状況</h2><p id="dashboardDateLabel"></p></div>
+        <div><h2>本日・比較日の状況</h2><p id="dashboardDateLabel"></p></div>
         <div class="dashboard-heading-actions">
           <div class="dashboard-qr">
             <div class="dashboard-qr-code" id="inputQr" aria-label="スマホ入力用QRコード"></div>
             <div class="dashboard-qr-copy"><strong>スマホ入力</strong>QRを読み取って<br>入力画面を開く</div>
+          </div>
+          <div class="compare-date-control">
+            <label for="comparisonDate">比較日</label>
+            <input type="date" id="comparisonDate">
+            <button class="icon-btn" id="resetComparisonDate" type="button" title="直近の平日に戻す"><i data-lucide="calendar-clock"></i></button>
           </div>
           <div class="dept-picker" id="dashboardDeptPicker">
             <button class="dept-picker-btn" id="dashboardDeptButton" type="button" aria-expanded="false">
@@ -348,8 +357,8 @@
       </div>
       <div class="metric-grid">
         <div class="panel metric"><div class="metric-label">本日の落下品</div><div class="metric-value" id="todayTotal">0</div><div class="metric-sub">個</div></div>
-        <div class="panel metric warn"><div class="metric-label">前日の落下品</div><div class="metric-value" id="yesterdayTotal">0</div><div class="metric-sub">個</div></div>
-        <div class="panel metric danger"><div class="metric-label">前日との差</div><div class="metric-value" id="dayDifference">0</div><div class="metric-sub" id="differenceNote">個</div></div>
+        <div class="panel metric warn"><div class="metric-label">比較日の落下品</div><div class="metric-value" id="yesterdayTotal">0</div><div class="metric-sub" id="comparisonDateSub">個</div></div>
+        <div class="panel metric danger"><div class="metric-label">比較日との差</div><div class="metric-value" id="dayDifference">0</div><div class="metric-sub" id="differenceNote">個</div></div>
         <div class="panel metric"><div class="metric-label">本日の発生部署</div><div class="metric-value" id="activeDepartments">0</div><div class="metric-sub">部署</div></div>
       </div>
       <div class="dashboard-grid">
@@ -358,7 +367,7 @@
           <div class="chart-wrap"><canvas id="departmentChart"></canvas></div>
         </section>
         <section class="panel">
-          <div class="section-header"><h3>部署別・整理Noまたは部品名内訳</h3><span class="full-screen-note">本日 / 前日</span></div>
+          <div class="section-header"><h3>部署別・整理Noまたは部品名内訳</h3><span class="full-screen-note" id="breakdownDateLabel">本日 / 比較日</span></div>
           <div class="dept-list" id="departmentList"></div>
         </section>
       </div>
@@ -508,6 +517,7 @@
     const pad = n => String(n).padStart(2, '0');
     const localDateKey = date => `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
     const localDateTimeValue = date => `${localDateKey(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const shortDateLabel = key => key.slice(5).replace('-', '/');
     const parseDate = item => item.occurredAt?.toDate?.() || new Date(`${item.dateKey || '1970-01-01'}T00:00:00`);
     const fmtDateTime = item => new Intl.DateTimeFormat('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(parseDate(item));
     const quantity = item => Number(item.quantity) || 0;
@@ -517,6 +527,18 @@
     const groupSum = (rows, keyFn) => rows.reduce((map, row) => {
       const key = keyFn(row) || '未設定'; map[key] = (map[key] || 0) + quantity(row); return map;
     }, {});
+
+    function previousWeekday(reference){
+      const date = new Date(reference);
+      date.setHours(12, 0, 0, 0);
+      do { date.setDate(date.getDate() - 1); } while(date.getDay() === 0 || date.getDay() === 6);
+      return date;
+    }
+
+    function resetComparisonDate(){
+      $('comparisonDate').value = localDateKey(previousWeekday(new Date()));
+      renderDashboard();
+    }
 
     function refreshIcons(){ window.lucide?.createIcons(); }
     function showToast(message, isError=false){
@@ -537,6 +559,8 @@
         bindEvents();
         renderDashboardDepartmentPicker();
         renderInputQr();
+        $('comparisonDate').max = localDateKey(new Date());
+        $('comparisonDate').value = localDateKey(previousWeekday(new Date()));
         subscribeItems();
         $('occurredAt').value = localDateTimeValue(new Date());
         const to = new Date(); const from = new Date(); from.setDate(from.getDate()-29);
@@ -591,6 +615,10 @@
       $('cancelDelete').addEventListener('click', closeDelete);
       $('confirmDelete').addEventListener('click', confirmDelete);
       $('deleteModal').addEventListener('click', e => { if(e.target === $('deleteModal')) closeDelete(); });
+      $('comparisonDate').addEventListener('change', () => {
+        if(!$('comparisonDate').value) resetComparisonDate(); else renderDashboard();
+      });
+      $('resetComparisonDate').addEventListener('click', resetComparisonDate);
       $('dashboardDeptButton').addEventListener('click', event => {
         event.stopPropagation();
         const panel = $('dashboardDeptPanel');
@@ -944,27 +972,31 @@
     }
 
     function renderDashboard(){
-      const today = new Date(); const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
-      const todayKey = localDateKey(today), yesterdayKey = localDateKey(yesterday);
+      const today = new Date();
+      const todayKey = localDateKey(today);
+      const comparisonKey = $('comparisonDate').value || localDateKey(previousWeekday(today));
+      if(!$('comparisonDate').value) $('comparisonDate').value = comparisonKey;
       const dashboardItems = state.items.filter(row => state.dashboardDepartments.has(row.department));
-      const todayRows = byDate(dashboardItems,todayKey), yesterdayRows = byDate(dashboardItems,yesterdayKey);
-      const todayTotal = sumQty(todayRows), yesterdayTotal = sumQty(yesterdayRows), diff = todayTotal-yesterdayTotal;
+      const todayRows = byDate(dashboardItems,todayKey), comparisonRows = byDate(dashboardItems,comparisonKey);
+      const todayTotal = sumQty(todayRows), comparisonTotal = sumQty(comparisonRows), diff = todayTotal-comparisonTotal;
       $('todayTotal').textContent = todayTotal.toLocaleString('ja-JP');
-      $('yesterdayTotal').textContent = yesterdayTotal.toLocaleString('ja-JP');
+      $('yesterdayTotal').textContent = comparisonTotal.toLocaleString('ja-JP');
+      $('comparisonDateSub').textContent = `個（${shortDateLabel(comparisonKey)}）`;
       $('dayDifference').textContent = `${diff>0?'+':''}${diff.toLocaleString('ja-JP')}`;
       $('differenceNote').textContent = diff>0 ? '個増加' : diff<0 ? '個減少' : '個（同数）';
       $('activeDepartments').textContent = new Set(todayRows.map(row=>row.department).filter(Boolean)).size;
-      $('dashboardDateLabel').textContent = `${todayKey.replaceAll('-','/')} と ${yesterdayKey.replaceAll('-','/')} の比較・${state.dashboardDepartments.size}部署表示`;
+      $('dashboardDateLabel').textContent = `${todayKey.replaceAll('-','/')} と ${comparisonKey.replaceAll('-','/')} の比較・${state.dashboardDepartments.size}部署表示`;
+      $('breakdownDateLabel').textContent = `${shortDateLabel(todayKey)} / ${shortDateLabel(comparisonKey)}`;
       const departments = state.departments.filter(name => state.dashboardDepartments.has(name));
-      const todayByDept = groupSum(todayRows,r=>r.department), yesterdayByDept = groupSum(yesterdayRows,r=>r.department);
+      const todayByDept = groupSum(todayRows,r=>r.department), comparisonByDept = groupSum(comparisonRows,r=>r.department);
       departments.sort((a,b)=>(todayByDept[b]||0)-(todayByDept[a]||0) || a.localeCompare(b,'ja'));
-      renderDepartmentChart(departments,todayByDept,yesterdayByDept,todayRows,yesterdayRows);
+      renderDepartmentChart(departments,todayByDept,comparisonByDept,todayRows,comparisonRows,todayKey,comparisonKey);
       $('departmentList').innerHTML = departments.length ? departments.map(dept => {
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,count])=>`<span class="serial-chip">${esc(name)} ${count}</span>`).join('');
-        return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>本日</small></span><span class="dept-number">${yesterdayByDept[dept]||0}<small>前日</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">本日0件</span>'}</span></button>`;
+        return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">本日0件</span>'}</span></button>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
-      document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：本日・前日`,[...todayRows,...yesterdayRows].filter(r=>r.department===btn.dataset.dept))));
+      document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${shortDateLabel(todayKey)}・${shortDateLabel(comparisonKey)}`,[...todayRows,...comparisonRows].filter(r=>r.department===btn.dataset.dept))));
       const recent = dashboardItems.slice(0,12);
       $('recentList').innerHTML = recent.length ? recent.map(item=>`<button class="recent-item" data-item="${item.id}"><div class="recent-top"><span class="recent-serial">${esc(item.serialNo)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div><div class="recent-meta">${esc(item.department)} / ${quantity(item)}個<br>${fmtDateTime(item)}</div></button>`).join('') : '<div class="empty">登録データがありません</div>';
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
@@ -974,12 +1006,12 @@
       state.charts[key]?.destroy(); state.charts[key] = new Chart(canvas,config); return state.charts[key];
     }
 
-    function renderDepartmentChart(labels,todayMap,yesterdayMap,todayRows,yesterdayRows){
+    function renderDepartmentChart(labels,todayMap,comparisonMap,todayRows,comparisonRows,todayKey,comparisonKey){
       makeChart('department',$('departmentChart'),{
         type:'bar',data:{labels,datasets:[
-          {label:'本日',data:labels.map(x=>todayMap[x]||null),backgroundColor:'#4b5359',borderRadius:3,skipNull:true},
-          {label:'前日',data:labels.map(x=>yesterdayMap[x]||null),backgroundColor:'#aab0b4',borderRadius:3,skipNull:true}
-        ]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=labels[els[0].index];openDetail(`${dept}：本日・前日`,[...todayRows,...yesterdayRows].filter(r=>r.department===dept));},plugins:{legend:{position:'top',labels:{font:{size:15},padding:18}}},scales:{y:{beginAtZero:true,ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},x:{ticks:{autoSkip:false,maxRotation:35,minRotation:0,font:{size:14}}}}}
+          {label:`本日 ${shortDateLabel(todayKey)}`,data:labels.map(x=>todayMap[x]||null),backgroundColor:'#4b5359',borderRadius:3,skipNull:true},
+          {label:`比較日 ${shortDateLabel(comparisonKey)}`,data:labels.map(x=>comparisonMap[x]||null),backgroundColor:'#aab0b4',borderRadius:3,skipNull:true}
+        ]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=labels[els[0].index];openDetail(`${dept}：${shortDateLabel(todayKey)}・${shortDateLabel(comparisonKey)}`,[...todayRows,...comparisonRows].filter(r=>r.department===dept));},plugins:{legend:{position:'top',labels:{font:{size:15},padding:18}}},scales:{y:{beginAtZero:true,ticks:{precision:0,font:{size:14}},title:{display:true,text:'落下品数（個）',font:{size:14}}},x:{ticks:{autoSkip:false,maxRotation:35,minRotation:0,font:{size:14}}}}}
       });
     }
 
