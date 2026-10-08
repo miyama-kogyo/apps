@@ -55,6 +55,21 @@ let t=setup();
 t.ctx.pollApprovalNotifications();
 assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'sender@example.com');
 assert.ok(t.sent[0].body.includes('?changepointId=test%20card'));
+assert.ok(t.sent[0].body.includes('?productionDateId=test%20card'));
+assert.ok(t.sent[0].body.includes('発生部署（Receiver）の現場管理者'));
+for (const date of [null,'','2026-10-12']) {
+  const item=record({occurrenceDate:date});
+  const message=t.ctx.distributionMessage(item,{name:'Team',email:'team@example.com'});
+  assert.ok(message.body.includes('変化点情報リンク:'));
+  assert.ok(!message.body.includes('変化点カード'));
+  assert.ok(!message.body.includes('印刷して'));
+  assert.equal(message.body.includes('?productionDateId='),!date);
+  assert.equal(t.ctx.approvalMessage(item,{name:'Boss',email:'boss@example.com'}).body.includes('?productionDateId='),!date);
+}
+for (const state of [{approvalStatus:'approved'},{switchStatus:'canceled'},{switchStatus:'completed'},{activatedAt:at}]) {
+  assert.equal(t.ctx.productionDateMessageLines(record(state)).length,0);
+}
+assert.ok(t.ctx.resultMessage(record({receiverApprovedAt:at,approvalStatus:'approved'}),{name:'Team',email:'team@example.com'},'receiver_approved').body.includes('変化点情報リンク:'));
 assert.equal(t.jobs()[0].state,'sent');
 assert.ok(t.writes.findIndex(k=>k.startsWith('job_'))<t.writes.indexOf('CURSOR'));
 const query=JSON.parse(t.requests.find(r=>r.url.endsWith(':runQuery')).options.payload).structuredQuery;
@@ -145,7 +160,7 @@ function distributionSetup(overrides={}){
 }
 t=distributionSetup();t.ctx.pollApprovalNotifications();
 assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'sender@example.com,receiver@example.com,extra@example.com');
-assert.ok(t.sent[0].subject.includes('変化点展開'));assert.ok(t.sent[0].body.includes('現場リーダー'));
+assert.ok(t.sent[0].subject.includes('変化点展開'));assert.ok(!t.sent[0].body.includes('現場リーダー'));
 assert.ok(t.state.CURSOR_DISTRIBUTION);t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);
 t=distributionSetup({distributionDepartments:['Extra']});t.ctx.pollApprovalNotifications();assert.equal(t.sent[0].to,'sender@example.com,receiver@example.com,extra@example.com','mandatory departments enforced by worker too');
 for(const change of ['missing','notAllowed','duplicate','malformed','emptyEntry','quota']){
@@ -208,4 +223,39 @@ for(let i=0;i<10;i++)t.ctx.pollApprovalNotifications();assert.equal(t.sent.lengt
 assert.equal(JSON.parse(t.state.REMINDER_SCAN).done,true);
 t=reminderSetup('draft');t.env.records[0].approvalRequestedAt=at;t.env.reminderQueryError=true;t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1,'reminder collection failure does not stop existing approval mail');assert.ok(t.state.REMINDER_LAST_ERROR);assert.equal(t.state.LAST_ERROR,undefined);
 console.log('PASS: daily overdue reminders; JST schedule; current-stage routing; direct links; same-day dedup; next-day repeat; completion/reschedule/cancel stop; pending expiry; uncertain hold; pagination.');
+for (const kind of ['approval_request','production_date','receiver_approved','distribution','overdue_reminder']) {
+  t=kind==='distribution'?distributionSetup():kind==='overdue_reminder'?reminderSetup():setup();
+  t.state.ALLOWED_RECIPIENTS='';
+  t.ctx.enableAutomaticMasterRecipients();
+  t.env.departments.forEach(d=>{
+    for(const field of ['approverEmail','notificationEmail','distributionEmail']) {
+      if(d[field])d[field]=d[field].replaceAll('example.com','miyama-unitec.co.jp');
+    }
+  });
+  if(['production_date','receiver_approved'].includes(kind))t.env.records=[record({approvalStatus:'approved',occurrenceDate:'2026-10-20',[kind==='production_date'?'productionDateUpdatedAt':'receiverApprovedAt']:at})];
+  t.ctx.pollApprovalNotifications();
+  assert.equal(t.sent.length,1,kind+' accepts current company master recipients without a static allowlist');
+  assert.ok(t.sent[0].to.split(',').every(e=>e.endsWith('@miyama-unitec.co.jp')));
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1,'automatic mode retains deduplication');
+}
+for (const email of ['new@outside.com','new@sub.miyama-unitec.co.jp','new@miyama-unitec.co.jp.evil.com','new@notmiyama-unitec.co.jp','invalid']) {
+  t=setup();t.ctx.enableAutomaticMasterRecipients();
+  t.env.departments[0].approverEmail='new@miyama-unitec.co.jp,'+email;
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'no partial send to an invalid or external group');
+  assert.equal(t.jobs()[0].state,'pending');
+}
+t=setup();t.state.ALLOWED_RECIPIENTS='';t.ctx.enableAutomaticMasterRecipients();
+t.env.departments[0].approverEmail='New@MIYAMA-UNITEC.CO.JP,new@miyama-unitec.co.jp';
+t.ctx.pollApprovalNotifications();assert.equal(t.sent[0].to,'new@miyama-unitec.co.jp');
+t.env.departments[0].approverEmail='replacement@miyama-unitec.co.jp';
+t.env.records.push(record({_name:prefix+'/changepoints/new-master-recipient'}));
+t.ctx.pollApprovalNotifications();assert.equal(t.sent.at(-1).to,'replacement@miyama-unitec.co.jp','master changes apply without config edits');
+assert.equal(t.state.ALLOWED_RECIPIENTS,'','do not accumulate obsolete master addresses in the static allowlist');
+t=setup();t.ctx.enableAutomaticMasterRecipients();t.ctx.collectApprovalRequests();
+t.env.departments[0].approverEmail='';t.ctx.processApprovalJobs();assert.equal(t.sent.length,0,'removed recipients are never used from a cache');
+t=setup();t.env.departments[0].approverEmail='new@miyama-unitec.co.jp';t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'manual mode is unchanged by default');
+t=setup();t.state.ALLOWED_RECIPIENTS='';t.ctx.enableAutomaticMasterRecipients();const preservedStart=t.state.START_AT;
+t.ctx.startApprovalNotifications();assert.equal(t.triggers.length,1);assert.equal(t.state.START_AT,preservedStart);
+t=setup();t.env.owner='other@example.com';assert.throws(()=>t.ctx.enableAutomaticMasterRecipients());assert.equal(t.state.AUTO_ALLOW_MASTER_RECIPIENTS,undefined);
+console.log('PASS: automatic master recipients across all five notification kinds; exact company domain; invalid/external group hold; live additions/removals; dedup; owner guard; existing manual mode.');
 console.log('PASS: mocked Gmail/Firestore tests; routing, allowlist, stages, cursor, duplicate prevention, stale requests, quotas, uncertain send, owner, trigger lifecycle and queue capacity. No real email or database writes.');

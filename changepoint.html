@@ -832,6 +832,11 @@
     .workflow-fold[open] summary { margin-bottom:12px; }
     .responder-checks h4 { font-size:13px; margin-bottom:10px; }
     .workflow-checks { scroll-margin-top:100px; }
+    .actual-switch { margin:12px 0; }
+    .actual-switch-fields { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:10px; max-width:430px; }
+    .actual-switch-fields label { display:block; font-size:14px; margin:6px 0; }
+    .actual-switch-fields input { width:100%; min-width:0; box-sizing:border-box; padding:9px 6px; font:inherit; border:1px solid #b8c9bf; border-radius:4px; }
+    .production-date-link { display:inline-block; margin:8px 0; color:#176343; text-decoration:underline; }
     .checks-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
     .checks-heading h4 { font-size:16px; }
     .checks-heading>span { font-size:12px; color:#627369; }
@@ -1597,6 +1602,8 @@
       { key: 'issuedDate',        label: '起票日' },
       { key: 'occurrenceDate',    label: '発生日' },
       { key: 'occurrenceTime',    label: '時刻' },
+      { key: 'actualSwitchDate',  label: '実際の切替日' },
+      { key: 'actualSwitchTime',  label: '実際の切替時刻' },
       { key: 'lot',               label: '対象ロット' },
       { key: 'document',          label: '関連資料' },
       { key: 'documentUrl',       label: '資料URL' },
@@ -3028,6 +3035,40 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     let currentDetailItem = null;
     const workflowCommentDrafts = new Map();
     const workflowCommentSaves = new Set();
+    const actualSwitchDrafts = new Map();
+    const receiverStampSaves = new Set();
+
+    function actualSwitchLabel(item){
+      return item.actualSwitchDate && item.actualSwitchTime ? `${item.actualSwitchDate} ${item.actualSwitchTime}` : '未記録';
+    }
+
+    window.setActualSwitchDraft = function(field, value){
+      if (!currentDetailItem?._id || !['actualSwitchDate','actualSwitchTime'].includes(field) || approvalStatusOf(currentDetailItem) !== 'sender_approved') return;
+      const item = currentDetailItem;
+      const draft = actualSwitchDrafts.get(item._id) || {actualSwitchDate:item.actualSwitchDate || '',actualSwitchTime:item.actualSwitchTime || ''};
+      actualSwitchDrafts.set(item._id,{...draft,[field]:value});
+    };
+
+    function validateActualSwitch(date, time){
+      const parsed = new Date(date + 'T00:00:00Z');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0,10) !== date || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)){
+        throw new Error('実際に切り替わった日付と時刻（時・分）を入力してください。');
+      }
+    }
+
+    async function saveReceiverStamp(id, who, actual){
+      validateActualSwitch(actual.actualSwitchDate,actual.actualSwitchTime);
+      return runTransaction(db, async transaction => {
+        const ref = doc(db,'changepoints',id);
+        const snapshot = await transaction.get(ref);
+        if (!snapshot.exists()) throw new Error('対象の変化点が見つかりません。');
+        const latest = snapshot.data();
+        if (!(latest.type === 'planned' || latest.workflowManaged === true) || approvalStatusOf(latest) !== 'sender_approved' || boardCompleted(latest) || boardCanceled(latest)) throw new Error('状態が変更されています。画面を開き直してください。');
+        if (!allRoleChecksDone(getRecordChecklist(latest),'receiver')) throw new Error('対応者チェックをすべて合格または該当なしにしてください。');
+        transaction.update(ref,{...actual,approvalStatus:'receiver_confirmed',receiverConfirmedBy:who,receiverConfirmedAt:serverTimestamp(),approvalRequestedAt:serverTimestamp(),updatedBy:who,updatedAt:serverTimestamp()});
+        return {...latest,_id:id,...actual,approvalStatus:'receiver_confirmed',receiverConfirmedBy:who,receiverConfirmedAt:new Date(),approvalRequestedAt:new Date()};
+      });
+    }
 
     function isQrWorkflow(item){
       return !!item?._id && new URLSearchParams(location.search).get('changepointId') === item._id;
@@ -3135,6 +3176,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const receiverLocked = stage >= 3;
       const commentValue = workflowCommentDrafts.has(item._id) ? workflowCommentDrafts.get(item._id) : (item.workflowComment || '');
       const commentSaving = workflowCommentSaves.has(item._id);
+      const actual = actualSwitchDrafts.get(item._id) || item;
+      const stamping = receiverStampSaves.has(item._id);
       const actions = {
         draft: ['発信部署の承認者', '承認スタンプを押す', 'approveSender()'],
         sender_approved: ['発生部署の対応者', '対応スタンプを押す', 'confirmReceiver()'],
@@ -3148,6 +3191,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
           <div class="checks-heading"><h4 id="responderChecksTitle">対応者チェック</h4><span>確認完了 ${progress(receiverChecks,'receiver')}</span></div>
           <section class="responder-checks">
             <h4>発生部署の対応者：${escapeHtml(item.department || '-')}</h4>
+            ${!item.occurrenceDate && !boardCompleted(item) && !boardCanceled(item) ? `<a class="production-date-link" href="${escapeAttr(buildProductionDateUrl(item._id))}">生産予定日を入力する（未定）</a>` : ''}
+            <div class="actual-switch" data-workflow-section="actual-switch"><strong>実際の切替日時（日本時間）${status === 'sender_approved' ? ' *' : ''}</strong>
+            ${status === 'sender_approved' ? `<div class="actual-switch-fields"><div><label for="actualSwitchDate">切替日</label><input type="date" id="actualSwitchDate" required value="${escapeAttr(actual.actualSwitchDate || '')}" ${stamping ? 'disabled' : ''} oninput="setActualSwitchDraft('actualSwitchDate',this.value)"></div><div><label for="actualSwitchTime">切替時刻</label><input type="time" id="actualSwitchTime" step="60" required value="${escapeAttr(actual.actualSwitchTime || '')}" ${stamping ? 'disabled' : ''} oninput="setActualSwitchDraft('actualSwitchTime',this.value)"></div></div>` : `<p>${escapeHtml(actualSwitchLabel(item))}</p>`}
+            </div>
             <div class="checklist-panel">${renderApprovalChecklist(items, 'receiver', !receiverEnabled || receiverLocked)}</div>
             ${!senderLocked ? `<div class="approval-add"><input id="senderCustomCheck" placeholder="確認項目を追加"><button type="button" onclick="addApprovalCustom('sender')">追加</button></div>` : ''}
             ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
@@ -3178,7 +3225,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
         ${next ? `<div class="stamp-action">
           <label for="workflowStampName">次：${next[0]}</label>
-          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" onclick="${next[2]}">${next[1]}</button></div>
+          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" ${stamping ? 'disabled' : ''} onclick="${next[2]}">${stamping ? '保存中...' : next[1]}</button></div>
         </div>` : ''}
         <div class="workflow-stamps">${workflowStampEntries(item).map((stamp,index)=>`<div class="workflow-stamp ${stamp.name ? 'is-stamped' : ''} ${index===stage+1 && next ? 'is-next' : ''}">
           <div class="stamp-role"><small>${escapeHtml(stamp.department)}</small><strong>${index+1}. ${escapeHtml(stamp.role)}</strong></div>
@@ -3317,16 +3364,28 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
 
     window.confirmReceiver = async function(){
-      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'sender_approved') return;
+      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'sender_approved' || receiverStampSaves.has(currentDetailItem._id)) return;
+      const id = currentDetailItem._id;
       const items = getRecordChecklist(currentDetailItem);
       if (!allRoleChecksDone(items, 'receiver')){ workflowNotice('対応者チェックをすべて合格または該当なしにしてください。NGは対応後に再判定が必要です', 'checks'); return; }
       const who = readStampName();
-      if (!who || !confirm(`${who} さんの発生部署対応スタンプを登録しますか？`)) return;
+      if (!who) return;
+      const actual = {actualSwitchDate:document.getElementById('actualSwitchDate')?.value || '',actualSwitchTime:document.getElementById('actualSwitchTime')?.value || ''};
+      try{ validateActualSwitch(actual.actualSwitchDate,actual.actualSwitchTime); }
+      catch(error){ workflowNotice(error.message,'actual-switch'); return; }
+      actualSwitchDrafts.set(id,actual);
+      if (!confirm(`実際の切替日時：${actualSwitchLabel(actual)}\n${who} さんの発生部署対応スタンプを登録しますか？`)) return;
+      receiverStampSaves.add(id);
+      renderApprovalWorkflow(currentDetailItem);
       try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:serverTimestamp(), approvalRequestedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, approvalStatus:'receiver_confirmed', receiverConfirmedBy:who, receiverConfirmedAt:new Date(), approvalRequestedAt:new Date() };
-        renderApprovalWorkflow(currentDetailItem);
-      }catch(e){ console.error(e); alert('確認の登録に失敗しました'); }
+        const saved = await saveReceiverStamp(id,who,actual);
+        actualSwitchDrafts.delete(id);
+        if (currentDetailItem?._id === id) currentDetailItem = saved;
+      }catch(e){ console.error(e); alert('確認の登録に失敗しました: ' + e.message); }
+      finally{
+        receiverStampSaves.delete(id);
+        if (currentDetailItem?._id === id) renderApprovalWorkflow(currentDetailItem);
+      }
     };
 
     window.approveReceiver = async function(){
@@ -3367,7 +3426,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const cardStatus = managed ? approvalStatusLabel(approvalStatusOf(item)) : boardStatus(item);
       const resultLabel = (x, role) => ({ok:'合格',ng:'NG',na:'該当なし','':'未判定'})[checklistResult(x, role)] || '未判定';
       const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}</td><td>${escapeHtml(x.criteria || '-')}</td><td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
-      const checks = activeCheckRows;
+      const checks = activeCheckRows + (managed ? `<tr><td colspan="3"><b>実際の切替日時：</b>${escapeHtml(actualSwitchLabel(item))}（日本時間）</td></tr>` : '');
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
       const qr = (kind, src, alt, label) => `<div class="qr" data-card-qr="${escapeAttr(item._id || '')}" data-qr-kind="${kind}"><img ${src ? `src="${src}"` : 'hidden'} alt="${alt}">${src ? '' : '<span class="qr-pending">QR準備中</span>'}<b>${label}</b></div>`;

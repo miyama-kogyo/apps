@@ -3,6 +3,7 @@ const NOTIFIER = Object.freeze({
   sender: 'miyama.firebase@gmail.com',
   project: 'abnreport-fd733',
   appUrl: 'https://miyama-kogyo.github.io/apps/changepoint.html',
+  autoAllowedDomain: 'miyama-unitec.co.jp',
   batchSize: 40,
   maxJobs: 200,
   maxSendsPerRun: 10
@@ -62,6 +63,25 @@ function allowedRecipients() {
     .split(/[,;\s、，；]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
 }
 
+function automaticMasterRecipientsEnabled() {
+  return notifierProperties().getProperty('AUTO_ALLOW_MASTER_RECIPIENTS') === 'true';
+}
+
+// Call only for validated addresses resolved from the current department master.
+function areDepartmentRecipientsAllowed(emails) {
+  const allowed = allowedRecipients();
+  const automatic = automaticMasterRecipientsEnabled();
+  return emails.every(email => allowed.includes(email) ||
+    (automatic && email.split('@').length === 2 && email.split('@')[1] === NOTIFIER.autoAllowedDomain));
+}
+
+function enableAutomaticMasterRecipients() {
+  verifyNotifierOwner();
+  readDepartments();
+  notifierProperties().setProperty('AUTO_ALLOW_MASTER_RECIPIENTS', 'true');
+  console.log('部署マスターの社内アドレスを自動許可しました: @' + NOTIFIER.autoAllowedDomain);
+}
+
 function parseDepartmentEmails(value){
   const text = String(value || '').trim();
   if (!text) return [];
@@ -76,13 +96,13 @@ function parseDepartmentEmails(value){
 function previewNotifierConfiguration() {
   verifyNotifierOwner();
   const departments = readDepartments().map(d => ({department:d.name,name:d.approverName || '',approvalEmail:d.approverEmail || '',notificationEmail:d.notificationEmail || '',distributionEmail:d.distributionEmail || ''}));
-  console.log(JSON.stringify({sender:NOTIFIER.sender,allowedRecipients:allowedRecipients(),departments:departments}, null, 2));
+  console.log(JSON.stringify({sender:NOTIFIER.sender,automaticMasterRecipients:automaticMasterRecipientsEnabled(),autoAllowedDomain:NOTIFIER.autoAllowedDomain,allowedRecipients:allowedRecipients(),departments:departments}, null, 2));
   return departments;
 }
 
 function startApprovalNotifications() {
   verifyNotifierOwner();
-  if (!allowedRecipients().length) throw new Error('ALLOWED_RECIPIENTSに確認済みの承認先を設定してください。');
+  if (!allowedRecipients().length && !automaticMasterRecipientsEnabled()) throw new Error('ALLOWED_RECIPIENTSに確認済みの承認先を設定してください。');
   readDepartments();
   const props = notifierProperties();
   // The first start never mails old records. Resume keeps the cursor and queued jobs.
@@ -265,8 +285,7 @@ function resolveRecipient(item, departments, kind) {
     if (matches.length !== 1) throw new Error('対応者の部署が未登録、または重複しています。');
     const emails = parseDepartmentEmails(matches[0].distributionEmail);
     if (!emails.length) throw new Error('発生部署の展開先アドレスが未設定です: '+item.department);
-    const allowed = allowedRecipients();
-    if (emails.some(email=>!allowed.includes(email))) throw new Error('許可されていない対応者宛先が含まれています。');
+    if (!areDepartmentRecipientsAllowed(emails)) throw new Error('許可されていない対応者宛先が含まれています。');
     return {email:emails.join(','),emails:emails,name:item.department+' 対応者',department:item.department};
   }
   const resultNotification = kind && kind !== 'approval_request';
@@ -278,8 +297,7 @@ function resolveRecipient(item, departments, kind) {
   const emails = parseDepartmentEmails(separate ? master.notificationEmail : master.approverEmail);
   const name = separate ? department : master.approverName;
   if (!emails.length || !name) throw new Error('部署の通知先が未設定です: ' + department);
-  const allowed = allowedRecipients();
-  if (emails.some(email => !allowed.includes(email))) throw new Error('許可されていない宛先が含まれています: ' + department);
+  if (!areDepartmentRecipientsAllowed(emails)) throw new Error('許可されていない宛先が含まれています: ' + department);
   return {email:emails.join(','),emails:emails,name:name,department:department};
 }
 
@@ -296,22 +314,29 @@ function resolveDistributionRecipient(item, departments) {
     addresses.push(...emails);
   });
   const emails = parseDepartmentEmails(addresses.join(','));
-  const allowed = allowedRecipients();
-  if (emails.some(email => !allowed.includes(email))) throw new Error('許可されていない展開先アドレスが含まれています。');
+  if (!areDepartmentRecipientsAllowed(emails)) throw new Error('許可されていない展開先アドレスが含まれています。');
   return {email:emails.join(','),emails:emails,name:names.join('・'),department:names.join('・')};
+}
+
+function productionDateMessageLines(item) {
+  if (item.occurrenceDate || item.approvalStatus === 'approved' ||
+      ['completed','canceled'].includes(item.switchStatus) || ['completed','canceled'].includes(item.switchState) ||
+      item.activatedAt || item.effectiveAt || item.isActivated || item.effectiveStatus === 'active' || item.activationStatus === 'activated') return [];
+  return ['', '生産予定日が未定です。発生部署（' + (item.department || '-') + '）の現場管理者は、次回生産予定日を入力してください。',
+    '生産予定日入力リンク:', NOTIFIER.appUrl + '?productionDateId=' + encodeURIComponent(item._name.split('/').pop())];
 }
 
 function distributionMessage(item, recipient) {
   return {
     to:recipient.email,name:'変化点管理',
     subject:('【変化点展開】' + (item.lineName || '-') + ' / 整理No ' + (item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180),
-    body:[recipient.name + ' 各位','','変化点カードが登録されました。','',
+    body:[recipient.name + ' 各位','','変化点が登録されました。','',
       '実施予定日: ' + (item.occurrenceDate || '未確定'),'ライン: ' + (item.lineName || '-'),
       '工程: ' + (item.processName || '-'),'整理No: ' + (item.serialNo || '-'),'分類: ' + (item.category || '-'),
       '発信部署: ' + (item.planneddepartment || '-'),'発生部署: ' + (item.department || '-'),
       '作成者: ' + (item.createdBy || '-'),'','変化点内容:',String(item.content || '').slice(0,4000),'',
-      '変化点カード:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()),
-      '','変化点カードを印刷して現場リーダーへ渡してください。',
+      '変化点情報リンク:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()),
+      ...productionDateMessageLines(item),
       '','変化点管理アプリからの自動通知です。'].join('\n')
   };
 }
@@ -343,8 +368,9 @@ function resultMessage(item, recipient, kind) {
     '生産予定日: ' + (item.occurrenceDate || '未確定'),'作成部署: ' + (item.planneddepartment || '-'),
     '発生部署: ' + (item.department || '-'),'操作した人: ' + (actors[kind] || '-'),
     '操作日時: ' + Utilities.formatDate(new Date(timestamp),'Asia/Tokyo','yyyy/MM/dd HH:mm:ss'),
-    '','変化点内容:',String(item.content || '').slice(0,4000),'','変化点カード:',
+    '','変化点内容:',String(item.content || '').slice(0,4000),'','変化点情報リンク:',
     NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()),
+    ...productionDateMessageLines(item),
     '','変化点管理アプリからの自動通知です。'].join('\n');
   return message;
 }
@@ -363,6 +389,7 @@ function approvalMessage(item, recipient) {
       '発信部署: ' + (item.planneddepartment || '-'),'発生部署: ' + (item.department || '-'),
       '作成・対応者: ' + (who || '-'),'','変化点内容:',String(item.content || '').slice(0,4000),
       '','承認画面:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(id),
+      ...productionDateMessageLines(item),
       '','変化点管理アプリからの自動通知です。'].join('\n')
   };
 }
@@ -465,7 +492,7 @@ function pollApprovalNotifications() {
 function showNotificationStatus() {
   verifyNotifierOwner();
   const state = notifierProperties().getProperties();
-  console.log(JSON.stringify({enabled:state.ENABLED,start:state.START_AT,lastRun:state.LAST_SUCCESS_AT,error:state.LAST_ERROR,
+  console.log(JSON.stringify({enabled:state.ENABLED,automaticMasterRecipients:automaticMasterRecipientsEnabled(),autoAllowedDomain:NOTIFIER.autoAllowedDomain,start:state.START_AT,lastRun:state.LAST_SUCCESS_AT,error:state.LAST_ERROR,
     reminders:{enabled:state.REMINDERS_ENABLED,startDay:state.REMINDERS_START_DAY,hour:'09:00 Asia/Tokyo',weekdaysOnly:state.REMINDER_WEEKDAYS_ONLY,scan:state.REMINDER_SCAN,error:state.REMINDER_LAST_ERROR},
     jobs:Object.keys(state).filter(k => k.startsWith('job_')).map(key => ({key:key,details:JSON.parse(state[key])}))},null,2));
 }
