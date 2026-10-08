@@ -58,7 +58,18 @@ function readDepartments() {
 
 function allowedRecipients() {
   return (notifierProperties().getProperty('ALLOWED_RECIPIENTS') || '')
-    .split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+    .split(/[,;\s、，；]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+}
+
+function parseDepartmentEmails(value){
+  const text = String(value || '').trim();
+  if (!text) return [];
+  const emails = [...new Set(text.split(/[,;\s、，；]+/).filter(Boolean).map(x => x.toLowerCase()))];
+  if (!emails.length || emails.some(x => x.length > 254 || !/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(x))){
+    throw new Error('メールアドレスに誤りがあります。複数の宛先はカンマで区切ってください。');
+  }
+  if (emails.length > 50 || emails.join(',').length > 6000) throw new Error('宛先は50件以内、合計6000文字以内で入力してください。');
+  return emails;
 }
 
 function previewNotifierConfiguration() {
@@ -163,11 +174,12 @@ function resolveRecipient(item, departments, kind) {
   if (matches.length !== 1) throw new Error('承認先の部署が未登録、または重複しています: ' + (department || '未設定'));
   const master = matches[0];
   const separate = resultNotification;
-  const email = String((separate ? master.notificationEmail : master.approverEmail) || '').trim().toLowerCase();
+  const emails = parseDepartmentEmails(separate ? master.notificationEmail : master.approverEmail);
   const name = separate ? department : master.approverName;
-  if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(email) || !name) throw new Error('部署の通知先が未設定です: ' + department);
-  if (!allowedRecipients().includes(email)) throw new Error('許可されていない宛先です: ' + department);
-  return {email:email,name:name,department:department};
+  if (!emails.length || !name) throw new Error('部署の通知先が未設定です: ' + department);
+  const allowed = allowedRecipients();
+  if (emails.some(email => !allowed.includes(email))) throw new Error('許可されていない宛先が含まれています: ' + department);
+  return {email:emails.join(','),emails:emails,name:name,department:department};
 }
 
 function resultMessage(item, recipient, kind) {
@@ -230,6 +242,11 @@ function processApprovalJobs() {
         props.setProperty(key, JSON.stringify(job)); continue;
       }
       const recipient = resolveRecipient(item, departments, kind);
+      if (recipient.emails.length > remaining) {
+        job.error = '全宛先分の送信可能数が不足しています。次回以降に再確認します。';
+        props.setProperty(key,JSON.stringify(job));
+        continue;
+      }
       const message = kind === 'approval_request' ? approvalMessage(item, recipient) : resultMessage(item,recipient,kind);
       job.state = 'sending'; job.recipient = recipient.email;
       job.attemptedAt = new Date().toISOString();
@@ -239,7 +256,7 @@ function processApprovalJobs() {
       MailApp.sendEmail(message);
       job.state = 'sent'; job.finishedAt = new Date().toISOString();
       props.setProperty(key, JSON.stringify(job));
-      remaining--; sent++;
+      remaining -= recipient.emails.length; sent++;
     } catch (error) {
       if (job.state === 'sending' || job.state === 'sent') {
         job.state = 'uncertain';

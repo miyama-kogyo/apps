@@ -907,6 +907,7 @@
     #masterDepartment .master-table td { overflow-wrap:anywhere; }
     .department-approver { display:grid; gap:3px; font-size:12px; }
     .department-approver b { font-size:14px; }
+    .department-approver span { white-space:pre-line; }
     .department-actions { display:flex; flex-wrap:wrap; gap:6px; }
     .issued-card-preview td[colspan] { width:auto; text-align:left; }
     .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
@@ -2792,7 +2793,7 @@
 
     function renderMasterTables(){
       document.getElementById('deptTableBody').innerHTML = deptDocs.map(d =>
-        `<tr><td>${escapeHtml(d.name || '')}</td><td><div class="department-approver"><b>承認依頼先：${escapeHtml(d.approverName || '未設定')}</b><span>${escapeHtml(d.approverEmail || '')}</span><b>生産日・承認完了の通知先</b><span>${escapeHtml(d.notificationEmail || '未設定')}</span></div></td><td><div class="department-actions"><button class="btn btn-sm" onclick="editDepartmentApprover('${escapeAttr(d.id)}')">承認先</button><button class="btn btn-sm" onclick="editDepartmentNotification('${escapeAttr(d.id)}')">通知先</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></div></td></tr>`
+        `<tr><td>${escapeHtml(d.name || '')}</td><td><div class="department-approver"><b>承認依頼先：${escapeHtml(d.approverName || '未設定')}</b><span>${escapeHtml((d.approverEmail || '').replace(/,\s*/g,'\n'))}</span><b>生産日・承認完了の通知先</b><span>${escapeHtml((d.notificationEmail || '未設定').replace(/,\s*/g,'\n'))}</span></div></td><td><div class="department-actions"><button class="btn btn-sm" onclick="editDepartmentApprover('${escapeAttr(d.id)}')">承認先</button><button class="btn btn-sm" onclick="editDepartmentNotification('${escapeAttr(d.id)}')">通知先</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></div></td></tr>`
       ).join('');
       document.getElementById('lineTableBody').innerHTML = lineDocs.map(d =>
         `<tr><td>${escapeHtml(d.name || '')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteMaster('line', '${escapeAttr(d.id)}')">削除</button></td></tr>`
@@ -2803,15 +2804,26 @@
       ).join('') : '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:20px;">チェック項目は未登録です</td></tr>';
     }
 
+    function parseDepartmentEmails(value){
+      const text = String(value || '').trim();
+      if (!text) return [];
+      const emails = [...new Set(text.split(/[,;\s、，；]+/).filter(Boolean).map(x => x.toLowerCase()))];
+      if (!emails.length || emails.some(x => x.length > 254 || !/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(x))){
+        throw new Error('メールアドレスに誤りがあります。複数の宛先はカンマで区切ってください。');
+      }
+      if (emails.length > 50 || emails.join(',').length > 6000) throw new Error('宛先は50件以内、合計6000文字以内で入力してください。');
+      return emails;
+    }
+
     window.editDepartmentApprover = async function(id){
       const item = deptDocs.find(x => x.id === id);
       if (!item) return;
       const name = prompt(`${item.name}の承認者名`, item.approverName || '');
       if (name === null) return;
-      const email = prompt('承認依頼先メールアドレス（1件。空欄で解除）', item.approverEmail || '');
+      const email = prompt('承認依頼先メールアドレス（複数はカンマ区切り。空欄で解除）', item.approverEmail || '');
       if (email === null) return;
-      const address = email.trim();
-      if (address && !/^[^\s@,;<>]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(address)){ alert('正しいメールアドレスを1件入力してください'); return; }
+      let address;
+      try{ address = parseDepartmentEmails(email).join(','); }catch(error){ alert(error.message); return; }
       if (address && !name.trim()){ alert('承認者名を入力してください'); return; }
       try{
         await updateDoc(doc(db,'masters','department','items',id), {approverName:address ? name.trim() : '',approverEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
@@ -2822,10 +2834,10 @@
     window.editDepartmentNotification = async function(id){
       const item = deptDocs.find(x => x.id === id);
       if (!item) return;
-      const email = prompt(`${item.name}の生産日・承認完了の通知先メールアドレス（1件。空欄で解除）`, item.notificationEmail || '');
+      const email = prompt(`${item.name}の生産日・承認完了の通知先メールアドレス（複数はカンマ区切り。空欄で解除）`, item.notificationEmail || '');
       if (email === null) return;
-      const address = email.trim();
-      if (address && !/^[^\s@,;<>]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(address)){ alert('正しいメールアドレスを1件入力してください'); return; }
+      let address;
+      try{ address = parseDepartmentEmails(email).join(','); }catch(error){ alert(error.message); return; }
       try{
         await updateDoc(doc(db,'masters','department','items',id), {notificationEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
         await loadMasters(); renderMasterTables();

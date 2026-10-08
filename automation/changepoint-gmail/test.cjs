@@ -101,4 +101,24 @@ t=setup();t.state.ALLOWED_RECIPIENTS+=',origin-notify@example.com';
 t.env.records=[record({approvalStatus:'sender_approved',occurrenceDate:'2026-10-20',productionDateUpdatedAt:at})];
 t.ctx.collectApprovalRequests();t.env.records[0].productionDateUpdatedAt='2026-10-08T02:00:00Z';t.ctx.processApprovalJobs();assert.equal(t.sent.length,0);assert.equal(t.jobs()[0].state,'skipped','old date update superseded');
 t.ctx.collectApprovalRequests();t.ctx.processApprovalJobs();assert.equal(t.sent.length,1,'latest production date notified');
+for(const kind of ['approval_request','production_date','receiver_approved']){
+  t=setup();t.state.ALLOWED_RECIPIENTS+='; second@example.com';
+  if(kind==='approval_request')t.env.departments[0].approverEmail=' SENDER@EXAMPLE.COM、second@example.com;sender@example.com';
+  else{
+    t.state.ALLOWED_RECIPIENTS+=',origin-notify@example.com';
+    t.env.departments[0].notificationEmail='ORIGIN-NOTIFY@example.com，second@example.com\norigin-notify@example.com';
+    t.env.records=[record({approvalStatus:'approved',occurrenceDate:'2026-10-20',[kind==='production_date'?'productionDateUpdatedAt':'receiverApprovedAt']:at})];
+  }
+  t.env.quota=1;t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'defer whole group when quota insufficient');assert.equal(t.jobs()[0].state,'pending');
+  t.env.quota=2;t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,(kind==='approval_request'?'sender@example.com':'origin-notify@example.com')+',second@example.com');
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1,'group is not resent');
+}
+t=setup();t.state.ALLOWED_RECIPIENTS+=',second@example.com';t.env.departments[0].approverEmail='sender@example.com,second@example.com';t.env.quota=3;
+t.env.records=[record(),record({_name:prefix+'/changepoints/another'})];t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1,'quota counts recipients rather than messages');assert.equal(t.jobs().filter(j=>j.state==='pending').length,1);
+for(const emails of ['sender@example.com,not-allowed@example.com','sender@example.com,invalid']){
+  t=setup();t.env.departments[0].approverEmail=emails;t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'invalid or unapproved group is not partially sent');
+}
+t=setup();t.env.quota=1;t.env.departments[0].approverEmail='sender@example.com,SENDER@example.com';t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'sender@example.com');
+const fifty=Array.from({length:50},(_,i)=>`user${i}@example.com`).join(',');assert.equal(t.ctx.parseDepartmentEmails(fifty).length,50);assert.throws(()=>t.ctx.parseDepartmentEmails(fifty+',extra@example.com'));
+console.log('PASS: multiple-recipient approvals and results; deduplication; whole-group allowlist; quota accounting and defer/retry.');
 console.log('PASS: mocked Gmail/Firestore tests; routing, allowlist, stages, cursor, duplicate prevention, stale requests, quotas, uncertain send, owner, trigger lifecycle and queue capacity. No real email or database writes.');
