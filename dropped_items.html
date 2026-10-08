@@ -227,6 +227,64 @@
       .filters{display:grid;grid-template-columns:1fr 1fr}.filters .field{min-width:0}.filters .field:nth-child(3),.filters .field:nth-child(4){grid-column:1/-1}
     }
     @media (min-width:1400px){body.monitor-mode .metric-value{font-size:2.45rem}body.monitor-mode .dept-row{font-size:1.05rem}body.monitor-mode .chart-wrap{height:410px}}
+    /* Dashboard review layout */
+    #page-dashboard{max-width:1800px}
+    #page-dashboard .dashboard-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+    #page-dashboard .dashboard-heading-actions{display:grid;grid-template-columns:auto auto auto;gap:16px}
+    #page-dashboard .dashboard-qr{grid-column:3;grid-row:1;border:0;border-left:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent;padding:0 0 0 16px}
+    #page-dashboard .compare-date-control{grid-column:1;grid-row:1;border:0;box-shadow:none;background:transparent;padding:0;flex-wrap:wrap;max-width:255px}
+    #page-dashboard .dept-picker{grid-column:2;grid-row:1}
+    #page-dashboard .metric-grid{gap:0;background:#fff;border-block:1px solid var(--line);margin-bottom:24px}
+    #page-dashboard .metric{border:0;border-right:1px solid var(--line);border-radius:0;box-shadow:none;padding:18px 24px;min-width:0}
+    #page-dashboard .metric:last-child{border-right:0}
+    #page-dashboard .metric-value{font-size:2.65rem;overflow-wrap:anywhere}
+    #page-dashboard .dashboard-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:stretch}
+    #page-dashboard .dashboard-grid>.panel,#page-dashboard .recent-panel{min-width:0;border:0;border-radius:0;box-shadow:none;background:transparent}
+    #page-dashboard .section-header{padding:0 0 12px;min-height:44px;flex-wrap:wrap;align-items:center}
+    #page-dashboard .chart-wrap{height:480px;padding:16px 0;background:#fff}
+    #page-dashboard .dept-list{height:440px;max-height:none;overflow:auto;background:#fff}
+    #page-dashboard .dept-row,.dept-column-head{grid-template-columns:minmax(75px,1fr) 70px 70px minmax(0,1.5fr);gap:12px}
+    #page-dashboard .dept-row{padding:12px;min-height:62px}
+    #page-dashboard .dept-row:nth-child(even){background:#f7f8f9}
+    #page-dashboard .dept-row:hover{background:#e9edef}
+    #page-dashboard .dept-number small{display:none}
+    .dept-column-head{display:grid;align-items:center;min-height:40px;padding:8px 12px;background:#e9edef;font-size:.8rem;font-weight:700;color:#4b5359}
+    .dept-column-head span:nth-child(2),.dept-column-head span:nth-child(3){text-align:right}
+    #page-dashboard .serial-breakdown{min-width:0}
+    #page-dashboard .serial-chip{border-radius:4px;overflow-wrap:anywhere;max-width:100%}
+    #page-dashboard .recent-panel{margin-top:24px;border-top:1px solid var(--line);padding-top:18px}
+    #page-dashboard .recent-list{padding:12px 0;grid-template-columns:repeat(4,minmax(0,1fr))}
+    #page-dashboard .recent-serial{min-width:0;overflow-wrap:anywhere}
+    #page-dashboard .cause-tag{flex-shrink:0;align-self:flex-start}
+    @media(max-width:1200px){
+      #page-dashboard .dashboard-heading{grid-template-columns:1fr}
+      #page-dashboard .dashboard-heading-actions{grid-template-columns:auto auto 1fr;justify-content:start}
+      #page-dashboard .dashboard-qr{justify-self:end}
+      #page-dashboard .dashboard-grid{grid-template-columns:1fr}
+      #page-dashboard .dept-list{height:auto;max-height:560px}
+      #page-dashboard .chart-wrap{height:360px}
+      #page-dashboard .metric-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+    }
+    @media(max-width:760px){
+      #page-dashboard .dashboard-heading-actions{grid-template-columns:minmax(0,1fr) auto;gap:12px}
+      #page-dashboard .dashboard-qr{grid-column:2;grid-row:1/3;padding-left:10px;flex-direction:column;gap:2px}
+      #page-dashboard .dashboard-qr-copy{font-size:.8rem}
+      #page-dashboard .compare-date-control{grid-column:1;grid-row:1;max-width:none;width:100%;gap:6px}
+      #page-dashboard .compare-date-control label{width:100%}
+      #page-dashboard .compare-date-control input{width:0;flex:1;min-width:0;font-size:16px}
+      #page-dashboard .dept-picker{grid-column:1;grid-row:2}
+      #page-dashboard .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      #page-dashboard .metric{padding:16px;border-bottom:1px solid var(--line)}
+      #page-dashboard .metric:nth-child(even){border-right:0}
+      #page-dashboard .metric:nth-child(n+3){border-bottom:0}
+      #page-dashboard .metric-value{font-size:2.2rem}
+      #page-dashboard .dept-row,.dept-column-head{grid-template-columns:minmax(0,1fr) 66px 66px}
+      .dept-column-head span:last-child{display:none}
+      #page-dashboard .serial-breakdown{grid-column:1/-1}
+      #page-dashboard .recent-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+      #page-dashboard .recent-top{flex-wrap:wrap}
+      #page-dashboard .section-header h3{font-size:1.1rem}
+    }
   </style>
 </head>
 <body>
@@ -330,7 +388,7 @@
         <div class="dashboard-heading-actions">
           <div class="dashboard-qr">
             <div class="dashboard-qr-code" id="inputQr" aria-label="スマホ入力用QRコード"></div>
-            <div class="dashboard-qr-copy"><strong>スマホ入力</strong>QRを読み取って<br>入力画面を開く</div>
+            <div class="dashboard-qr-copy"><strong>スマホ入力</strong></div>
           </div>
           <div class="compare-date-control">
             <label for="comparisonDate">比較日</label>
@@ -352,7 +410,6 @@
               <div class="dept-check-list" id="dashboardDeptList"></div>
             </div>
           </div>
-          <span class="full-screen-note">大型モニターでは右上の全画面ボタンを利用できます</span>
         </div>
       </div>
       <div class="metric-grid">
@@ -363,16 +420,17 @@
       </div>
       <div class="dashboard-grid">
         <section class="panel">
-          <div class="section-header"><h3>部署別比較</h3><span class="full-screen-note">グラフをクリックして詳細表示</span></div>
+          <div class="section-header"><h3>部署別比較</h3><span class="full-screen-note">落下品数（個）</span></div>
           <div class="chart-wrap"><canvas id="departmentChart"></canvas></div>
         </section>
         <section class="panel">
-          <div class="section-header"><h3>部署別・整理Noまたは部品名内訳</h3><span class="full-screen-note" id="breakdownDateLabel">本日 / 比較日</span></div>
+          <div class="section-header"><h3>部署別内訳</h3><span class="full-screen-note" id="breakdownDateLabel">本日 / 比較日</span></div>
+          <div class="dept-column-head"><span>部署</span><span id="deptTodayHeading">本日</span><span id="deptComparisonHeading">比較日</span><span>本日の整理No・部品名</span></div>
           <div class="dept-list" id="departmentList"></div>
         </section>
       </div>
       <section class="panel recent-panel">
-        <div class="section-header"><h3>直近の登録</h3><span class="full-screen-note">クリックして詳細表示</span></div>
+        <div class="section-header"><h3>直近の登録</h3></div>
         <div class="recent-list" id="recentList"></div>
       </section>
     </section>
@@ -989,6 +1047,8 @@
       $('activeDepartments').textContent = new Set(todayRows.map(row=>row.department).filter(Boolean)).size;
       $('dashboardDateLabel').textContent = `${todayKey.replaceAll('-','/')} と ${comparisonKey.replaceAll('-','/')} の比較・${state.dashboardDepartments.size}部署表示`;
       $('breakdownDateLabel').textContent = `${shortDateLabel(todayKey)} / ${shortDateLabel(comparisonKey)}`;
+      $('deptTodayHeading').textContent = shortDateLabel(todayKey);
+      $('deptComparisonHeading').textContent = shortDateLabel(comparisonKey);
       const departments = state.departments.filter(name => state.dashboardDepartments.has(name));
       const todayByDept = groupSum(todayRows,r=>r.department), comparisonByDept = groupSum(comparisonRows,r=>r.department);
       departments.sort((a,b)=>(todayByDept[b]||0)-(todayByDept[a]||0) || a.localeCompare(b,'ja'));
