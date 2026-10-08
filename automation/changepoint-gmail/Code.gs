@@ -32,6 +32,7 @@ function firestoreRead(path, body) {
 }
 
 function firestoreValue(value) {
+  if ('arrayValue' in value) return (value.arrayValue.values || []).map(firestoreValue);
   if ('stringValue' in value) return value.stringValue;
   if ('timestampValue' in value) return value.timestampValue;
   if ('booleanValue' in value) return value.booleanValue;
@@ -74,7 +75,7 @@ function parseDepartmentEmails(value){
 
 function previewNotifierConfiguration() {
   verifyNotifierOwner();
-  const departments = readDepartments().map(d => ({department:d.name,name:d.approverName || '',approvalEmail:d.approverEmail || '',notificationEmail:d.notificationEmail || ''}));
+  const departments = readDepartments().map(d => ({department:d.name,name:d.approverName || '',approvalEmail:d.approverEmail || '',notificationEmail:d.notificationEmail || '',distributionEmail:d.distributionEmail || ''}));
   console.log(JSON.stringify({sender:NOTIFIER.sender,allowedRecipients:allowedRecipients(),departments:departments}, null, 2));
   return departments;
 }
@@ -116,13 +117,15 @@ function notificationStreams() {
   return [
     {kind:'approval_request',field:'approvalRequestedAt',cursor:'CURSOR'},
     {kind:'production_date',field:'productionDateUpdatedAt',cursor:'CURSOR_PRODUCTION_DATE'},
-    {kind:'receiver_approved',field:'receiverApprovedAt',cursor:'CURSOR_APPROVED'}
+    {kind:'receiver_approved',field:'receiverApprovedAt',cursor:'CURSOR_APPROVED'},
+    {kind:'distribution',field:'distributionRequestedAt',cursor:'CURSOR_DISTRIBUTION'}
   ];
 }
 
 function isResultNotificationCurrent(item, kind) {
   if (!item || !(item.type === 'planned' || item.workflowManaged === true)) return false;
   if (item.switchStatus === 'canceled' || item.switchState === 'canceled') return false;
+  if (kind === 'distribution') return Boolean(item.distributionRequestedAt);
   if (kind === 'production_date') return Boolean(item.occurrenceDate && item.productionDateUpdatedAt);
   if (kind === 'receiver_approved') return item.approvalStatus === 'approved';
   return false;
@@ -168,6 +171,7 @@ function collectNotificationStream(stream) {
 }
 
 function resolveRecipient(item, departments, kind) {
+  if (kind === 'distribution') return resolveDistributionRecipient(item,departments);
   const resultNotification = kind && kind !== 'approval_request';
   const department = resultNotification || item.approvalStatus === 'draft' ? item.planneddepartment : item.department;
   const matches = departments.filter(d => d.name === department);
@@ -180,6 +184,39 @@ function resolveRecipient(item, departments, kind) {
   const allowed = allowedRecipients();
   if (emails.some(email => !allowed.includes(email))) throw new Error('許可されていない宛先が含まれています: ' + department);
   return {email:emails.join(','),emails:emails,name:name,department:department};
+}
+
+function resolveDistributionRecipient(item, departments) {
+  if (!Array.isArray(item.distributionDepartments) || item.distributionDepartments.some(name => typeof name !== 'string' || !name.trim()) ||
+      !item.planneddepartment || !item.department) throw new Error('展開先部署が不正です。');
+  const names = [...new Set([item.planneddepartment,item.department].concat(item.distributionDepartments))];
+  const addresses = [];
+  names.forEach(name => {
+    const matches = departments.filter(d => d.name === name);
+    if (matches.length !== 1) throw new Error('展開先部署が未登録、または重複しています: ' + name);
+    const emails = parseDepartmentEmails(matches[0].distributionEmail);
+    if (!emails.length) throw new Error('展開先メールアドレスが未設定です: ' + name);
+    addresses.push(...emails);
+  });
+  const emails = parseDepartmentEmails(addresses.join(','));
+  const allowed = allowedRecipients();
+  if (emails.some(email => !allowed.includes(email))) throw new Error('許可されていない展開先アドレスが含まれています。');
+  return {email:emails.join(','),emails:emails,name:names.join('・'),department:names.join('・')};
+}
+
+function distributionMessage(item, recipient) {
+  return {
+    to:recipient.email,name:'変化点管理',
+    subject:('【変化点展開】' + (item.lineName || '-') + ' / 整理No ' + (item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180),
+    body:[recipient.name + ' 各位','','変化点カードが登録されました。','',
+      '実施予定日: ' + (item.occurrenceDate || '未確定'),'ライン: ' + (item.lineName || '-'),
+      '工程: ' + (item.processName || '-'),'整理No: ' + (item.serialNo || '-'),'分類: ' + (item.category || '-'),
+      '発信部署: ' + (item.planneddepartment || '-'),'発生部署: ' + (item.department || '-'),
+      '作成者: ' + (item.createdBy || '-'),'','変化点内容:',String(item.content || '').slice(0,4000),'',
+      '変化点カード:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()),
+      '','変化点カードを印刷して現場リーダーへ渡してください。',
+      '','変化点管理アプリからの自動通知です。'].join('\n')
+  };
 }
 
 function resultMessage(item, recipient, kind) {
@@ -247,7 +284,8 @@ function processApprovalJobs() {
         props.setProperty(key,JSON.stringify(job));
         continue;
       }
-      const message = kind === 'approval_request' ? approvalMessage(item, recipient) : resultMessage(item,recipient,kind);
+      const message = kind === 'approval_request' ? approvalMessage(item, recipient)
+        : kind === 'distribution' ? distributionMessage(item,recipient) : resultMessage(item,recipient,kind);
       job.state = 'sending'; job.recipient = recipient.email;
       job.attemptedAt = new Date().toISOString();
       delete job.error;

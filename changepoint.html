@@ -909,6 +909,10 @@
     .department-approver b { font-size:14px; }
     .department-approver span { white-space:pre-line; }
     .department-actions { display:flex; flex-wrap:wrap; gap:6px; }
+    .distribution-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px 16px; }
+    .distribution-option { display:flex; align-items:center; gap:8px; min-height:40px; margin:0; overflow-wrap:anywhere; }
+    .distribution-option input { flex:0 0 auto; width:18px; height:18px; margin:0; }
+    .distribution-option small { display:block; color:#765016; font-size:12px; }
     .issued-card-preview td[colspan] { width:auto; text-align:left; }
     .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
     .issued-card-preview .sign { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
@@ -1227,6 +1231,11 @@
           </div>
 
           <div class="form-group">
+            <label id="distributionLabel">展開先部署<span class="required">*</span></label>
+            <div id="planDistributionDepartments" class="distribution-options" role="group" aria-labelledby="distributionLabel"></div>
+          </div>
+
+          <div class="form-group">
             <label>5Mチェック項目</label>
             <div class="hint" style="margin-bottom:8px;">対象外の項目はチェックを外せます。発信部署独自の確認項目も追加できます。</div>
             <div id="planChecklistPreview" class="checklist-panel"><div class="checklist-empty">変化点分類を選択してください</div></div>
@@ -1266,7 +1275,8 @@
               ※「CSV出力」「ワークフローQR」は、最後に登録した変化点の内容を出力します
           </div>
           <div id="registrationResult" class="registration-result" hidden role="status">
-            <strong>変化点カードを登録しました</strong>
+            <strong>変化点カードを印刷して現場リーダーへ渡してください</strong>
+            <button type="button" id="btnPrintLastCard" class="btn btn-primary">印刷する</button>
             <button type="button" id="btnOpenLastCard" class="btn btn-primary">登録したカードを開く</button>
           </div>
         </form>
@@ -1490,17 +1500,25 @@
   <!-- 確認ダイアログ -->
   <div id="confirmModal" class="confirm-modal">
     <div class="confirm-modal-content">
-      <div class="confirm-modal-header">登録内容の確認（メール下書き作成）</div>
+      <div class="confirm-modal-header">登録内容の確認</div>
       <div class="confirm-modal-body">
         <div id="confirmContent"></div>
         <div class="confirm-modal-buttons">
           <button class="confirm-btn confirm-btn-cancel" id="btnConfirmCancel">キャンセル</button>
-          <button class="confirm-btn confirm-btn-confirm" id="btnConfirmOk">登録してOutlookを開く</button>
+          <button class="confirm-btn confirm-btn-confirm" id="btnConfirmOk">登録する</button>
         </div>
       </div>
     </div>
   </div>
 
+  <dialog id="registrationPrintDialog" aria-labelledby="registrationPrintTitle" style="max-width:540px;width:calc(100% - 32px);border:0;border-radius:8px;padding:24px;">
+    <h2 id="registrationPrintTitle" style="font-size:18px;margin:0 0 16px;">変化点カードを登録しました</h2>
+    <p>変化点カードを印刷して現場リーダーへ渡してください</p>
+    <div class="confirm-modal-buttons">
+      <button type="button" id="btnPrintLater" class="btn btn-secondary">後で</button>
+      <button type="button" id="btnPrintRegistered" class="btn btn-primary">印刷する</button>
+    </div>
+  </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
@@ -2015,6 +2033,7 @@
           '<option value="">すべての部署</option>' +
           masterDepartments.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
         document.getElementById('lineList2').innerHTML = masterLines.map(l => `<option value="${escapeAttr(l)}">`).join('');
+        renderDistributionDepartments();
         renderPlanChecklistPreview();
       }catch(err){ console.error('マスタ読み込みエラー:', err); }
     }
@@ -2453,6 +2472,19 @@
     }
 
     function setupPlannedForm(){
+      document.getElementById('btnPrintLater').addEventListener('click', () => document.getElementById('registrationPrintDialog').close());
+      const printRegistered = async () => {
+        if (!lastRegisteredPlanned) return;
+        const button = document.getElementById('btnPrintRegistered');
+        button.disabled = true;
+        try{
+          const item = changepointData.find(p => p._id === lastRegisteredPlanned.docId) || { ...lastRegisteredPlanned, _id:lastRegisteredPlanned.docId };
+          if (await window.printChangeCard(item)) document.getElementById('registrationPrintDialog').close();
+        }catch(error){ console.error(error); alert('登録済みです。印刷画面を開けませんでした。もう一度「印刷する」を押してください'); }
+        finally{ button.disabled = false; }
+      };
+      document.getElementById('btnPrintRegistered').addEventListener('click', printRegistered);
+      document.getElementById('btnPrintLastCard').addEventListener('click', printRegistered);
       document.getElementById('planDateUndecided').addEventListener('change', updatePlanDateMode);
       document.getElementById('planCategory').addEventListener('change', () => { plannedExcludedChecklist = new Map(); renderPlanChecklistPreview(); });
       document.getElementById('planType').addEventListener('change', (e) => {
@@ -2507,6 +2539,32 @@
       document.getElementById('confirmModal').addEventListener('click', (e) => { if (e.target.id === 'confirmModal') document.getElementById('confirmModal').style.display = 'none'; });
     }
 
+    const additionalDistributionDepartments = new Set();
+    function selectedDistributionDepartments(){
+      return [...new Set([
+        document.getElementById('planDepartment').value,
+        document.getElementById('planDepartmentOccur').value,
+        ...additionalDistributionDepartments
+      ].filter(Boolean))];
+    }
+    function renderDistributionDepartments(){
+      const required = new Set([document.getElementById('planDepartment').value,document.getElementById('planDepartmentOccur').value].filter(Boolean));
+      const names = [...new Set([...masterDepartments,...required])];
+      for (const name of additionalDistributionDepartments) if (!names.includes(name)) additionalDistributionDepartments.delete(name);
+      document.getElementById('planDistributionDepartments').innerHTML = names.map(name => {
+        const matches = deptDocs.filter(d => d.name === name);
+        let available = false;
+        try{ available = matches.length === 1 && parseDepartmentEmails(matches[0].distributionEmail).length > 0; }catch(_){}
+        return `<label class="distribution-option"><input type="checkbox" value="${escapeAttr(name)}" ${required.has(name) || additionalDistributionDepartments.has(name) ? 'checked' : ''} ${required.has(name) ? 'disabled' : ''}><span>${escapeHtml(name)}${required.has(name) ? '（必須）' : ''}${available ? '' : '<small>展開先アドレス未設定</small>'}</span></label>`;
+      }).join('');
+    }
+    ['planDepartment','planDepartmentOccur'].forEach(id => document.getElementById(id).addEventListener('change',renderDistributionDepartments));
+    document.getElementById('planDistributionDepartments').addEventListener('change',event => {
+      if (event.target.type !== 'checkbox' || event.target.disabled) return;
+      if (event.target.checked) additionalDistributionDepartments.add(event.target.value);
+      else additionalDistributionDepartments.delete(event.target.value);
+    });
+
     function showConfirmDialog(){
       const type = document.getElementById('planType').value || '';
       const planneddepartment = document.getElementById('planDepartment').value || '';
@@ -2522,6 +2580,7 @@
         <div class="confirm-item"><div class="confirm-label">発信部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点分類</div><div class="confirm-value">${escapeHtml(category)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点発生部署</div><div class="confirm-value">${escapeHtml(department)}</div></div>
+        <div class="confirm-item"><div class="confirm-label">展開先部署</div><div class="confirm-value">${selectedDistributionDepartments().map(escapeHtml).join('、')}</div></div>
         <div class="confirm-item"><div class="confirm-label">対象ライン名</div><div class="confirm-value">${escapeHtml(lineName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">工程名・作業内容</div><div class="confirm-value">${escapeHtml(processName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
@@ -2670,7 +2729,9 @@
       }
     });
 
+    let registrationSaving = false;
     async function executeRegistration(){
+      if (registrationSaving) return;
       const type = document.getElementById('planType').value || 'planned';
       const planneddepartment = document.getElementById('planDepartment').value || '';
       const department = document.getElementById('planDepartmentOccur').value || '';
@@ -2681,6 +2742,8 @@
       const content  = document.getElementById('planContent').value || '';
       const occurrenceDate = document.getElementById('planDate').value || '';
       const occurrenceTime = document.getElementById('planTime')?.value || '';
+      if (!planneddepartment || !department){ alert('発信部署と変化点発生部署を選択してください'); return; }
+      const distributionDepartments = selectedDistributionDepartments();
       const user = auth.currentUser;
       const createdBy = getActorName();
       const checklistItems = buildRecordChecklist(category);
@@ -2690,7 +2753,9 @@
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null, switchStatus: occurrenceDate ? 'scheduled' : 'undecided',
         document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', approvalRequestedAt: serverTimestamp(), specialHandlingStatus: '', relatedReviewCompleted: false,
         continuedManagementRequired: false, managementUntil: '', createdBy,
-        createdAt: serverTimestamp() };
+        createdAt: serverTimestamp(), distributionDepartments, distributionRequestedAt:serverTimestamp() };
+      registrationSaving = true;
+      document.getElementById('btnRegisterPlanned').disabled = true;
       try{
         const docRef = await addDoc(collection(db, 'changepoints'), data);
         let documentUrl = '';
@@ -2699,16 +2764,12 @@
           catch(uploadErr){ alert('ファイルのアップロードに失敗しましたが、変化点は登録されました'); }
         }
         const now = new Date();
-        lastRegisteredPlanned = { docId: docRef.id, ...data, documentUrl, createdAtLocal: now.toISOString() };
+        lastRegisteredPlanned = { docId: docRef.id, ...data, documentUrl, createdAt:now, createdAtLocal: now.toISOString() };
         lastDetailHtmlUrl = null;
         setExportButtonEnabled(true);
-        try{
-          const who = createdBy;
-          const workflowUrl = buildWorkflowUrl(docRef.id);
-          openMailDraft({ to: '', cc: '', subject: buildMailSubject(lineName, department, category), body: buildMailBody({ type, planneddepartment, department, category, lineName, processName, serialNo, occurrenceDate, occurrenceTime, content, who, workflowUrl }) });
-        }catch(_){}
-        alert('変化点カードを登録しました');
         document.getElementById('plannedForm').reset();
+        additionalDistributionDepartments.clear();
+        renderDistributionDepartments();
         document.getElementById('planDate').value = '';
         document.getElementById('planDateUndecided').checked = false;
         updatePlanDateMode();
@@ -2719,7 +2780,9 @@
         selectedFile = null;
         document.getElementById('filePreview').style.display = 'none';
         document.getElementById('filePreview').innerHTML = '';
-      }catch(err){ alert('登録に失敗しました: ' + (err.message || err)); }
+      }catch(err){ alert('登録に失敗しました: ' + (err.message || err)); return; }
+      finally{ registrationSaving = false; document.getElementById('btnRegisterPlanned').disabled = false; }
+      document.getElementById('registrationPrintDialog').showModal();
     }
 
     function renderPlannedHistory(){
@@ -2793,7 +2856,7 @@
 
     function renderMasterTables(){
       document.getElementById('deptTableBody').innerHTML = deptDocs.map(d =>
-        `<tr><td>${escapeHtml(d.name || '')}</td><td><div class="department-approver"><b>承認依頼先：${escapeHtml(d.approverName || '未設定')}</b><span>${escapeHtml((d.approverEmail || '').replace(/,\s*/g,'\n'))}</span><b>生産日・承認完了の通知先</b><span>${escapeHtml((d.notificationEmail || '未設定').replace(/,\s*/g,'\n'))}</span></div></td><td><div class="department-actions"><button class="btn btn-sm" onclick="editDepartmentApprover('${escapeAttr(d.id)}')">承認先</button><button class="btn btn-sm" onclick="editDepartmentNotification('${escapeAttr(d.id)}')">通知先</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></div></td></tr>`
+        `<tr><td>${escapeHtml(d.name || '')}</td><td><div class="department-approver"><b>承認依頼先：${escapeHtml(d.approverName || '未設定')}</b><span>${escapeHtml((d.approverEmail || '').replace(/,\s*/g,'\n'))}</span><b>生産日・承認完了の通知先</b><span>${escapeHtml((d.notificationEmail || '未設定').replace(/,\s*/g,'\n'))}</span><b>登録時の展開先</b><span>${escapeHtml((d.distributionEmail || '未設定').replace(/,\s*/g,'\n'))}</span></div></td><td><div class="department-actions"><button class="btn btn-sm" onclick="editDepartmentApprover('${escapeAttr(d.id)}')">承認先</button><button class="btn btn-sm" onclick="editDepartmentNotification('${escapeAttr(d.id)}')">通知先</button><button class="btn btn-sm" onclick="editDepartmentDistribution('${escapeAttr(d.id)}')">展開先</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></div></td></tr>`
       ).join('');
       document.getElementById('lineTableBody').innerHTML = lineDocs.map(d =>
         `<tr><td>${escapeHtml(d.name || '')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteMaster('line', '${escapeAttr(d.id)}')">削除</button></td></tr>`
@@ -2842,6 +2905,19 @@
         await updateDoc(doc(db,'masters','department','items',id), {notificationEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
         await loadMasters(); renderMasterTables();
       }catch(error){ console.error(error); alert('通知先の保存に失敗しました'); }
+    };
+
+    window.editDepartmentDistribution = async function(id){
+      const item = deptDocs.find(x => x.id === id);
+      if (!item) return;
+      const email = prompt(`${item.name}の展開先メールアドレス（複数はカンマ区切り。空欄で解除）`, item.distributionEmail || '');
+      if (email === null) return;
+      let address;
+      try{ address = parseDepartmentEmails(email).join(','); }catch(error){ alert(error.message); return; }
+      try{
+        await updateDoc(doc(db,'masters','department','items',id), {distributionEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
+        await loadMasters(); renderMasterTables();
+      }catch(error){ console.error(error); alert('展開先の保存に失敗しました'); }
     };
 
     window.deleteMaster = async function(type, id){
@@ -3321,9 +3397,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return '<article class="board-issued-card"><div class="issued-card-preview">'+renderChangeTicket(item,'原本','発信部署')+
         '</div><button type="button" class="board-change" data-change-id="'+escapeAttr(item._id)+'" aria-label="'+escapeAttr((item.lineName||'ライン未設定')+' 整理No. '+(item.serialNo||'-')+' の変化点カードを開く')+'"></button></article>';
     }
-    window.printChangeCard = async function(){
-      if (!currentDetailItem || (currentDetailItem.type !== 'planned' && currentDetailItem.workflowManaged !== true)) return;
-      const item = currentDetailItem;
+    window.printChangeCard = async function(item = currentDetailItem){
+      if (!item || (item.type !== 'planned' && item.workflowManaged !== true)) return false;
+      const w = window.open('', '_blank');
+      if (!w){ alert('印刷画面を開けません。ポップアップを許可してもう一度印刷してください'); return false; }
+      w.document.title = '変化点カードを準備中';
+      w.document.body.textContent = '印刷画面を準備しています…';
       const workflowUrl = buildWorkflowUrl(item._id);
       let qrDataUrl = '';
       let productionQrDataUrl = '';
@@ -3331,7 +3410,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         qrDataUrl = await createQrDataUrl(workflowUrl);
         productionQrDataUrl = await createQrDataUrl(buildProductionDateUrl(item._id));
       }
-      catch(e){ console.error(e); alert('QRコードの生成に失敗しました'); return; }
+      catch(e){ w.close(); console.error(e); alert('QRコードの生成に失敗しました。もう一度印刷してください'); return false; }
+      if (w.closed) return false;
       const ticket = (copyLabel, keeper) => renderChangeTicket(item, copyLabel, keeper, qrDataUrl, productionQrDataUrl);
       const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>変化点カード</title><style>
         @page{size:A4 portrait;margin:8mm}
@@ -3392,9 +3472,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         window.addEventListener('beforeprint',fitCards);
         window.onload=async()=>{await document.fonts.ready;fitCards();window.print();};
       <\/script></body></html>`;
-      const w = window.open('', '_blank');
-      if (!w){ alert('印刷画面を開けません。ポップアップを許可してください'); return; }
       w.document.open(); w.document.write(html); w.document.close();
+      return true;
     };
 
     function showDetail(item){

@@ -7,7 +7,8 @@ const prefix = 'projects/abnreport-fd733/databases/(default)/documents';
 const at = '2026-10-08T01:00:00.123456Z';
 const record = (overrides = {}) => ({_name:`${prefix}/changepoints/test card`,type:'planned',approvalStatus:'draft',approvalRequestedAt:at,planneddepartment:'Sender',department:'Receiver',createdBy:'Creator',content:'Test only',...overrides});
 function encoded(item) {
-  return {name:item._name,fields:Object.fromEntries(Object.entries(item).filter(([k])=>k!=='_name').map(([k,v])=>[k,typeof v==='boolean'?{booleanValue:v}:k.endsWith('At')?{timestampValue:v}:{stringValue:v}]))};
+  const encode = (v,k='') => Array.isArray(v)?{arrayValue:{values:v.map(x=>encode(x))}}:typeof v==='boolean'?{booleanValue:v}:k.endsWith('At')?{timestampValue:v}:{stringValue:v};
+  return {name:item._name,fields:Object.fromEntries(Object.entries(item).filter(([k])=>k!=='_name').map(([k,v])=>[k,encode(v,k)]))};
 }
 function setup() {
   const state = {ALLOWED_RECIPIENTS:'sender@example.com,receiver@example.com',START_AT:'2026-10-08T00:00:00Z',ENABLED:'true'};
@@ -121,4 +122,35 @@ for(const emails of ['sender@example.com,not-allowed@example.com','sender@exampl
 t=setup();t.env.quota=1;t.env.departments[0].approverEmail='sender@example.com,SENDER@example.com';t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'sender@example.com');
 const fifty=Array.from({length:50},(_,i)=>`user${i}@example.com`).join(',');assert.equal(t.ctx.parseDepartmentEmails(fifty).length,50);assert.throws(()=>t.ctx.parseDepartmentEmails(fifty+',extra@example.com'));
 console.log('PASS: multiple-recipient approvals and results; deduplication; whole-group allowlist; quota accounting and defer/retry.');
+function distributionSetup(overrides={}){
+  const t=setup();
+  t.env.records=[record({approvalStatus:'approved',distributionRequestedAt:at,distributionDepartments:['Sender','Receiver','Extra'],...overrides})];
+  t.env.departments[0].distributionEmail='sender@example.com';
+  t.env.departments[1].distributionEmail='receiver@example.com';
+  t.env.departments.push({_name:'extra',name:'Extra',distributionEmail:'SENDER@example.com;extra@example.com'});
+  t.state.ALLOWED_RECIPIENTS+=',extra@example.com';
+  return t;
+}
+t=distributionSetup();t.ctx.pollApprovalNotifications();
+assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'sender@example.com,receiver@example.com,extra@example.com');
+assert.ok(t.sent[0].subject.includes('変化点展開'));assert.ok(t.sent[0].body.includes('現場リーダー'));
+assert.ok(t.state.CURSOR_DISTRIBUTION);t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);
+t=distributionSetup({distributionDepartments:['Extra']});t.ctx.pollApprovalNotifications();assert.equal(t.sent[0].to,'sender@example.com,receiver@example.com,extra@example.com','mandatory departments enforced by worker too');
+for(const change of ['missing','notAllowed','duplicate','malformed','emptyEntry','quota']){
+  t=distributionSetup();
+  if(change==='missing')t.env.departments[1].distributionEmail='';
+  if(change==='notAllowed')t.state.ALLOWED_RECIPIENTS='sender@example.com';
+  if(change==='duplicate')t.env.departments.push({...t.env.departments[0]});
+  if(change==='malformed')t.env.records[0].distributionDepartments='Sender';
+  if(change==='emptyEntry')t.env.records[0].distributionDepartments=[''];
+  if(change==='quota')t.env.quota=2;
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,change+' never sends partial distribution');assert.equal(t.jobs()[0].state,'pending');
+}
+t=distributionSetup({switchStatus:'completed'});t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);
+t=distributionSetup({switchStatus:'canceled'});t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);
+t=distributionSetup({distributionRequestedAt:undefined});t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'legacy records never queued');
+t=distributionSetup({distributionRequestedAt:'2020-01-01T00:00:00Z'});t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'pre-start records never queued');
+t=distributionSetup({approvalStatus:'sender_approved'});t.ctx.collectApprovalRequests();t.env.records[0].approvalStatus='approved';t.ctx.processApprovalJobs();assert.equal(t.sent.length,1,'approval advancing does not lose distribution');
+t=distributionSetup();t.ctx.collectApprovalRequests();t.env.records=[];t.ctx.processApprovalJobs();assert.equal(t.jobs()[0].state,'skipped');
+console.log('PASS: registration distribution; mandatory departments; all-recipient safety; array decoding; no historical flood; deduplication and independent cursor.');
 console.log('PASS: mocked Gmail/Firestore tests; routing, allowlist, stages, cursor, duplicate prevention, stale requests, quotas, uncertain send, owner, trigger lifecycle and queue capacity. No real email or database writes.');
