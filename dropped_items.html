@@ -102,6 +102,9 @@
     .dashboard-qr-copy{font-size:.76rem;line-height:1.45;color:var(--muted)}
     .dashboard-qr-copy strong{display:block;color:var(--ink);font-size:.86rem;margin-bottom:2px}
     .compare-date-control{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:var(--shadow)}
+    .dashboard-period{display:flex;width:100%;border:1px solid #b9c1c6;border-radius:6px;overflow:hidden}
+    .dashboard-period button{flex:1;min-height:40px;border:0;background:#fff;color:#444;font:inherit;font-size:14px;font-weight:700;cursor:pointer;padding:6px 8px}
+    .dashboard-period button[aria-pressed="true"]{background:#42494e;color:#fff}
     .compare-date-control label{font-size:.82rem;font-weight:900;white-space:nowrap}
     .compare-date-control input{width:142px;min-height:40px;padding:7px 8px;border:1px solid #cfd5d8;border-radius:6px;background:#fff;color:var(--ink);font-weight:700}
     .compare-date-control .icon-btn{width:40px;height:40px;flex:0 0 40px}
@@ -387,14 +390,15 @@
 
     <section class="page" id="page-dashboard">
       <div class="page-heading dashboard-heading">
-        <div><h2>本日・比較日の状況</h2><p id="dashboardDateLabel"></p></div>
+        <div><h2 id="dashboardTitle">落下品 朝会レビュー</h2><p id="dashboardDateLabel"></p></div>
         <div class="dashboard-heading-actions">
           <div class="dashboard-qr">
             <div class="dashboard-qr-code" id="inputQr" aria-label="スマホ入力用QRコード"></div>
             <div class="dashboard-qr-copy"><strong>スマホ入力</strong></div>
           </div>
           <div class="compare-date-control">
-            <label for="comparisonDate">比較日</label>
+            <div class="dashboard-period" role="group" aria-label="表示日の切り替え"><button id="showReviewDay" type="button" aria-pressed="true">朝会（前稼働日）</button><button id="showToday" type="button" aria-pressed="false">本日</button></div>
+            <label for="comparisonDate">対象日</label>
             <input type="date" id="comparisonDate">
             <button class="icon-btn" id="resetComparisonDate" type="button" title="直近の平日に戻す"><i data-lucide="calendar-clock"></i></button>
           </div>
@@ -416,10 +420,10 @@
         </div>
       </div>
       <div class="metric-grid">
-        <div class="panel metric"><div class="metric-label">本日の落下品</div><div class="metric-value" id="todayTotal">0</div><div class="metric-sub">個</div></div>
+        <div class="panel metric"><div class="metric-label">対象日の落下品</div><div class="metric-value" id="todayTotal">0</div><div class="metric-sub">個</div></div>
         <div class="panel metric warn"><div class="metric-label">比較日の落下品</div><div class="metric-value" id="yesterdayTotal">0</div><div class="metric-sub" id="comparisonDateSub">個</div></div>
         <div class="panel metric danger"><div class="metric-label">比較日との差</div><div class="metric-value" id="dayDifference">0</div><div class="metric-sub" id="differenceNote">個</div></div>
-        <div class="panel metric"><div class="metric-label">本日の発生部署</div><div class="metric-value" id="activeDepartments">0</div><div class="metric-sub">部署</div></div>
+        <div class="panel metric"><div class="metric-label">対象日の発生部署</div><div class="metric-value" id="activeDepartments">0</div><div class="metric-sub">部署</div></div>
       </div>
       <div class="dashboard-grid">
         <section class="panel">
@@ -427,13 +431,13 @@
           <div class="chart-wrap"><canvas id="departmentChart"></canvas></div>
         </section>
         <section class="panel">
-          <div class="section-header"><h3>部署別内訳</h3><span class="full-screen-note" id="breakdownDateLabel">本日 / 比較日</span></div>
-          <div class="dept-column-head"><span>部署</span><span id="deptTodayHeading">本日</span><span id="deptComparisonHeading">比較日</span><span>本日の整理No・部品名</span></div>
+          <div class="section-header"><h3>対象日の部署別内訳</h3><span class="full-screen-note" id="breakdownDateLabel"></span></div>
+          <div class="dept-column-head"><span>部署</span><span id="deptTodayHeading">対象日</span><span id="deptComparisonHeading">比較日</span><span>対象日の整理No・部品名と個数</span></div>
           <div class="dept-list" id="departmentList"></div>
         </section>
       </div>
       <section class="panel recent-panel">
-        <div class="section-header"><h3>直近の登録</h3></div>
+        <div class="section-header"><h3>対象日の登録内容</h3></div>
         <div class="recent-list" id="recentList"></div>
       </section>
     </section>
@@ -682,6 +686,11 @@
         if(!$('comparisonDate').value) resetComparisonDate(); else renderDashboard();
       });
       $('resetComparisonDate').addEventListener('click', resetComparisonDate);
+      $('showReviewDay').addEventListener('click', resetComparisonDate);
+      $('showToday').addEventListener('click', () => {
+        $('comparisonDate').value = localDateKey(new Date());
+        renderDashboard();
+      });
       $('dashboardDeptButton').addEventListener('click', event => {
         event.stopPropagation();
         const panel = $('dashboardDeptPanel');
@@ -1036,9 +1045,14 @@
 
     function renderDashboard(){
       const today = new Date();
-      const todayKey = localDateKey(today);
-      const comparisonKey = $('comparisonDate').value || localDateKey(previousWeekday(today));
-      if(!$('comparisonDate').value) $('comparisonDate').value = comparisonKey;
+      const todayKey = $('comparisonDate').value || localDateKey(previousWeekday(today));
+      if(!$('comparisonDate').value) $('comparisonDate').value = todayKey;
+      const comparisonKey = localDateKey(previousWeekday(new Date(`${todayKey}T12:00:00`)));
+      const isToday = todayKey === localDateKey(today);
+      const isReviewDay = todayKey === localDateKey(previousWeekday(today));
+      $('showToday').setAttribute('aria-pressed', String(isToday));
+      $('showReviewDay').setAttribute('aria-pressed', String(isReviewDay));
+      $('dashboardTitle').textContent = isToday ? '落下品 本日の状況' : isReviewDay ? '落下品 朝会レビュー' : '落下品 日別レビュー';
       const dashboardItems = state.items.filter(row => state.dashboardDepartments.has(row.department));
       const todayRows = byDate(dashboardItems,todayKey), comparisonRows = byDate(dashboardItems,comparisonKey);
       const todayTotal = sumQty(todayRows), comparisonTotal = sumQty(comparisonRows), diff = todayTotal-comparisonTotal;
@@ -1048,21 +1062,21 @@
       $('dayDifference').textContent = `${diff>0?'+':''}${diff.toLocaleString('ja-JP')}`;
       $('differenceNote').textContent = diff>0 ? '個増加' : diff<0 ? '個減少' : '個（同数）';
       $('activeDepartments').textContent = new Set(todayRows.map(row=>row.department).filter(Boolean)).size;
-      $('dashboardDateLabel').textContent = `${todayKey.replaceAll('-','/')} と ${comparisonKey.replaceAll('-','/')} の比較・${state.dashboardDepartments.size}部署表示`;
-      $('breakdownDateLabel').textContent = `${shortDateLabel(todayKey)} / ${shortDateLabel(comparisonKey)}`;
-      $('deptTodayHeading').textContent = shortDateLabel(todayKey);
-      $('deptComparisonHeading').textContent = shortDateLabel(comparisonKey);
+      $('dashboardDateLabel').textContent = `対象日 ${todayKey.replaceAll('-','/')}・比較日 ${comparisonKey.replaceAll('-','/')}（対象日の前稼働日）・${state.dashboardDepartments.size}部署表示`;
+      $('breakdownDateLabel').textContent = `対象日 ${shortDateLabel(todayKey)}`;
+      $('deptTodayHeading').textContent = `対象日 ${shortDateLabel(todayKey)}`;
+      $('deptComparisonHeading').textContent = `比較日 ${shortDateLabel(comparisonKey)}`;
       const departments = state.departments.filter(name => state.dashboardDepartments.has(name));
       const todayByDept = groupSum(todayRows,r=>r.department), comparisonByDept = groupSum(comparisonRows,r=>r.department);
       departments.sort((a,b)=>(todayByDept[b]||0)-(todayByDept[a]||0) || a.localeCompare(b,'ja'));
       renderDepartmentChart(departments,todayRows,comparisonRows,todayKey,comparisonKey);
       $('departmentList').innerHTML = departments.length ? departments.map(dept => {
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
-        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([name,count])=>`<span class="serial-chip serial-chip-item"><span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></span>`).join('');
-        return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">本日0件</span>'}</span></button>`;
+        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>`<span class="serial-chip serial-chip-item"><span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></span>`).join('');
+        return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></button>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
-      document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${shortDateLabel(todayKey)}・${shortDateLabel(comparisonKey)}`,[...todayRows,...comparisonRows].filter(r=>r.department===btn.dataset.dept))));
-      const recent = dashboardItems.slice(0,12);
+      document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
+      const recent = todayRows;
       $('recentList').innerHTML = recent.length ? recent.map(item=>`<button class="recent-item" data-item="${item.id}"><div class="recent-top"><span class="recent-serial">${esc(item.serialNo)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div><div class="recent-meta">${esc(item.department)} / ${quantity(item)}個<br>${fmtDateTime(item)}</div></button>`).join('') : '<div class="empty">登録データがありません</div>';
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
     }
@@ -1074,10 +1088,10 @@
     function renderDepartmentChart(labels,todayRows,comparisonRows,todayKey,comparisonKey){
       const causes = ['設備','作業','その他'];
       const colors = ['#527f98','#b18b46','#8b9298'];
-      const comparisonName = comparisonKey === localDateKey(previousWeekday(new Date(`${todayKey}T12:00:00`))) ? '前日' : '比較日';
+      const comparisonName = '比較日';
       const causeOf = row => causes.includes(row.cause) ? row.cause : 'その他';
       const periods = [
-        {name:'本日',key:todayKey,rows:todayRows},
+        {name:'対象日',key:todayKey,rows:todayRows},
         {name:comparisonName,key:comparisonKey,rows:comparisonRows}
       ];
       const datasets = periods.flatMap((period,periodIndex) => causes.map((cause,causeIndex) => {
@@ -1127,7 +1141,7 @@
               period.rows.filter(row=>row.department===dept&&causeOf(row)===cause));
           },
           plugins:{
-            subtitle:{display:true,text:`本日 ${shortDateLabel(todayKey)} / ${comparisonName} ${shortDateLabel(comparisonKey)}`,font:{size:14},padding:{bottom:12}},
+            subtitle:{display:true,text:`対象日 ${shortDateLabel(todayKey)} / ${comparisonName} ${shortDateLabel(comparisonKey)}`,font:{size:14},padding:{bottom:12}},
             legend:{position:'top',labels:{font:{size:15},padding:18,
               generateLabels:chart=>causes.map((cause,index)=>({text:cause,fillStyle:colors[index],strokeStyle:colors[index],hidden:!chart.isDatasetVisible(index),datasetIndex:index}))
             },onClick:(_,item,legend)=>{
