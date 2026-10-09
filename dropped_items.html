@@ -318,6 +318,24 @@
     .preview-photos img{display:block;width:100%;height:120px;object-fit:contain;background:#f2f3f4}
     .serial-preview-empty{font-size:14px;color:#667078;padding:10px 0}
     @media(max-width:480px){.preview-photos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .product-master-layout{display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:28px;align-items:start}
+    .product-master-form{display:grid;gap:16px}
+    .product-master-form label{display:grid;gap:6px;font-weight:700;font-size:14px}
+    .product-master-form input,.product-master-search{width:100%;min-width:0;padding:10px;border:1px solid #cbd1d5;border-radius:6px;font:inherit}
+    .product-master-preview{width:100%;height:220px;object-fit:contain;background:#f1f3f4;border:1px solid #d9dee1}
+    .product-master-preview[hidden]{display:none}
+    .product-master-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-top:16px}
+    .product-master-card{border:1px solid #d9dee1;border-radius:6px;overflow:hidden;background:white}
+    .product-master-card img{width:100%;height:160px;object-fit:contain;background:#f3f4f5;display:block}
+    .product-master-card-body{padding:12px;display:grid;gap:8px;overflow-wrap:anywhere}
+    .product-master-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .product-master-status{font-size:14px;color:#59636b;margin:10px 0}
+    #page-dashboard .serial-chip-item{max-width:100%}
+    #page-dashboard .serial-chip-item .product-thumb{width:46px;height:40px;object-fit:contain;flex:none;background:white}
+    .product-reference{margin:12px 0}
+    .product-reference img{display:block;width:100%;max-height:260px;object-fit:contain;background:#f2f3f4}
+    .product-reference p{margin:6px 0;font-size:14px;overflow-wrap:anywhere}
+    @media(max-width:760px){.product-master-layout{grid-template-columns:minmax(0,1fr)}.main-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
   </style>
 </head>
 <body>
@@ -335,6 +353,7 @@
         <button class="nav-btn active" data-page="entry"><i data-lucide="square-pen"></i>入力</button>
         <button class="nav-btn" data-page="dashboard"><i data-lucide="layout-dashboard"></i>ダッシュボード</button>
         <button class="nav-btn" data-page="analysis"><i data-lucide="chart-no-axes-combined"></i>分析</button>
+        <button class="nav-btn" data-page="products"><i data-lucide="image"></i>製品写真</button>
       </nav>
       <div class="header-actions">
         <span class="connection" id="connectionState"><span class="connection-dot"></span><span>接続中</span></span>
@@ -492,10 +511,30 @@
         <div class="ranking-list" id="serialRanking"></div>
       </section>
     </section>
+    <section class="page" id="page-products">
+      <div class="page-heading"><div><h2>製品写真マスター</h2><p>全部署共通</p></div></div>
+      <p id="productMasterStatus" class="product-master-status" role="status">読み込み中...</p>
+      <div class="product-master-layout">
+        <form id="productMasterForm" class="product-master-form">
+          <h3 id="productMasterFormTitle">製品写真の登録</h3>
+          <fieldset id="productMasterFields" style="border:0;padding:0;margin:0;display:grid;gap:16px" disabled>
+            <label>整理Noまたは部品名<input id="productMasterSerial" maxlength="60" list="productMasterSuggestions" required autocomplete="off"></label>
+            <datalist id="productMasterSuggestions"></datalist>
+            <label>製品名（任意）<input id="productMasterName" maxlength="100"></label>
+            <label>製品写真<input id="productMasterFile" type="file" accept="image/jpeg,image/png,image/webp"></label>
+            <img id="productMasterPreview" class="product-master-preview" alt="登録する製品写真" hidden>
+            <div id="productMasterProgress" class="upload-progress" style="display:none"><span></span></div>
+            <div class="product-master-actions"><button type="submit" class="btn btn-primary" id="saveProductMaster"><i data-lucide="save"></i>保存</button><button type="button" class="btn btn-secondary" id="cancelProductMaster">新規登録に戻る</button></div>
+          </fieldset>
+        </form>
+        <section><label for="productMasterSearch">登録済み製品</label><input id="productMasterSearch" class="product-master-search" type="search" placeholder="整理No・部品名・製品名で検索"><div id="productMasterList" class="product-master-list"></div></section>
+      </div>
+    </section>
   </main>
 
   <aside id="serialPreview" class="serial-preview" role="dialog" aria-modal="false" aria-labelledby="serialPreviewTitle" hidden>
     <div class="serial-preview-head"><div><h3 id="serialPreviewTitle"></h3><p id="serialPreviewMeta" class="serial-preview-meta"></p></div><button id="closeSerialPreview" type="button" class="icon-btn" aria-label="品番プレビューを閉じる" title="閉じる"><i data-lucide="x"></i></button></div>
+    <h4>製品写真</h4><div id="serialProductPhoto"></div>
     <h4>原因内訳（落下個数）</h4><div class="serial-preview-chart"><canvas id="serialCauseChart" role="img" aria-label="原因別の落下個数"></canvas></div>
     <h4>コメントの内訳（登録件数）</h4><div id="serialCommentBubbles" class="comment-bubbles"></div>
     <h4>状況写真</h4><div id="serialPreviewPhotos" class="preview-photos"></div>
@@ -579,7 +618,7 @@
     import { getAuth, signInAnonymously, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
     import {
       getFirestore, collection, addDoc, deleteDoc, doc, getDocs, onSnapshot, updateDoc,
-      serverTimestamp, Timestamp
+      serverTimestamp, Timestamp, runTransaction
     } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
     import {
       getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
@@ -601,7 +640,8 @@
     const storage = getStorage(app);
     const state = {
       departments: [], items: [], files: [], editFiles: [], editMedia: [], editItemId: '', deleteItemId: '', charts: {}, activePage: 'entry',
-      dashboardDepartments: new Set()
+      dashboardDepartments: new Set(), productMasters: new Map(), productMastersReady:false,
+      productEdit:null, productFile:null, productPreviewUrl:'', productBusy:false, productPhotoLoading:false
     };
 
     const $ = id => document.getElementById(id);
@@ -658,10 +698,11 @@
         renderDashboardDepartmentPicker();
         renderInputQr();
         const requestedScreen = new URLSearchParams(location.search).get('screen');
-        if(['entry','dashboard','analysis'].includes(requestedScreen)) showPage(requestedScreen);
+        if(['entry','dashboard','analysis','products'].includes(requestedScreen)) showPage(requestedScreen);
         $('comparisonDate').max = localDateKey(new Date());
         $('comparisonDate').value = localDateKey(previousWeekday(new Date()));
         subscribeItems();
+        subscribeProductMasters();
         $('occurredAt').value = localDateTimeValue(new Date());
         const to = new Date(); const from = new Date(); from.setDate(from.getDate()-29);
         $('dateFrom').value = localDateKey(from); $('dateTo').value = localDateKey(to);
@@ -688,6 +729,10 @@
     }
 
     function bindEvents(){
+      $('productMasterForm').addEventListener('submit', saveProductMaster);
+      $('productMasterFile').addEventListener('change', selectProductPhoto);
+      $('cancelProductMaster').addEventListener('click', resetProductMasterForm);
+      $('productMasterSearch').addEventListener('input', renderProductMasters);
       const preview = $('serialPreview');
       $('closeSerialPreview').addEventListener('click', () => closeSerialPreview(true));
       document.addEventListener('keydown', event => {
@@ -804,13 +849,143 @@
     }
 
     function showPage(page){
+      closeSerialPreview();
       state.activePage = page;
       document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
       document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id === `page-${page}`));
       document.body.classList.toggle('monitor-mode', page !== 'entry');
       if(page === 'dashboard') renderDashboard();
       if(page === 'analysis') renderAnalysis();
+      if(page === 'products') renderProductMasters();
       refreshIcons();
+    }
+
+    const productKey = value => String(value || '').trim().normalize('NFC');
+    function productFor(serial){ return state.productMasters.get(productKey(serial)); }
+    function productPhotoHtml(serial){
+      const product=productFor(serial),url=safeUrl(product?.photo?.url);
+      if(!url) return '<p class="serial-preview-empty">製品写真は未登録です</p>';
+      return `<div class="product-reference"><a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="${esc(product.productName||serial)}の製品写真" loading="lazy"></a>${product.productName?`<p>${esc(product.productName)}</p>`:''}</div>`;
+    }
+    function subscribeProductMasters(){
+      onSnapshot(collection(db,'droppedProductPhotos'),snap=>{
+        state.productMasters=new Map(snap.docs.map(doc=>{const data={...doc.data(),id:doc.id};return [productKey(data.serialNo),data];}));
+        state.productMastersReady=true;
+        $('productMasterStatus').textContent=`${state.productMasters.size}製品登録済み`;
+        $('productMasterFields').disabled=state.productBusy;
+        renderProductMasters();
+        renderDashboard();
+      },error=>{
+        console.error(error);
+        state.productMastersReady=false;
+        $('productMasterFields').disabled=true;
+        $('productMasterStatus').textContent='製品写真を読み込めません。通信・アクセス権を確認して再読み込みしてください。';
+      });
+    }
+    function renderProductMasters(){
+      const query=$('productMasterSearch').value.trim().toLocaleLowerCase('ja');
+      const products=[...state.productMasters.values()].sort((a,b)=>a.serialNo.localeCompare(b.serialNo,'ja',{numeric:true}));
+      const matched=products.filter(p=>`${p.serialNo} ${p.productName||''}`.toLocaleLowerCase('ja').includes(query));
+      $('productMasterList').innerHTML=matched.length?matched.map(p=>`<article class="product-master-card"><img src="${esc(safeUrl(p.photo?.url))}" alt="${esc(p.productName||p.serialNo)}" loading="lazy"><div class="product-master-card-body"><strong>${esc(p.serialNo)}</strong><span>${esc(p.productName||'')}</span><div class="product-master-actions"><button type="button" class="btn btn-secondary" data-product-edit="${esc(p.serialNo)}" ${state.productBusy?'disabled':''}><i data-lucide="pencil"></i>編集</button><button type="button" class="icon-btn" data-product-delete="${esc(p.serialNo)}" title="マスターから削除" aria-label="${esc(p.serialNo)}をマスターから削除" ${state.productBusy?'disabled':''}><i data-lucide="trash-2"></i></button></div></div></article>`).join(''):'<p class="serial-preview-empty">該当する製品写真はありません</p>';
+      $('productMasterSuggestions').innerHTML=[...new Set([...state.items.map(row=>productKey(row.serialNo)),...state.productMasters.keys()])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ja',{numeric:true})).map(value=>`<option value="${esc(value)}"></option>`).join('');
+      document.querySelectorAll('[data-product-edit]').forEach(btn=>btn.addEventListener('click',()=>editProductMaster(btn.dataset.productEdit)));
+      document.querySelectorAll('[data-product-delete]').forEach(btn=>btn.addEventListener('click',()=>deleteProductMaster(btn.dataset.productDelete)));
+      refreshIcons();
+    }
+    function resetProductMasterForm(){
+      if(state.productBusy)return;
+      if(state.productPreviewUrl) URL.revokeObjectURL(state.productPreviewUrl);
+      state.productFile=null; state.productPreviewUrl=''; state.productEdit=null; state.productPhotoLoading=false;
+      $('saveProductMaster').disabled=false;
+      $('productMasterForm').reset(); $('productMasterSerial').readOnly=false;
+      $('productMasterPreview').hidden=true; $('productMasterPreview').removeAttribute('src');
+      $('productMasterFormTitle').textContent='製品写真の登録';
+    }
+    function editProductMaster(serial){
+      if(state.productBusy)return;
+      const product=productFor(serial); if(!product)return;
+      resetProductMasterForm(); state.productEdit={...product};
+      $('productMasterSerial').value=product.serialNo; $('productMasterSerial').readOnly=true;
+      $('productMasterName').value=product.productName||'';
+      $('productMasterPreview').src=safeUrl(product.photo?.url); $('productMasterPreview').hidden=false;
+      $('productMasterFormTitle').textContent='製品写真の編集';
+      $('productMasterForm').scrollIntoView({block:'start',behavior:'smooth'});
+    }
+    async function selectProductPhoto(){
+      const file=$('productMasterFile').files[0]; if(!file)return;
+      if(!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>15*1024*1024){
+        $('productMasterFile').value=''; showToast('JPEG・PNG・WebP形式の15MB以下の画像を選んでください',true); return;
+      }
+      const url=URL.createObjectURL(file);
+      state.productPhotoLoading=true; $('saveProductMaster').disabled=true;
+      try{
+        const image=new Image(); image.src=url; await image.decode();
+        if($('productMasterFile').files[0]!==file){URL.revokeObjectURL(url);return;}
+        if(state.productPreviewUrl) URL.revokeObjectURL(state.productPreviewUrl);
+        state.productFile=file; state.productPreviewUrl=url;
+        $('productMasterPreview').src=url; $('productMasterPreview').hidden=false;
+      }catch{
+        URL.revokeObjectURL(url); $('productMasterFile').value=''; showToast('画像を読み込めません。別の写真を選んでください',true);
+      }finally{
+        if($('productMasterFile').files[0]===file || !$('productMasterFile').files.length){state.productPhotoLoading=false;$('saveProductMaster').disabled=false;}
+      }
+    }
+    async function productDocumentId(serial){
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(serial));
+      return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+    }
+    function setProductBusy(busy){
+      state.productBusy=busy;
+      $('productMasterFields').disabled=busy || !state.productMastersReady;
+      renderProductMasters();
+    }
+    async function saveProductMaster(event){
+      event.preventDefault(); if(state.productBusy || state.productPhotoLoading || !state.productMastersReady)return;
+      const serial=productKey($('productMasterSerial').value),productName=$('productMasterName').value.trim();
+      if(!serial || serial.length>60 || productName.length>100){showToast('整理No・部品名と製品名の文字数を確認してください',true);return;}
+      const existing=state.productEdit;
+      if(!existing && productFor(serial)){showToast('登録済みです。一覧の「編集」から変更してください',true);return;}
+      if(!state.productFile && !existing?.photo){showToast('製品写真を選んでください',true);return;}
+      const file=state.productFile;
+      setProductBusy(true); let uploaded=null,committed=false;
+      $('productMasterProgress').style.display=file?'block':'none';
+      try{
+        if(file) uploaded=await uploadMedia(file,0,1,'productMasterProgress');
+        const ref=doc(db,'droppedProductPhotos',await productDocumentId(serial));
+        await runTransaction(db,async transaction=>{
+          const current=await transaction.get(ref);
+          if(existing ? !current.exists() || current.data().revision!==existing.revision : current.exists()) throw new Error('他の利用者が更新しています。一覧から編集し直してください。');
+          transaction.set(ref,{serialNo:serial,productName,photo:uploaded||existing.photo,
+            revision:(existing?.revision||0)+1,createdAt:current.exists()?current.data().createdAt:serverTimestamp(),
+            createdBy:current.exists()?current.data().createdBy:auth.currentUser.uid,
+            updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+        });
+        committed=true;
+        showToast('製品写真を保存しました');
+      }catch(error){
+        console.error(error);
+        // An uncertain commit must never leave a saved master pointing at a deleted image.
+        showToast(`保存できませんでした。${error.message||'通信状態を確認してください'}`,true);
+      }finally{
+        setProductBusy(false); $('productMasterProgress').style.display='none';
+        if(committed)resetProductMasterForm();
+      }
+    }
+    async function deleteProductMaster(serial){
+      if(state.productBusy || !state.productMastersReady)return;
+      const product=productFor(serial);if(!product)return;
+      if(!confirm(`${serial} の製品写真マスターを削除しますか？\n落下品の履歴・状況写真は削除されません。`))return;
+      setProductBusy(true);
+      try{
+        await runTransaction(db,async transaction=>{
+          const ref=doc(db,'droppedProductPhotos',product.id),current=await transaction.get(ref);
+          if(!current.exists() || current.data().revision!==product.revision)throw new Error('他の利用者が更新しています。一覧を確認してください。');
+          transaction.delete(ref);
+        });
+        showToast('製品写真マスターを削除しました');
+        setProductBusy(false); if(state.productEdit?.id===product.id)resetProductMasterForm();
+      }catch(error){showToast(`削除できませんでした。${error.message}`,true);}
+      finally{setProductBusy(false);}
     }
 
     function changeQty(delta){
@@ -885,9 +1060,10 @@
         const own = snap.bytesTransferred / snap.totalBytes;
         const percent = ((index + own) / total) * 100;
         $(progressId).querySelector('span').style.width = `${percent}%`;
-      }, reject, async () => resolve({
-        url: await getDownloadURL(task.snapshot.ref), path, type:file.type.startsWith('video/') ? 'video' : 'image', name:file.name.slice(0,120)
-      })));
+      }, reject, async () => {
+        try{resolve({url:await getDownloadURL(task.snapshot.ref),path,type:file.type.startsWith('video/')?'video':'image',name:file.name.slice(0,120)});}
+        catch(error){reject(error);}
+      }));
     }
 
     async function submitEntry(event){
@@ -1085,7 +1261,7 @@
     }
 
     function renderAll(){
-      updateSerialOptions(); renderDashboard(); renderAnalysis();
+      updateSerialOptions(); renderDashboard(); renderAnalysis(); renderProductMasters();
     }
 
     function renderDashboard(){
@@ -1121,7 +1297,10 @@
       renderDepartmentChart(departments,todayRows,comparisonRows,todayKey,comparisonKey,showComparison);
       $('departmentList').innerHTML = departments.length ? departments.map(dept => {
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
-        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>`<button type="button" class="serial-chip serial-chip-item" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></button>`).join('');
+        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
+          const product=productFor(name),url=safeUrl(product?.photo?.url);
+          return `<button type="button" class="serial-chip serial-chip-item" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></button>`;
+        }).join('');
         return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
@@ -1154,6 +1333,7 @@
       anchor.setAttribute('aria-expanded','true');
       const preview=$('serialPreview');
       $('serialPreviewTitle').textContent=anchor.dataset.previewSerial;
+      $('serialProductPhoto').innerHTML=productPhotoHtml(anchor.dataset.previewSerial);
       $('serialPreviewMeta').textContent=`${anchor.dataset.previewDept} / ${dateKey.replaceAll('-','/')} / ${sumQty(rows).toLocaleString('ja-JP')}個`;
       const causes=['設備','作業','その他'];
       const totals=causes.map(cause=>sumQty(rows.filter(row=>(causes.includes(row.cause)?row.cause:'その他')===cause)));

@@ -161,6 +161,39 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if isSignedIn();
     }
+    // Shared product-photo masters for the anonymous dropped-items app.
+    match /droppedProductPhotos/{productId} {
+      function validProductPhoto() {
+        let data = request.resource.data;
+        return data.keys().hasOnly([
+          'serialNo', 'productName', 'photo', 'revision',
+          'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+        ])
+          && data.serialNo is string && data.serialNo.size() > 0 && data.serialNo.size() <= 60
+          && data.productName is string && data.productName.size() <= 100
+          && data.photo is map
+          && data.photo.keys().hasOnly(['url', 'path', 'type', 'name'])
+          && data.photo.url is string && data.photo.url.size() <= 2048
+          && data.photo.url.matches('https://firebasestorage[.]googleapis[.]com/.*')
+          && data.photo.path is string && data.photo.path.matches('dropped-items/.*')
+          && data.photo.path.size() <= 500
+          && data.photo.type == 'image'
+          && data.photo.name is string && data.photo.name.size() <= 120
+          && data.revision is int
+          && data.updatedAt == request.time && data.updatedBy == request.auth.uid;
+      }
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && validProductPhoto()
+        && request.resource.data.revision == 1
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSignedIn() && validProductPhoto()
+        && request.resource.data.serialNo == resource.data.serialNo
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if isSignedIn();
+    }
     // 変化点管理システムは画面操作なしの匿名認証を使用する。
     match /changepoints/{docId} {
       allow read, create, update, delete: if canUseChangePointApp();
