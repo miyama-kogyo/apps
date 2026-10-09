@@ -415,7 +415,7 @@
       </div>
     </section>
 
-    <section class="page" id="page-dashboard">
+    <section class="page review-only" id="page-dashboard">
       <div class="page-heading dashboard-heading">
         <div><h2 id="dashboardTitle">落下品 朝会レビュー</h2><p id="dashboardDateLabel"></p></div>
         <div class="dashboard-heading-actions">
@@ -1096,7 +1096,7 @@
       const comparisonKey = localDateKey(previousWeekday(new Date(`${todayKey}T12:00:00`)));
       const isToday = todayKey === localDateKey(today);
       const isReviewDay = todayKey === localDateKey(previousWeekday(today));
-      const showComparison = isToday;
+      const showComparison = false;
       $('page-dashboard').classList.toggle('review-only', !showComparison);
       $('departmentChartTitle').textContent = showComparison ? '部署別比較' : '部署別落下品数';
       $('showToday').setAttribute('aria-pressed', String(isToday));
