@@ -3082,7 +3082,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
     function evidenceFileType(file){
       const extension = String(file.name || '').split('.').pop().toLowerCase();
-      if (!EVIDENCE_MIME[extension] || !file.name || file.name.length > 240) throw new Error('対応形式はExcel（xlsx・xls）、CSV、PDF、画像（jpg・png・webp・gif・bmp・heic・heif）です。ファイル名は240文字以内にしてください。');
+      if (!Object.hasOwn(EVIDENCE_MIME,extension) || !file.name || file.name.length > 240) throw new Error('対応形式はExcel（xlsx・xls）、CSV、PDF、画像（jpg・png・webp・gif・bmp・heic・heif）です。ファイル名は240文字以内にしてください。');
       if (!Number.isFinite(file.size) || file.size <= 0 || file.size > 5*1024*1024) throw new Error('ファイルは空でない5MB以下のものを選択してください。');
       return {extension,contentType:EVIDENCE_MIME[extension]};
     }
