@@ -1213,7 +1213,7 @@
           afterDatasetsDraw(chart){
             const {ctx,chartArea}=chart;
             if(!chartArea || !labels.length)return;
-            const vertical=(chartArea.right-chartArea.left)/labels.length < (comparisonName==='比較日'?100:65);
+            const labelWidth=Math.max(16,(chartArea.right-chartArea.left)/labels.length/periods.length-8);
             ctx.save();
             ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillStyle='#30363b';
             periods.forEach((period,periodIndex)=>{
@@ -1224,11 +1224,9 @@
                 const bars=visible.map(({index:datasetIndex})=>chart.getDatasetMeta(datasetIndex).data[index]);
                 const x=bars[0].x;
                 const top=Math.min(...bars.map(bar=>bar.y));
-                const height=vertical?period.name.length*14:14;
-                const bottom=Math.max(chartArea.top+height,top-6);
-                if(vertical){
-                  [...period.name].forEach((char,i)=>ctx.fillText(char,x,bottom-(period.name.length-1-i)*14));
-                }else ctx.fillText(period.name,x,bottom);
+                const total=visible.reduce((sum,{dataset})=>sum+dataset.data[index],0);
+                const bottom=Math.max(chartArea.top+14,top-6);
+                ctx.fillText(`${total.toLocaleString('ja-JP')}個`,x,bottom,labelWidth);
               });
             });
             ctx.restore();
