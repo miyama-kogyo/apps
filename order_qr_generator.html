@@ -49,6 +49,12 @@
     @media (max-width:960px){.head-inner{width:calc(100% - 24px)}.simple-issue{width:calc(100% - 24px);margin:28px auto;padding:22px}.simple-file{grid-template-columns:1fr}.simple-file button{width:100%}body.edit-mode main{grid-template-columns:1fr}}
     #printSheet { display:none; }
     @media print { @page { size:A4 portrait; margin:12mm; } @page originalOrderPortrait { size:A4 portrait; margin:10mm; } @page originalOrderLandscape { size:A4 landscape; margin:10mm; } body{background:#fff;color:#111}.no-print,header,main,.simple-issue{display:none!important}#printSheet{display:block;width:100%;font-family:"Noto Sans JP",sans-serif}.print-title{display:flex;justify-content:space-between;align-items:end;border-bottom:2px solid #111;padding-bottom:7px}.print-title h1{font-size:25px;color:#111}.print-title .print-issued{font-size:11px}.print-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;margin:13px 0;border:1px solid #111;padding:9px 11px}.print-meta div{font-size:12px}.print-meta b{display:block;font-size:10px;color:#444;margin-bottom:2px}.print-body{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:15px;align-items:start}.print-table{width:100%;min-width:0;border-collapse:collapse}.print-table th,.print-table td{border:1px solid #111;padding:5px 6px;font-size:10px}.print-table th{background:#eee;text-align:center}.print-table td.num{text-align:right}.print-qr{border:1px solid #111;padding:5px;text-align:center}.print-qr img{display:block;width:58px;height:58px;margin:0 auto 4px}.print-qr b{font-size:9px}.print-foot{margin-top:12px;border-top:1px solid #111;padding-top:6px;font-size:9px;color:#444}.print-original-page{position:relative;break-before:auto;page-break-before:auto}.print-original-page.portrait{page:originalOrderPortrait}.print-original-page.landscape{page:originalOrderLandscape}.print-original-page + .print-original-page{break-before:page;page-break-before:always}.print-original-page h2{display:none}.print-original-page .print-original-source{display:block;width:100%;object-fit:contain;object-position:top center}.print-original-page.portrait .print-original-source{max-height:270mm}.print-original-page.landscape .print-original-source{max-height:188mm}.print-original-qr{position:absolute;right:8mm;bottom:32mm;width:58px;padding:3px;background:#fff;border:1px solid #111;text-align:center}.print-original-qr img{display:block;width:50px;height:50px;margin:0 auto}.print-original-qr b{display:block;font-size:7px;margin-top:2px} }
+    @media print {
+      .print-original-qr { width:83px; }
+      .print-original-qr img { width:75px; height:75px; }
+      .print-body { grid-template-columns:minmax(0,1fr) 105px; }
+      .print-qr img { width:87px; height:87px; }
+    }
   </style>
 </head>
 <body>
@@ -121,6 +127,10 @@
   }
   function saveMasterLocal() { localStorage.setItem(storageKey(), JSON.stringify(state.master)); }
   function getPackQty(part) { const entry=state.master.find(item=>partKey(item.partNumber)===partKey(part)); return entry ? entry.packQty : 0; }
+  function getOrderRowPackQty(line) {
+    const masterPack=getPackQty(line.partNumber);
+    return masterPack>0&&line.totalQty>0&&line.totalQty<masterPack?line.totalQty:masterPack;
+  }
   function renderMaster() { const list=document.getElementById('masterList'); if(!state.master.length){list.innerHTML='<div class="master-empty">登録なし</div>';return;} list.innerHTML=state.master.map(item=>`<div class="master-row"><div class="master-part">${esc(item.partNumber)}</div><div class="master-qty">${item.packQty} 入/箱</div><button class="icon danger" onclick="removeMasterEntry('${esc(partKey(item.partNumber))}')">削除</button></div>`).join(''); renderLines(); }
   function persistMaster() { state.master=normalizeMaster(state.master); saveMasterLocal(); renderMaster(); if(database) database.ref(masterPath()).set(state.master).then(()=>setStatus('ok','Firebase同期済み')).catch(()=>setStatus('off','ローカル保存')); }
   function saveMasterEntry() { const part=cleanPart(document.getElementById('masterPart').value); const qty=Math.floor(Number(document.getElementById('masterQty').value)); if(!part||!qty||qty<1){alert('品番と1以上の入数を入力してください');return;} const key=partKey(part); const found=state.master.find(item=>partKey(item.partNumber)===key); if(found){found.partNumber=part;found.packQty=qty;}else state.master.push({partNumber:part,packQty:qty}); document.getElementById('masterPart').value='';document.getElementById('masterQty').value='';persistMaster(); }
@@ -294,7 +304,8 @@
       const quantities=words.filter(word=>Math.abs(word.y-ea.y)<14&&word.x<ea.x&&/^(?:\d{1,3}(?:,\d{3})*|\d+)$/.test(token(word))).sort((a,b)=>b.x-a.x);
       const quantity=quantities[0];if(!quantity)return;
       const partNumber=token(part), quantityText=token(quantity);
-      const key=partNumber+'|'+quantityText;if(seen.has(key))return;seen.add(key);
+      // Identical parts and quantities on different order rows are separate orders.
+      const key=partNumber+'|'+quantity.x+'|'+quantity.y;if(seen.has(key))return;seen.add(key);
       found.push({partNumber,totalQty:Number(quantityText.replace(/,/g,'')),backNo:'',anchor:part});
     });
     return found;
@@ -515,7 +526,7 @@
         const meta={...extractPageMeta(words,found[0]?.anchor,pageKyb,ocrText),...specialMeta};
         state.originalPages.push({src:originalCanvas.toDataURL('image/png'),orientation,meta,...(pageMiyamaEast?{format:'miyamaEast'}:{})});
         if(!found.length){unreadable.push(p);continue;}
-        found.forEach(line=>state.lines.push({partNumber:line.partNumber,totalQty:line.totalQty,backNo:line.backNo,packQty:(pageKyb||pageMiyamaEast)?(line.packQty||''):(getPackQty(line.partNumber)||''),pageIndex:p-1}));
+        found.forEach(line=>state.lines.push({partNumber:line.partNumber,totalQty:line.totalQty,backNo:line.backNo,packQty:(pageKyb||pageMiyamaEast)?(line.packQty||''):(getOrderRowPackQty(line)||''),pageIndex:p-1}));
         if(pageMiyamaEast)copiedOrder={meta,lines:found};
       }
       fillFormMeta(state.originalPages[0]?.meta||{});state.importedFormMeta=getFormMeta();renderLines();
