@@ -837,6 +837,30 @@
     .actual-switch-fields label { display:block; font-size:14px; margin:6px 0; }
     .actual-switch-fields input { width:100%; min-width:0; box-sizing:border-box; padding:9px 6px; font:inherit; border:1px solid #b8c9bf; border-radius:4px; }
     .production-date-link { display:inline-block; margin:8px 0; color:#176343; text-decoration:underline; }
+    .evidence-panel { margin-top:16px; padding-top:12px; border-top:1px solid #d4ded7; }
+    .evidence-panel summary { cursor:pointer; font-weight:700; font-size:15px; padding:6px 0; }
+    .evidence-list { margin-top:8px; }
+    .evidence-row { display:flex; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid #e1e7e3; }
+    .evidence-row img { display:block; width:88px; height:72px; object-fit:contain; background:#f3f5f4; border:1px solid #d4ded7; }
+    .evidence-row>div { flex:1; min-width:0; }
+    .evidence-row a { color:#176343; overflow-wrap:anywhere; }
+    .evidence-row p { font-size:13px; margin:5px 0 0; overflow-wrap:anywhere; white-space:pre-wrap; }
+    .evidence-meta { color:#56665c; font-size:12px!important; }
+    .evidence-form { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:16px; }
+    .evidence-form>div { min-width:0; }
+    .evidence-form label { display:block; font-size:13px; font-weight:600; margin-bottom:5px; }
+    .evidence-form input,.evidence-form select,.evidence-form textarea { width:100%; min-width:0; padding:9px; border:1px solid #bdcbc2; border-radius:4px; font:inherit; font-size:16px; box-sizing:border-box; }
+    .evidence-form textarea { resize:vertical; min-height:60px; }
+    .evidence-wide { grid-column:1/-1; }
+    .evidence-queue { list-style:none; padding:0; }
+    .evidence-queue li { display:flex; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid #e1e7e3; font-size:13px; }
+    .evidence-queue span { flex:1; min-width:0; overflow-wrap:anywhere; }
+    .evidence-queue button { width:32px; height:32px; flex:none; border:1px solid #bdcbc2; background:white; border-radius:4px; font-size:20px; cursor:pointer; }
+    .evidence-status { font-size:13px; margin:8px 0; overflow-wrap:anywhere; }
+    .evidence-status[data-error="true"] { color:#b42318; }
+    .evidence-panel progress { width:100%; height:8px; accent-color:#176343; }
+    .evidence-form button:disabled { opacity:.6; cursor:wait; }
+    @media(max-width:420px){ .evidence-row { gap:8px; } .evidence-row img { width:64px; height:64px; } }
     .checks-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
     .checks-heading h4 { font-size:16px; }
     .checks-heading>span { font-size:12px; color:#627369; }
@@ -2138,6 +2162,7 @@
       onSnapshot(query(collection(db, 'changepoints'), orderBy('occurrenceDate', 'desc')), (snap) => {
         changepointData = snap.docs.map(d => ({ _id: d.id, docType: 'changepoint', ...d.data() }));
         window.changepointData = changepointData; // ★ グローバル参照を更新
+        refreshEvidenceFromSnapshot();
         setupTopicsDeptFilter();
         buildTopicsDeptOptions();
         updateTopics();
@@ -3033,6 +3058,138 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     let currentDetailItem = null;
+    const EVIDENCE_TYPES = ['断面評価','強度評価','条件表','その他'];
+    const EVIDENCE_MIME = {
+      xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',
+      csv:'text/csv',pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',bmp:'image/bmp',heic:'image/heic',heif:'image/heif'
+    };
+    const evidenceDrafts = new Map();
+
+    function evidenceDraft(id){
+      if (!evidenceDrafts.has(id)) evidenceDrafts.set(id,{category:EVIDENCE_TYPES[0],note:'',actor:localStorage.getItem('changepointActorName') || '',jobs:[],busy:false,open:false,message:'',error:false,progress:0});
+      return evidenceDrafts.get(id);
+    }
+    function evidenceFiles(item){ return Array.isArray(item?.evidenceAttachments) ? item.evidenceAttachments : []; }
+    function legacyAttachmentUrl(value){
+      try{const url=new URL(value);return ['http:','https:'].includes(url.protocol) ? url.href : '';}
+      catch{return '';}
+    }
+    function evidenceUrl(value){
+      try{
+        const url = new URL(value);
+        return url.protocol === 'https:' && url.hostname === 'firebasestorage.googleapis.com' && url.pathname.startsWith('/v0/b/'+firebaseConfig.storageBucket+'/o/') ? url.href : '';
+      }catch{ return ''; }
+    }
+    function evidenceFileType(file){
+      const extension = String(file.name || '').split('.').pop().toLowerCase();
+      if (!EVIDENCE_MIME[extension] || !file.name || file.name.length > 240) throw new Error('対応形式はExcel（xlsx・xls）、CSV、PDF、画像（jpg・png・webp・gif・bmp・heic・heif）です。ファイル名は240文字以内にしてください。');
+      if (!Number.isFinite(file.size) || file.size <= 0 || file.size > 5*1024*1024) throw new Error('ファイルは空でない5MB以下のものを選択してください。');
+      return {extension,contentType:EVIDENCE_MIME[extension]};
+    }
+    function evidenceListHtml(item){
+      const legacy = item.documentUrl ? `<div class="evidence-row"><div>${legacyAttachmentUrl(item.documentUrl) ? `<a href="${escapeHtml(legacyAttachmentUrl(item.documentUrl))}" target="_blank" rel="noopener noreferrer">登録時の添付資料を開く</a>` : '<span>登録時の添付資料（URLを確認してください）</span>'}</div></div>` : '';
+      const rows = evidenceFiles(item).map(file=>{
+        const url=evidenceUrl(file.url), preview=url && ['image/jpeg','image/png','image/webp','image/gif','image/bmp'].includes(file.contentType);
+        const size=Number.isFinite(file.size) ? (file.size/1024/1024).toFixed(2)+' MB' : '';
+        return `<div class="evidence-row">${preview ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(url)}" alt="${escapeHtml(file.name || '評価画像')}" loading="lazy"></a>` : ''}<div><strong>${escapeHtml(file.category || 'その他')}</strong><br>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(file.name || '添付ファイル')}</a>` : `<span>${escapeHtml(file.name || '添付ファイル')}（URLを確認してください）</span>`}<p class="evidence-meta">${escapeHtml(size)} / 登録者：${escapeHtml(file.uploadedBy || '未記録')} / ${escapeHtml(stampDate(file.uploadedAt))}</p>${file.note ? `<p>${escapeHtml(file.note)}</p>` : ''}</div></div>`;
+      }).join('');
+      return legacy+rows || '<p class="evidence-meta">添付なし</p>';
+    }
+    function renderEvidencePanel(item){
+      const host=document.getElementById('evidenceHost');
+      if (!host || !item?._id) return;
+      const draft=evidenceDraft(item._id);
+      const count=evidenceFiles(item).length+(item.documentUrl ? 1 : 0);
+      host.innerHTML=`<details class="evidence-panel" id="evidencePanel" ${draft.open ? 'open' : ''}><summary>評価エビデンス <span id="evidenceCount">${count}</span>件</summary><div id="evidenceList" class="evidence-list">${evidenceListHtml(item)}</div><form class="evidence-form" id="evidenceForm"><div><label for="evidenceCategory">評価区分</label><select id="evidenceCategory" ${draft.busy ? 'disabled' : ''}>${EVIDENCE_TYPES.map(v=>`<option ${v===draft.category ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div><label for="evidenceActor">登録者名 *</label><input id="evidenceActor" value="${escapeHtml(draft.actor)}" maxlength="80" required ${draft.busy ? 'disabled' : ''}></div><div class="evidence-wide"><label for="evidenceNote">評価メモ</label><textarea id="evidenceNote" rows="2" maxlength="500" ${draft.busy ? 'disabled' : ''}>${escapeHtml(draft.note)}</textarea></div><div class="evidence-wide"><label for="evidenceInput">ファイル（Excel・画像・PDF・CSV、各5MB以下）</label><input type="file" id="evidenceInput" multiple accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.heic,.heif" ${draft.busy ? 'disabled' : ''}><ul id="evidenceQueue" class="evidence-queue"></ul><progress id="evidenceProgress" max="100" value="${draft.progress}" ${draft.busy ? '' : 'hidden'}></progress><p id="evidenceStatus" class="evidence-status" role="status" data-error="${draft.error}">${escapeHtml(draft.message)}</p><button type="submit" class="btn btn-primary" ${draft.busy || !draft.jobs.length ? 'disabled' : ''}>${draft.busy ? '保存中...' : draft.jobs.some(j=>j.error) ? '未保存の添付を再試行' : '添付を保存'}</button></div></form></details>`;
+      document.getElementById('evidencePanel').addEventListener('toggle',e=>{draft.open=e.target.open;});
+      for (const [field,id] of [['category','evidenceCategory'],['actor','evidenceActor'],['note','evidenceNote']]) document.getElementById(id).addEventListener('input',e=>{draft[field]=e.target.value;});
+      document.getElementById('evidenceInput').addEventListener('change',e=>selectEvidenceFiles(item._id,e.target.files));
+      document.getElementById('evidenceForm').addEventListener('submit',e=>{e.preventDefault();saveEvidenceFiles(item._id);});
+      document.getElementById('evidenceQueue').innerHTML=draft.jobs.map((job,index)=>`<li><span>${escapeHtml(job.file.name)}${job.error ? ' / '+escapeHtml(job.error) : ''}</span>${!draft.busy && !job.uploaded ? `<button type="button" data-remove-evidence="${index}" title="選択を取り消す" aria-label="${escapeHtml(job.file.name)}の選択を取り消す">×</button>` : ''}</li>`).join('');
+      host.querySelectorAll('[data-remove-evidence]').forEach(button=>button.addEventListener('click',()=>{draft.jobs.splice(Number(button.dataset.removeEvidence),1);renderEvidencePanel(currentDetailItem);}));
+    }
+    function refreshEvidenceFromSnapshot(){
+      if (!currentDetailItem?._id) return;
+      const latest=changepointData.find(x=>x._id===currentDetailItem._id);
+      if (!latest) return;
+      currentDetailItem={...currentDetailItem,evidenceAttachments:evidenceFiles(latest)};
+      const list=document.getElementById('evidenceList'),count=document.getElementById('evidenceCount');
+      if(list) list.innerHTML=evidenceListHtml(currentDetailItem);
+      if(count) count.textContent=evidenceFiles(currentDetailItem).length+(currentDetailItem.documentUrl ? 1 : 0);
+    }
+    function selectEvidenceFiles(id, files){
+      const draft=evidenceDraft(id);
+      if(draft.busy) return;
+      try{
+        const selected=Array.from(files);
+        selected.forEach(evidenceFileType);
+        if (draft.jobs.length+selected.length>10) throw new Error('一度に選択できるファイルは10件までです。');
+        const record=changepointData.find(x=>x._id===id) || currentDetailItem;
+        if (evidenceFiles(record).length+draft.jobs.length+selected.length>100) throw new Error('1件の変化点に添付できるファイルは100件までです。');
+        for(const file of selected){
+          if(!draft.jobs.some(j=>j.file.name===file.name && j.file.size===file.size && j.file.lastModified===file.lastModified)) draft.jobs.push({id:crypto.randomUUID(),file,uploaded:null,error:''});
+        }
+        draft.message='';draft.error=false;draft.open=true;
+      }catch(error){draft.message=error.message;draft.error=true;}
+      if(currentDetailItem?._id===id) renderEvidencePanel(currentDetailItem);
+    }
+    function uploadEvidenceFile(file, recordId, attachmentId, onProgress){
+      const {extension,contentType}=evidenceFileType(file);
+      const storagePath=`changepoints/${recordId}/evidence_${attachmentId}.${extension}`;
+      return new Promise((resolve,reject)=>{
+        const disposition=contentType.startsWith('image/') ? 'inline' : 'attachment';
+        const task=uploadBytesResumable(ref(storage,storagePath),file,{contentType,contentDisposition:`${disposition}; filename*=UTF-8''${encodeURIComponent(file.name)}`});
+        task.on('state_changed',snapshot=>onProgress(Math.round(snapshot.bytesTransferred/snapshot.totalBytes*100)),reject,async()=>{
+          try{resolve({id:attachmentId,name:file.name,size:file.size,contentType,storagePath,url:await getDownloadURL(task.snapshot.ref),uploadedAt:task.snapshot.metadata.timeCreated});}
+          catch(error){reject(error);}
+        });
+      });
+    }
+    async function appendEvidence(recordId, attachment){
+      if (!attachment.id || !evidenceUrl(attachment.url) || !attachment.uploadedBy?.trim() || !attachment.uploadedAt) throw new Error('添付情報が不完全です。再試行してください。');
+      return runTransaction(db,async transaction=>{
+        const recordRef=doc(db,'changepoints',recordId),snap=await transaction.get(recordRef);
+        if(!snap.exists()) throw new Error('変化点が削除されています。添付は登録できません。');
+        const latest=snap.data(),files=evidenceFiles(latest);
+        if(files.some(x=>x.id===attachment.id)) return files;
+        if(files.length>=100) throw new Error('1件の変化点に添付できるファイルは100件までです。');
+        const next=[...files,attachment];
+        transaction.update(recordRef,{evidenceAttachments:next,evidenceUpdatedAt:serverTimestamp(),evidenceUpdatedBy:attachment.uploadedBy});
+        return next;
+      });
+    }
+    async function saveEvidenceFiles(id){
+      const draft=evidenceDraft(id);
+      if(draft.busy || !draft.jobs.length) return;
+      if(!draft.actor.trim() || draft.actor.trim().length>80 || !EVIDENCE_TYPES.includes(draft.category) || draft.note.length>500){draft.message='評価区分・登録者名・評価メモを確認してください。';draft.error=true;if(currentDetailItem?._id===id)renderEvidencePanel(currentDetailItem);return;}
+      const details={category:draft.category,note:draft.note.trim(),uploadedBy:draft.actor.trim()};
+      draft.busy=true;draft.error=false;draft.message='添付を保存しています...';draft.progress=0;
+      localStorage.setItem('changepointActorName',details.uploadedBy);updateActorNameButton();
+      if(currentDetailItem?._id===id)renderEvidencePanel(currentDetailItem);
+      let saved=0;
+      try{
+        for(const job of [...draft.jobs]){
+          try{
+            job.error='';
+            if(!job.uploaded) job.uploaded=await uploadEvidenceFile(job.file,id,job.id,percent=>{
+              draft.progress=percent;
+              if(currentDetailItem?._id===id){const progress=document.getElementById('evidenceProgress');if(progress)progress.value=percent;}
+            });
+            const attachments=await appendEvidence(id,{...job.uploaded,...(job.details || (job.details=details))});
+            const record=changepointData.find(x=>x._id===id);if(record)record.evidenceAttachments=attachments;
+            if(currentDetailItem?._id===id)currentDetailItem={...currentDetailItem,evidenceAttachments:attachments};
+            draft.jobs=draft.jobs.filter(x=>x.id!==job.id);saved++;
+          }catch(error){console.error(error);job.error='保存失敗';draft.error=true;}
+        }
+        draft.message=draft.jobs.length ? `${saved}件保存、${draft.jobs.length}件未保存です。通信・保存権限を確認し、画面を閉じずに再試行してください。` : `${saved}件のエビデンスを保存しました。`;
+      }finally{
+        draft.busy=false;
+        if(currentDetailItem?._id===id)renderEvidencePanel(currentDetailItem);
+      }
+    }
+    window.addEventListener('beforeunload',event=>{
+      if([...evidenceDrafts.values()].some(d=>d.busy || d.jobs.length)){event.preventDefault();event.returnValue='';}
+    });
     const workflowCommentDrafts = new Map();
     const workflowCommentSaves = new Set();
     const actualSwitchDrafts = new Map();
@@ -3591,13 +3748,14 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         if (isPlannedCP) body += `<div class="detail-section"><div class="detail-section-title">発信部署（起票部署）</div><div class="detail-section-content">${escapeHtml(item.planneddepartment || '-')}</div></div><div class="detail-section"><div class="detail-section-title">工程名・作業内容</div><div class="detail-section-content">${escapeHtml(item.processName || '-')}</div></div>`;
         body += `<div class="detail-section"><div class="detail-section-title">📝 変化点内容</div><div class="detail-section-content">${escapeHtml(item.content || '-')}</div></div>`;
         if (item.document) body += `<div class="detail-section"><div class="detail-section-title">📎 関連資料</div><div class="detail-section-content">${escapeHtml(item.document)}</div></div>`;
-        if (item.documentUrl) body += `<div class="detail-section"><div class="detail-section-title">📁 添付ファイル</div><div class="detail-section-content"><a href="${escapeHtml(item.documentUrl)}" target="_blank" style="color:#667eea;">ファイルを開く</a></div></div>`;
       }
       if (qrMode){
         document.getElementById('detailTitle').textContent='チェック・承認';
         body = `<div class="qr-basic"><div><span>実施日</span><strong>${escapeHtml(item.occurrenceDate || '未定')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div class="qr-basic-content"><span>変化点内容</span><p>${escapeHtml(item.content || '-')}</p></div></div>`;
       }
+      if (isCP) body += '<section id="evidenceHost" aria-label="評価エビデンス"></section>';
       document.getElementById('detailBody').innerHTML = body;
+      if (isCP) renderEvidencePanel(item);
 
       const actionsEl = document.getElementById('detailActions');
       actionsEl.style.display = isPlannedCP ? 'flex' : 'none';
