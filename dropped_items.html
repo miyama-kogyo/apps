@@ -690,9 +690,6 @@
     function bindEvents(){
       const preview = $('serialPreview');
       $('closeSerialPreview').addEventListener('click', () => closeSerialPreview(true));
-      preview.addEventListener('pointerenter', () => clearTimeout(serialPreviewTimer));
-      preview.addEventListener('pointerleave', scheduleSerialPreviewClose);
-      preview.addEventListener('focusout', scheduleSerialPreviewClose);
       document.addEventListener('keydown', event => {
         if(event.key==='Escape' && !preview.hidden) closeSerialPreview(true);
       });
@@ -1133,10 +1130,6 @@
       }));
       document.querySelectorAll('[data-preview-serial]').forEach(btn => {
         const show = () => openSerialPreview(btn, todayRows.filter(row => row.department===btn.dataset.previewDept && row.serialNo===btn.dataset.previewSerial), todayKey);
-        btn.addEventListener('pointerenter', event => { if(event.pointerType==='mouse') show(); });
-        btn.addEventListener('pointerleave', scheduleSerialPreviewClose);
-        btn.addEventListener('focus', () => { if(btn.matches(':focus-visible')) show(); });
-        btn.addEventListener('blur', scheduleSerialPreviewClose);
         btn.addEventListener('click', () => { show(); $('closeSerialPreview').focus({preventScroll:true}); });
       });
       const recent = todayRows;
@@ -1144,11 +1137,9 @@
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
     }
 
-    let serialPreviewTimer, serialPreviewAnchor;
+    let serialPreviewAnchor;
     function closeSerialPreview(restoreFocus=false){
-      clearTimeout(serialPreviewTimer);
       const anchor=serialPreviewAnchor;
-      // Keep the current preview open during focus restoration, then close it.
       if(restoreFocus && anchor?.isConnected) anchor.focus({preventScroll:true});
       anchor?.setAttribute('aria-expanded','false');
       serialPreviewAnchor=null;
@@ -1156,16 +1147,7 @@
       state.charts.serialPreview?.destroy();
       delete state.charts.serialPreview;
     }
-    function scheduleSerialPreviewClose(){
-      clearTimeout(serialPreviewTimer);
-      serialPreviewTimer=setTimeout(()=>{
-        const preview=$('serialPreview');
-        if(preview.matches(':hover') || preview.contains(document.activeElement) || serialPreviewAnchor===document.activeElement) return;
-        closeSerialPreview();
-      },250);
-    }
     function openSerialPreview(anchor,rows,dateKey){
-      clearTimeout(serialPreviewTimer);
       if(serialPreviewAnchor===anchor && !$('serialPreview').hidden) return;
       closeSerialPreview();
       serialPreviewAnchor=anchor;
