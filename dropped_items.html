@@ -331,7 +331,10 @@
     .product-master-actions{display:flex;gap:8px;flex-wrap:wrap}
     .product-master-status{font-size:14px;color:#59636b;margin:10px 0}
     #page-dashboard .serial-chip-item{max-width:100%}
-    #page-dashboard .serial-chip-item .product-thumb{width:46px;height:40px;object-fit:contain;flex:none;background:white}
+    #page-dashboard .serial-chip-product{display:grid;grid-template-columns:80px minmax(0,1fr);grid-template-rows:68px auto;column-gap:10px;row-gap:5px;padding:8px;background:#fff}
+    #page-dashboard .serial-chip-product .product-thumb{grid-column:1;grid-row:1;width:80px;height:68px;object-fit:contain;background:#f2f3f4}
+    #page-dashboard .serial-chip-product .serial-chip-name{grid-column:1;grid-row:2;font-size:12px;font-weight:500;text-align:center;color:#657079;line-height:1.4;overflow-wrap:anywhere}
+    #page-dashboard .serial-chip-product .serial-chip-count{grid-column:2;grid-row:1;border:0;padding:0;font-size:20px;font-weight:800}
     .product-reference{margin:12px 0}
     .product-reference img{display:block;width:100%;max-height:260px;object-fit:contain;background:#f2f3f4}
     .product-reference p{margin:6px 0;font-size:14px;overflow-wrap:anywhere}
@@ -1299,7 +1302,7 @@
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
           const product=productFor(name),url=safeUrl(product?.photo?.url);
-          return `<button type="button" class="serial-chip serial-chip-item" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></button>`;
+          return `<button type="button" class="serial-chip serial-chip-item${url?' serial-chip-product':''}" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${url?'× ':''}${count.toLocaleString('ja-JP')}個</span></button>`;
         }).join('');
         return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
