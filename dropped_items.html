@@ -302,6 +302,22 @@
       #page-dashboard.review-only .dept-row,
       #page-dashboard.review-only .dept-column-head{grid-template-columns:minmax(0,1fr) 66px}
     }
+    .dept-detail-trigger{border:0;background:transparent;color:inherit;text-align:left;font:inherit;font-weight:800;padding:8px 0;cursor:pointer}
+    .serial-preview{position:fixed;z-index:1000;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;background:#fff;border:1px solid #b9c1c6;border-radius:8px;box-shadow:0 12px 40px #0003;padding:18px}
+    .serial-preview[hidden]{display:none}
+    .serial-preview-head{display:flex;justify-content:space-between;align-items:start;gap:12px}
+    .serial-preview h3{margin:0;font-size:20px;overflow-wrap:anywhere}
+    .serial-preview h4{margin:18px 0 10px;font-size:15px}
+    .serial-preview-meta{margin:6px 0;color:#667078;font-size:14px}
+    .serial-preview-chart{height:205px;position:relative}
+    .comment-bubbles{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+    .comment-bubble{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;min-height:76px;max-width:100%;padding:16px;background:#e4edf2;border:1px solid #b6cbd7;border-radius:50%;font-size:14px;text-align:center;overflow-wrap:anywhere}
+    .comment-bubble:nth-child(3n+2){background:#f3eedf;border-color:#d8cba5}
+    .comment-bubble:nth-child(3n){background:#e9ebec;border-color:#c9ced1}
+    .preview-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .preview-photos img{display:block;width:100%;height:120px;object-fit:contain;background:#f2f3f4}
+    .serial-preview-empty{font-size:14px;color:#667078;padding:10px 0}
+    @media(max-width:480px){.preview-photos{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </head>
 <body>
@@ -478,6 +494,12 @@
     </section>
   </main>
 
+  <aside id="serialPreview" class="serial-preview" role="dialog" aria-modal="false" aria-labelledby="serialPreviewTitle" hidden>
+    <div class="serial-preview-head"><div><h3 id="serialPreviewTitle"></h3><p id="serialPreviewMeta" class="serial-preview-meta"></p></div><button id="closeSerialPreview" type="button" class="icon-btn" aria-label="品番プレビューを閉じる" title="閉じる"><i data-lucide="x"></i></button></div>
+    <h4>原因内訳（落下個数）</h4><div class="serial-preview-chart"><canvas id="serialCauseChart" role="img" aria-label="原因別の落下個数"></canvas></div>
+    <h4>コメントの内訳（登録件数）</h4><div id="serialCommentBubbles" class="comment-bubbles"></div>
+    <h4>状況写真</h4><div id="serialPreviewPhotos" class="preview-photos"></div>
+  </aside>
   <div class="modal" id="detailModal" aria-hidden="true">
     <div class="modal-card">
       <div class="modal-head"><h3 id="detailTitle">詳細</h3><button class="icon-btn" id="closeModal" title="閉じる"><i data-lucide="x"></i></button></div>
@@ -666,6 +688,21 @@
     }
 
     function bindEvents(){
+      const preview = $('serialPreview');
+      $('closeSerialPreview').addEventListener('click', () => closeSerialPreview(true));
+      preview.addEventListener('pointerenter', () => clearTimeout(serialPreviewTimer));
+      preview.addEventListener('pointerleave', scheduleSerialPreviewClose);
+      preview.addEventListener('focusout', scheduleSerialPreviewClose);
+      document.addEventListener('keydown', event => {
+        if(event.key==='Escape' && !preview.hidden) closeSerialPreview(true);
+      });
+      document.addEventListener('pointerdown', event => {
+        if(!preview.hidden && !preview.contains(event.target) && !event.target.closest('[data-preview-serial]')) closeSerialPreview();
+      });
+      window.addEventListener('resize', () => closeSerialPreview());
+      document.addEventListener('scroll', event => {
+        if(!preview.contains(event.target)) closeSerialPreview();
+      }, true);
       document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => showPage(btn.dataset.page)));
       $('qtyMinus').addEventListener('click', () => changeQty(-1));
       $('qtyPlus').addEventListener('click', () => changeQty(1));
@@ -1055,6 +1092,7 @@
     }
 
     function renderDashboard(){
+      closeSerialPreview();
       const today = new Date();
       const todayKey = $('comparisonDate').value || localDateKey(previousWeekday(today));
       if(!$('comparisonDate').value) $('comparisonDate').value = todayKey;
@@ -1086,13 +1124,81 @@
       renderDepartmentChart(departments,todayRows,comparisonRows,todayKey,comparisonKey,showComparison);
       $('departmentList').innerHTML = departments.length ? departments.map(dept => {
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
-        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>`<span class="serial-chip serial-chip-item"><span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></span>`).join('');
-        return `<button class="dept-row" data-dept="${esc(dept)}"><span class="dept-name">${esc(dept)}</span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></button>`;
+        const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>`<button type="button" class="serial-chip serial-chip-item" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${count.toLocaleString('ja-JP')}個</span></button>`).join('');
+        return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
+      document.querySelectorAll('#departmentList .dept-row').forEach(row => row.addEventListener('click', event => {
+        if(!event.target.closest('button')) row.querySelector('[data-dept]').click();
+      }));
+      document.querySelectorAll('[data-preview-serial]').forEach(btn => {
+        const show = () => openSerialPreview(btn, todayRows.filter(row => row.department===btn.dataset.previewDept && row.serialNo===btn.dataset.previewSerial), todayKey);
+        btn.addEventListener('pointerenter', event => { if(event.pointerType==='mouse') show(); });
+        btn.addEventListener('pointerleave', scheduleSerialPreviewClose);
+        btn.addEventListener('focus', () => { if(btn.matches(':focus-visible')) show(); });
+        btn.addEventListener('blur', scheduleSerialPreviewClose);
+        btn.addEventListener('click', () => { show(); $('closeSerialPreview').focus({preventScroll:true}); });
+      });
       const recent = todayRows;
       $('recentList').innerHTML = recent.length ? recent.map(item=>`<button class="recent-item" data-item="${item.id}"><div class="recent-top"><span class="recent-serial">${esc(item.serialNo)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div><div class="recent-meta">${esc(item.department)} / ${quantity(item)}個<br>${fmtDateTime(item)}</div></button>`).join('') : '<div class="empty">登録データがありません</div>';
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
+    }
+
+    let serialPreviewTimer, serialPreviewAnchor;
+    function closeSerialPreview(restoreFocus=false){
+      clearTimeout(serialPreviewTimer);
+      const anchor=serialPreviewAnchor;
+      // Keep the current preview open during focus restoration, then close it.
+      if(restoreFocus && anchor?.isConnected) anchor.focus({preventScroll:true});
+      anchor?.setAttribute('aria-expanded','false');
+      serialPreviewAnchor=null;
+      $('serialPreview').hidden=true;
+      state.charts.serialPreview?.destroy();
+      delete state.charts.serialPreview;
+    }
+    function scheduleSerialPreviewClose(){
+      clearTimeout(serialPreviewTimer);
+      serialPreviewTimer=setTimeout(()=>{
+        const preview=$('serialPreview');
+        if(preview.matches(':hover') || preview.contains(document.activeElement) || serialPreviewAnchor===document.activeElement) return;
+        closeSerialPreview();
+      },250);
+    }
+    function openSerialPreview(anchor,rows,dateKey){
+      clearTimeout(serialPreviewTimer);
+      if(serialPreviewAnchor===anchor && !$('serialPreview').hidden) return;
+      closeSerialPreview();
+      serialPreviewAnchor=anchor;
+      anchor.setAttribute('aria-expanded','true');
+      const preview=$('serialPreview');
+      $('serialPreviewTitle').textContent=anchor.dataset.previewSerial;
+      $('serialPreviewMeta').textContent=`${anchor.dataset.previewDept} / ${dateKey.replaceAll('-','/')} / ${sumQty(rows).toLocaleString('ja-JP')}個`;
+      const causes=['設備','作業','その他'];
+      const totals=causes.map(cause=>sumQty(rows.filter(row=>(causes.includes(row.cause)?row.cause:'その他')===cause)));
+      const comments=new Map();
+      rows.forEach(row=>{const text=String(row.comment||'').trim();if(text) comments.set(text,(comments.get(text)||0)+1);});
+      const max=Math.max(1,...comments.values());
+      $('serialCommentBubbles').innerHTML=comments.size ? [...comments].sort((a,b)=>b[1]-a[1]).map(([comment,count])=>`<div class="comment-bubble" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
+      const photos=rows.flatMap(row=>Array.isArray(row.media)?row.media:[]).filter(file=>file.type!=='video' && safeUrl(file.url));
+      $('serialPreviewPhotos').innerHTML=photos.length ? photos.map(file=>`<a href="${esc(safeUrl(file.url))}" target="_blank" rel="noopener"><img src="${esc(safeUrl(file.url))}" alt="${esc(anchor.dataset.previewSerial)}の状況写真" loading="lazy"></a>`).join('') : '<p class="serial-preview-empty">写真はありません</p>';
+      preview.hidden=false;
+      preview.style.maxHeight='calc(100dvh - 24px)';
+      const rect=anchor.getBoundingClientRect();
+      const width=preview.offsetWidth;
+      let left=Math.max(12,Math.min(rect.left,innerWidth-width-12));
+      let top=Math.max(12,Math.min(rect.top,innerHeight-preview.offsetHeight-12));
+      if(rect.left>=width+20) left=rect.left-width-8;
+      else if(innerWidth-rect.right>=width+20) left=rect.right+8;
+      else {
+        const below=innerHeight-rect.bottom-20, above=rect.top-20;
+        const useBelow=below>=above;
+        preview.style.maxHeight=`${Math.max(100,useBelow?below:above)}px`;
+        top=useBelow?rect.bottom+8:Math.max(12,rect.top-preview.offsetHeight-8);
+      }
+      preview.style.left=`${left}px`;
+      preview.style.top=`${top}px`;
+      $('serialCauseChart').setAttribute('aria-label',causes.map((cause,i)=>`${cause} ${totals[i]}個`).join('、'));
+      makeChart('serialPreview',$('serialCauseChart'),{type:'doughnut',data:{labels:causes.map((cause,i)=>`${cause} ${totals[i]}個`),datasets:[{data:totals,backgroundColor:['#527f98','#b18b46','#8b9298'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'right'},tooltip:{callbacks:{label:context=>`${causes[context.dataIndex]}：${context.parsed}個`}}}}});
     }
 
     function makeChart(key, canvas, config){
@@ -1215,6 +1321,7 @@
     }
 
     function openDetail(title,rows){
+      closeSerialPreview();
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
       $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
       document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
