@@ -9,7 +9,7 @@ const stamps=slice('    function workflowStampEntries','    function readStampNa
 const related=slice('    function relatedAnomalyHtml','    function showDetail');
 const categories=['人','設備','材料','方法','金型'];
 const record=()=>({_id:'fixture',type:'sudden',workflowManaged:true,workflowKind:'unplanned_response_v2',approvalStatus:'post_check',postCheckRevision:0,planneddepartment:'品質',department:'製造',category:'',createdBy:'作成者',createdAt:'2026-10-12T09:00:00+09:00',evidenceAttachments:[{id:'preserve'}]});
-const data=()=>({category:'設備',responseDepartment:'保全',actualSwitchDate:'2026-10-12',actualSwitchTime:'09:15',temporaryChange:false,temporaryUntil:'',workflowComment:'確認結果',checklistItems:['safety','products','workability'].map(x=>({key:'post_'+x,receiverResult:'ok'}))});
+const data=()=>({category:'設備',responseDepartment:'保全',temporaryChange:false,temporaryUntil:'',workflowComment:'確認結果',checklistItems:['safety','products','workability'].map(x=>({key:'post_'+x,receiverResult:'ok'}))});
 async function unit(){
  const ctx={Date,Map,Set,URL,window:{},console,CHANGE_CATEGORIES:categories,db:{},doc:(_,c,id)=>({c,id}),serverTimestamp:()=> 'SERVER',latest:record(),writes:[]};
  ctx.runTransaction=async(_,fn)=>fn({get:async()=>({exists:()=>!!ctx.latest,data:()=>ctx.latest}),update:(ref,patch)=>{ctx.writes.push(patch);ctx.latest={...ctx.latest,...patch}}});
@@ -17,7 +17,8 @@ async function unit(){
  new vm.SourceTextModule(html.match(/<script type="module">([\s\S]*?)<\/script>/)[1]);
  assert.equal(ctx.unplannedChecklist({}).length,4);
  assert.equal(ctx.unplannedChecklist(data())[3].receiverResult,'na');
- for(const change of [{category:''},{responseDepartment:''},{actualSwitchTime:''},{temporaryChange:null},{temporaryChange:true},{temporaryChange:true,temporaryUntil:'2026-02-30'}, {temporaryChange:true,temporaryUntil:'2026-10-11'}, {checklistItems:[]}, {checklistItems:[{key:'post_safety',receiverResult:'na'}]}]) assert.throws(()=>ctx.validateUnplannedCheck({...data(),...change}));
+ for(const change of [{category:''},{responseDepartment:''},{temporaryChange:null},{temporaryChange:true},{temporaryChange:true,temporaryUntil:'2026-02-30'}, {checklistItems:[]}, {checklistItems:[{key:'post_safety',receiverResult:'na'}]}]) assert.throws(()=>ctx.validateUnplannedCheck({...data(),...change}));
+ ctx.validateUnplannedCheck(data());
  const temporary={...data(),temporaryChange:true,temporaryUntil:'2026-10-20',checklistItems:[...data().checklistItems,{key:'post_temporary',receiverResult:'ok'}]};
  ctx.validateUnplannedCheck(temporary);
  await ctx.saveUnplannedRecord('fixture',0,{...data(),category:''},'担当者',false);
@@ -25,6 +26,7 @@ async function unit(){
  await assert.rejects(ctx.saveUnplannedRecord('fixture',0,data(),'担当者',true));
  const saved=await ctx.saveUnplannedRecord('fixture',1,temporary,'担当者',true);
  assert.equal(saved.approvalStatus,'draft');assert.equal(ctx.latest.approvalRequestedAt,'SERVER');assert.equal(ctx.latest.postCheckedBy,'担当者');assert.equal(ctx.latest.evidenceAttachments[0].id,'preserve');
+ assert(!Object.hasOwn(ctx.latest,'actualSwitchDate'));assert(!Object.hasOwn(ctx.latest,'actualSwitchTime'));
  await assert.rejects(ctx.saveUnplannedRecord('fixture',2,data(),'担当者',false));
  await assert.rejects(ctx.approveUnplannedRecord('fixture',1,'上司'));
  await ctx.approveUnplannedRecord('fixture',2,'上司');assert.equal(ctx.latest.approvalStatus,'approved');assert.equal(ctx.latest.responseApprovedBy,'上司');assert.equal(ctx.latest.senderApprovedBy,undefined);assert.equal(ctx.latest.receiverApprovedBy,undefined);assert.equal(ctx.latest.department,'製造');assert.equal(ctx.latest.planneddepartment,'品質');assert.equal(ctx.latest.responseDepartment,'保全');
@@ -35,6 +37,12 @@ async function unit(){
   ctx.latest=legacy;await ctx.saveUnplannedRecord('fixture',0,data(),'担当者',true,legacy);assert.equal(ctx.latest.workflowKind,'unplanned_response_v2');assert.equal(ctx.latest.responseDepartment,'保全');assert.equal(ctx.latest.previousWorkflow.senderApprovedBy,legacy.senderApprovedBy || '');assert.equal(ctx.latest.senderApprovedBy,null);
  }
  ctx.latest={...record(),content:'updated'};await assert.rejects(ctx.saveUnplannedRecord('fixture',0,data(),'担当者',true,{...record(),content:'original'}));
+ for(const submit of [false,true]){
+  ctx.latest={...record(),actualSwitchDate:'2026-10-12',actualSwitchTime:'09:15'};
+  await ctx.saveUnplannedRecord('fixture',0,{...data(),actualSwitchDate:'',actualSwitchTime:''},'担当者',submit);
+  assert.equal(ctx.latest.actualSwitchDate,'2026-10-12');assert.equal(ctx.latest.actualSwitchTime,'09:15');
+  assert(!Object.hasOwn(ctx.writes.at(-1),'actualSwitchDate'));assert(!Object.hasOwn(ctx.writes.at(-1),'actualSwitchTime'));
+ }
  const rendered=ctx.relatedAnomalyHtml({anomalyContent:'<script>bad</script>',actionTaken:'交換',rootCauseAction:'再調整',mfgPhotoUrls:['https://example.com/photo.png','javascript:alert(1)'],techPhotoUrls:['https://example.com/photo.png']});
  assert(!rendered.includes('<script>'));assert(!rendered.includes('javascript:'));assert.equal((rendered.match(/<img /g)||[]).length,1);assert(rendered.includes('交換'));
  console.log('PASS unplanned: four checks, 5M, dates, temporary deadline, NG, draft, atomic submission/approval, concurrency, closed/canceled/planned guards, stamps, related anomaly escaping/photos. No live writes.');
@@ -59,7 +67,8 @@ async function browser(){
    assert(await page.locator('.tap-check-label').first().evaluate(label=>label.querySelector('input').getBoundingClientRect().left>=label.querySelector('span').getBoundingClientRect().right));
    await page.setViewportSize({width:390,height:900});
    assert(await page.locator('#postDepartment').isDisabled());
-   await page.locator('#postCategory').selectOption('設備');await page.locator('#postDate').fill('2026-10-12');await page.locator('#postTime').fill('09:15');await page.locator('#postActor').fill('担当者');
+   assert.equal(await page.locator('#postDate,#postTime').count(),0);
+   await page.locator('#postCategory').selectOption('設備');await page.locator('#postActor').fill('担当者');
    for(const id of ['post_safety','post_products','post_workability'])await page.locator('#'+id).check();
    await page.locator('#post_safety').uncheck();assert(await page.locator('#postDepartment').isDisabled());await page.locator('[data-check-key="post_safety"] .tap-check-label').click();assert(await page.locator('#post_safety').isChecked());
    await page.locator('#postTemporary').selectOption('yes');assert(await page.locator('#postUntil').isVisible());await page.locator('#postUntil').fill('2026-10-20');await page.locator('#post_temporary').check();
@@ -97,7 +106,7 @@ async function fullApp(engine='chromium'){
   const legacy={_id:'old',type:'sudden',relatedAnomalyId:'abn',category:'設備',department:'製造',content:'センサー交換',lineName:'94-300',serialNo:'7089',occurrenceDate:'2026-10-12'};
   await p.evaluate(x=>{window.__latest=x;window.showDetail(x)},legacy);await p.getByText('センサーが反応しない',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'事後チェックを開始する'}).count(),0);await p.locator('#postCategory').waitFor();assert.equal(await p.locator('#postDepartment').inputValue(),'');assert.equal(await p.evaluate(()=>window.__latest.workflowKind),undefined);
   const ticket=await p.evaluate(()=>window.__ticket(window.__latest,'原本','発信部署'));assert(ticket.includes('安全面に問題が無いか'));assert(!ticket.includes('関係部署確認'));assert(!ticket.includes('発生部署 承認者'));assert(!ticket.includes('data-card-qr'));assert(!ticket.includes('QR'));assert(ticket.includes('対応部署 承認'));assert(!ticket.includes('チェック項目なし'));
-  await p.locator('#postDate').fill('2026-10-12');await p.locator('#postTime').fill('10:00');for(const id of ['post_safety','post_products','post_workability'])await p.locator('#'+id).check();await p.locator('#postTemporary').selectOption('no');await p.locator('#postDepartment').selectOption('製造');await p.getByRole('button',{name:'確認完了・承認依頼'}).click();await p.getByRole('button',{name:'承認して完了する'}).waitFor();assert.equal(await p.evaluate(()=>window.__latest.workflowKind),'unplanned_response_v2');assert.equal(await p.evaluate(()=>window.__latest.responseDepartment),'製造');
+  assert.equal(await p.locator('#postDate,#postTime').count(),0);for(const id of ['post_safety','post_products','post_workability'])await p.locator('#'+id).check();await p.locator('#postTemporary').selectOption('no');await p.locator('#postDepartment').selectOption('製造');await p.getByRole('button',{name:'確認完了・承認依頼'}).click();await p.getByRole('button',{name:'承認して完了する'}).waitFor();assert.equal(await p.evaluate(()=>window.__latest.workflowKind),'unplanned_response_v2');assert.equal(await p.evaluate(()=>window.__latest.responseDepartment),'製造');assert.equal(await p.evaluate(()=>window.__latest.actualSwitchDate),undefined);
   const preview=await b.newPage();await preview.setContent('<style>'+html.match(/<style>([\s\S]*?)<\/style>/)[1]+'</style><div class="issued-card-preview" style="width:510px">'+ticket+'</div>');await preview.screenshot({path:path.join(__dirname,'outputs/unplanned-test/card-no-qr.png')});assert.equal(await preview.locator('.sign > div').count(),1);assert.equal(await preview.locator('.card-qrs').count(),0);await preview.close();
   const printResult=await p.evaluate(async x=>{const original=window.open;window.open=()=>({closed:false,document:{body:{},open(){},write(h){window.__printed=h},close(){}}});try{return await window.printChangeCard(x)}finally{window.open=original}},legacy);assert(printResult);const printed=await p.evaluate(()=>window.__printed);assert(!printed.includes('data-card-qr'));assert.equal((printed.match(/<td>安全面に問題が無いか/g)||[]).length,2);
   const plannedTicket=await p.evaluate(()=>window.__ticket({type:'planned',category:'設備'},'原本','発信部署'));assert.equal((plannedTicket.match(/data-card-qr=/g)||[]).length,2);
@@ -128,6 +137,7 @@ async function fullApp(engine='chromium'){
   await p.evaluate(()=>window.showDetail({_id:'planned',type:'planned',workflowManaged:true,category:'設備',approvalStatus:'draft',checklistItems:[],department:'製造',planneddepartment:'品質'}));assert.equal(await p.locator('.workflow-stamp').count(),4);assert(await p.getByRole('button',{name:'承認スタンプを押す',exact:true}).isVisible());assert.equal(await p.locator('#relatedAnomalyHost').count(),0);assert.deepEqual(errors,[]);
   const plannedCheck={_id:'planned-checkbox',type:'planned',workflowManaged:true,category:'人',approvalStatus:'sender_approved',department:'製造',planneddepartment:'品質',checklistItems:[{key:'a',label:'安全面を確認',criteria:'安全に作業できること',receiverResult:''},{key:'b',label:'変化点前後の物を確認',receiverResult:'ng'},{key:'c',label:'作業性を確認',receiverResult:'na'},{key:'d',label:'旧データの確認',receiverChecked:true}]};
   await p.evaluate(x=>{window.__latest=x;window.showDetail(x)},plannedCheck);
+  assert.equal(await p.locator('#actualSwitchDate,#actualSwitchTime').count(),2);
   const check=key=>p.locator(`[data-check-key="${key}"] input[type="checkbox"]`);
   assert(await check('d').isChecked());assert(!(await check('c').isChecked()));assert.equal(await p.locator('[data-check-key="c"] summary').textContent(),'該当なし');
   for(const width of [320,390,768,1440]){await p.setViewportSize({width,height:1000});assert.deepEqual(await p.locator('.tap-check-row').evaluateAll(rows=>rows.filter(r=>r.getBoundingClientRect().right>innerWidth+1).map(r=>r.dataset.checkKey)),[]);await p.screenshot({path:path.join(__dirname,`outputs/unplanned-test/planned-checkbox-${engine}-${width}.png`)});}

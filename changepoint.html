@@ -3297,11 +3297,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     function validateUnplannedCheck(data){
       if (!CHANGE_CATEGORIES.includes(data.category)) throw new Error('5M分類を選択してください。');
       if (!data.responseDepartment?.trim()) throw new Error('対応部署を選択してください。');
-      validateActualSwitch(data.actualSwitchDate || '',data.actualSwitchTime || '');
       if (typeof data.temporaryChange !== 'boolean') throw new Error('暫定対応の有無を選択してください。');
       if (data.temporaryChange){
         try{validateActualSwitch(data.temporaryUntil || '', '00:00');}catch(_){throw new Error('暫定期限の日付を入力してください。');}
-        if (data.temporaryUntil < data.actualSwitchDate) throw new Error('暫定期限は実際の切替日以降にしてください。');
       }
       const checks=unplannedChecklist(data);
       if (checks.slice(0,3).some(x=>x.receiverResult !== 'ok') || (data.temporaryChange && checks[3].receiverResult !== 'ok')) throw new Error('事後チェックをすべて確認済にしてください。NGの場合は対応後に再確認してください。');
@@ -3316,7 +3314,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         if (!canEditUnplanned(latest)) throw new Error('状態が変更されています。開き直してください。');
         if ((latest.postCheckRevision || 0)!==expectedRevision) throw new Error('別の操作で更新されています。開き直して確認してください。');
         if (expectedRecord && unplannedVersion(latest)!==unplannedVersion(expectedRecord)) throw new Error('別の操作で内容が変更されています。開き直して確認してください。');
-        const fields={workflowKind:'unplanned_response_v2',workflowManaged:true,category:data.category,responseDepartment:data.responseDepartment,actualSwitchDate:data.actualSwitchDate,actualSwitchTime:data.actualSwitchTime,
+        const fields={workflowKind:'unplanned_response_v2',workflowManaged:true,category:data.category,responseDepartment:data.responseDepartment,
           temporaryChange:data.temporaryChange,temporaryUntil:data.temporaryChange===true ? data.temporaryUntil : '',workflowComment:data.workflowComment,
           checklistItems:unplannedChecklist(data),postCheckRevision:expectedRevision+1,updatedBy:who.trim(),updatedAt:serverTimestamp()};
         if (!isResponsePostcheck(latest)) Object.assign(fields,{approvalStatus:'post_check',approvalRequestedAt:null,excludedChecklistItems:[],
@@ -3361,7 +3359,6 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       box.innerHTML=`<form id="unplannedCheckForm" class="unplanned-check-form">
         <section class="workflow-checks"><div class="checks-heading"><h4>計画外変化点の事後チェック</h4><span>${escapeHtml(boardStatus(item))}</span></div>
           <div class="form-group"><label for="postCategory">5M分類</label><select id="postCategory" ${disabled}><option value="">選択</option>${CHANGE_CATEGORIES.map(x=>`<option ${item.category===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div>
-          <div class="actual-switch-fields"><div><label for="postDate">実際の切替日</label><input id="postDate" type="date" value="${escapeAttr(item.actualSwitchDate || '')}" ${disabled}></div><div><label for="postTime">切替時刻</label><input id="postTime" type="time" value="${escapeAttr(item.actualSwitchTime || '')}" ${disabled}></div></div>
           <div class="checklist-panel">${unplannedChecklist(item).slice(0,3).map(x=>renderWorkflowCheck(x,!editable)).join('')}
           <div class="form-group" style="padding:12px"><label for="postTemporary">暫定の場合、暫定期間は明確になっているか</label><select id="postTemporary" ${disabled}><option value="">暫定対応の有無を選択</option><option value="no" ${item.temporaryChange===false?'selected':''}>暫定ではない（該当なし）</option><option value="yes" ${item.temporaryChange===true?'selected':''}>暫定対応</option></select>
           <div id="postTemporaryFields" ${item.temporaryChange===true?'':'hidden'}><label for="postUntil">暫定期限</label><input id="postUntil" type="date" value="${escapeAttr(item.temporaryUntil || '')}" ${disabled}>${renderWorkflowCheck({...unplannedChecklist(item)[3],label:'期間の確認',criteria:''},!editable)}</div></div></div>
@@ -3384,7 +3381,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.saveUnplannedForm=async function(submit){
       const item=currentDetailItem;if(!item || unplannedSaves.has(item._id))return;
       const v=id=>document.getElementById(id)?.value || '';
-      const data={category:v('postCategory'),responseDepartment:v('postDepartment'),actualSwitchDate:v('postDate'),actualSwitchTime:v('postTime'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:document.getElementById('post_'+key)?.dataset.result || ''}))};
+      const data={category:v('postCategory'),responseDepartment:v('postDepartment'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:document.getElementById('post_'+key)?.dataset.result || ''}))};
       const who=v('postActor').trim();
       if(submit){try{validateUnplannedCheck(data);}catch(e){alert(e.message);return;}}
       if(!who){alert('氏名を入力してください。');return;}
