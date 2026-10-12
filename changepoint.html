@@ -1007,6 +1007,20 @@
     .qr-mode .checklist-row { font-size:13px; }
     .qr-mode .checks-heading h4 { font-size:15px; }
     .qr-mode .stamp-heading strong { font-size:15px; }
+    .unplanned-check-form { display:flex; flex-direction:column; min-width:0; gap:12px; }
+    .unplanned-check-form input,.unplanned-check-form select,.unplanned-check-form textarea { min-width:0; max-width:100%; box-sizing:border-box; font-size:16px; }
+    .unplanned-check-form input[type=date],.unplanned-check-form input[type=time] { width:100%; -webkit-appearance:none; appearance:none; min-height:44px; }
+    .unplanned-check-form .checklist-row select { width:96px; flex-shrink:0; }
+    .unplanned-check-form .workflow-stamps { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+    .unplanned-check-form .stamp-name { overflow-wrap:anywhere; }
+    .unplanned-check-form #postActor { width:100%; min-height:44px; padding:8px; border:1px solid #c4cec7; border-radius:4px; }
+    .unplanned-check-form .workflow-signoff > * { order:2; }
+    .unplanned-check-form .workflow-signoff .stamp-heading { order:0; }
+    .unplanned-check-form .workflow-signoff .workflow-stamps { order:1; margin-bottom:12px; }
+    .post-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+    #plannedForm .approval-add[hidden],#planCustomCheckList[hidden] { display:none; }
+    .related-anomaly-photos { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; }
+    .related-anomaly-photos img { display:block; width:100%; height:130px; object-fit:contain; border:1px solid #d4ded7; }
   </style>
 </head>
 <body>
@@ -1563,7 +1577,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
     import {
-      getFirestore, collection, doc, getDocs, addDoc, deleteDoc, updateDoc,
+      getFirestore, collection, doc, getDoc, getDocs, addDoc, deleteDoc, updateDoc,
       query, orderBy, onSnapshot, serverTimestamp, runTransaction
     } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
     import {
@@ -2095,6 +2109,7 @@
     }
 
     function buildRecordChecklist(category){
+      if (document.getElementById('planType')?.value === 'sudden') return unplannedChecklist({});
       const masterItems = masterChecklistFor(category).filter(item => !plannedExcludedChecklist.has(item.masterId));
       const customItems = plannedCustomChecklist.map((name, index) => ({
         key: `sender_${Date.now()}_${index}`,
@@ -2111,6 +2126,7 @@
     }
 
     function getRecordChecklist(item){
+      if (isUnplannedPostcheck(item)) return unplannedChecklist(item);
       const masterItems = masterChecklistFor(item?.category || '');
       if (!Array.isArray(item?.checklistItems) || !item.checklistItems.length) return masterItems;
       const masterById = new Map(masterItems.map(x => [x.masterId, x]));
@@ -2130,6 +2146,14 @@
     function renderPlanChecklistPreview(){
       const box = document.getElementById('planChecklistPreview');
       if (!box) return;
+      const unplanned = document.getElementById('planType')?.value === 'sudden';
+      document.getElementById('planCategory').required = !unplanned;
+      document.getElementById('planCategory').previousElementSibling.innerHTML = unplanned ? '5M分類（後日選択可）' : '変化点分類<span class="required">*</span>';
+      document.getElementById('planCustomCheckText').parentElement.hidden = unplanned;
+      document.getElementById('planCustomCheckList').hidden = unplanned;
+      box.previousElementSibling.hidden = unplanned;
+      box.parentElement.querySelector('label').textContent = unplanned ? '事後チェック項目' : '5Mチェック項目';
+      if (unplanned){ box.innerHTML = unplannedChecklist({}).map(x=>`<div class="checklist-row">${escapeHtml(x.label)}</div>`).join(''); return; }
       const category = document.getElementById('planCategory')?.value || '';
       if (!category){ box.innerHTML = '<div class="checklist-empty">変化点分類を選択してください</div>'; return; }
       const items = masterChecklistFor(category);
@@ -2210,6 +2234,8 @@
     function boardTracked(p){ return p.type === 'planned' || p.workflowManaged === true || !!p.switchStatus || !!p.switchState || !!p.approvalStatus; }
     function boardStatus(p){
       if (boardCompleted(p)) return '完了';
+      if (boardCanceled(p)) return '中止';
+      if (isUnplannedPostcheck(p)) return p.approvalStatus === 'draft' ? '発信部署 承認待ち' : '事後チェック待ち';
       if (p.switchStatus === 'postponed') return '延期';
       if (p.workflowManaged || p.type === 'planned'){
         return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 対応待ち', receiver_confirmed:'発生部署 承認待ち' })[approvalStatusOf(p)] || '未完了';
@@ -2530,6 +2556,7 @@
       document.getElementById('planCategory').addEventListener('change', () => { plannedExcludedChecklist = new Map(); renderPlanChecklistPreview(); });
       document.getElementById('planType').addEventListener('change', (e) => {
         updatePlanDateMode();
+        renderPlanChecklistPreview();
         if (e.target.value === 'sudden' && !document.getElementById('planDate').value) document.getElementById('planDate').value = ymdLocal(new Date());
       });
       document.getElementById('btnAddPlanCustomCheck').addEventListener('click', () => {
@@ -2565,7 +2592,7 @@
         const occurrenceDate = document.getElementById('planDate').value || '';
         if (!['planned','sudden'].includes(type)){ alert('計画区分を選択してください'); return; }
         if (!planneddepartment){ alert('発信部署を選択してください'); return; }
-        if (!category){ alert('変化点分類を選択してください'); return; }
+        if (!category && type === 'planned'){ alert('変化点分類を選択してください'); return; }
         if (!department){ alert('変化点発生部署を選択してください'); return; }
         if (!lineName){ alert('対象ライン名を入力してください'); return; }
         if (!processName){ alert('工程名・作業内容を入力してください'); return; }
@@ -2795,6 +2822,7 @@
         document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', approvalRequestedAt: serverTimestamp(), specialHandlingStatus: '', relatedReviewCompleted: false,
         continuedManagementRequired: false, managementUntil: '', createdBy,
         createdAt: serverTimestamp(), distributionDepartments, distributionRequestedAt:serverTimestamp() };
+      if (type === 'sudden') Object.assign(data,{workflowKind:'unplanned_postcheck_v1',approvalStatus:'post_check',approvalRequestedAt:null,postCheckRevision:0,excludedChecklistItems:[]});
       registrationSaving = true;
       document.getElementById('btnRegisterPlanned').disabled = true;
       try{
@@ -3235,14 +3263,123 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return !!item?._id && new URLSearchParams(location.search).get('changepointId') === item._id;
     }
 
-    const APPROVAL_STAGES = ['draft', 'sender_approved', 'receiver_confirmed', 'approved'];
+    function isUnplannedPostcheck(item){ return item?.type === 'sudden' && item.workflowKind === 'unplanned_postcheck_v1'; }
+    const UNPLANNED_CHECKS = [
+      ['safety','安全面に問題が無いか'],
+      ['products','変化点前後の物の確認をしたか'],
+      ['workability','変化点による作業のやりづらさが無いか'],
+      ['temporary','暫定の場合、暫定期間は明確になっているか']
+    ];
+    function unplannedChecklist(item){
+      return UNPLANNED_CHECKS.map(([key,label])=>({key:'post_'+key,label,source:'postcheck',owner:'receiver',
+        receiverResult: key === 'temporary' && item.temporaryChange === false ? 'na' : (item.checklistItems || []).find(x=>x.key==='post_'+key)?.receiverResult || '',
+        criteria:key === 'temporary' && item.temporaryChange === true ? '暫定期限：'+(item.temporaryUntil || '未入力') : ''}));
+    }
+    function validateUnplannedCheck(data){
+      if (!CHANGE_CATEGORIES.includes(data.category)) throw new Error('5M分類を選択してください。');
+      if (!data.planneddepartment?.trim()) throw new Error('発信部署を選択してください。');
+      validateActualSwitch(data.actualSwitchDate || '',data.actualSwitchTime || '');
+      if (typeof data.temporaryChange !== 'boolean') throw new Error('暫定対応の有無を選択してください。');
+      if (data.temporaryChange){
+        try{validateActualSwitch(data.temporaryUntil || '', '00:00');}catch(_){throw new Error('暫定期限の日付を入力してください。');}
+        if (data.temporaryUntil < data.actualSwitchDate) throw new Error('暫定期限は実際の切替日以降にしてください。');
+      }
+      const checks=unplannedChecklist(data);
+      if (checks.slice(0,3).some(x=>x.receiverResult !== 'ok') || (data.temporaryChange && checks[3].receiverResult !== 'ok')) throw new Error('事後チェックをすべて確認済にしてください。NGの場合は対応後に再確認してください。');
+    }
+    async function saveUnplannedRecord(id,expectedRevision,data,who,submit){
+      if (!who?.trim() || who.trim().length>80) throw new Error('氏名を80文字以内で入力してください。');
+      if (submit) validateUnplannedCheck(data);
+      return runTransaction(db,async tx=>{
+        const ref=doc(db,'changepoints',id),snapshot=await tx.get(ref);
+        if (!snapshot.exists()) throw new Error('対象が見つかりません。');
+        const latest=snapshot.data();
+        if (!isUnplannedPostcheck(latest) || latest.approvalStatus!=='post_check' || boardCompleted(latest) || boardCanceled(latest)) throw new Error('状態が変更されています。開き直してください。');
+        if ((latest.postCheckRevision || 0)!==expectedRevision) throw new Error('別の操作で更新されています。開き直して確認してください。');
+        const fields={category:data.category,planneddepartment:data.planneddepartment,actualSwitchDate:data.actualSwitchDate,actualSwitchTime:data.actualSwitchTime,
+          temporaryChange:data.temporaryChange,temporaryUntil:data.temporaryChange===true ? data.temporaryUntil : '',workflowComment:data.workflowComment,
+          checklistItems:unplannedChecklist(data),postCheckRevision:expectedRevision+1,updatedBy:who.trim(),updatedAt:serverTimestamp()};
+        if(submit) Object.assign(fields,{approvalStatus:'draft',postCheckedBy:who.trim(),postCheckedAt:serverTimestamp(),approvalRequestedAt:serverTimestamp()});
+        tx.update(ref,fields);
+        return {...latest,_id:id,...fields,...(submit ? {postCheckedAt:new Date()} : {})};
+      });
+    }
+    async function approveUnplannedRecord(id,expectedRevision,who){
+      if(!who?.trim() || who.trim().length>80) throw new Error('氏名を80文字以内で入力してください。');
+      return runTransaction(db,async tx=>{
+        const ref=doc(db,'changepoints',id),snapshot=await tx.get(ref);
+        if(!snapshot.exists()) throw new Error('対象が見つかりません。');
+        const latest=snapshot.data();
+        if(!isUnplannedPostcheck(latest) || latest.approvalStatus!=='draft' || !latest.postCheckedBy || !latest.postCheckedAt || boardCompleted(latest) || boardCanceled(latest) || (latest.postCheckRevision || 0)!==expectedRevision) throw new Error('状態が変更されています。開き直してください。');
+        const fields={approvalStatus:'approved',switchStatus:'completed',senderApprovedBy:who.trim(),senderApprovedAt:serverTimestamp(),completedBy:who.trim(),completedAt:serverTimestamp(),updatedBy:who.trim(),updatedAt:serverTimestamp()};
+        tx.update(ref,fields);
+        return {...latest,_id:id,...fields,senderApprovedAt:new Date(),completedAt:new Date()};
+      });
+    }
+    const unplannedSaves=new Set();
+    function renderUnplannedWorkflow(item,box){
+      const editable=item.approvalStatus==='post_check' && !boardCompleted(item) && !boardCanceled(item);
+      const approvable=item.approvalStatus==='draft' && !boardCompleted(item) && !boardCanceled(item);
+      const disabled=editable ? '' : 'disabled';
+      box.style.display='block';box.classList.toggle('qr-mode',isQrWorkflow(item));
+      box.innerHTML=`<form id="unplannedCheckForm" class="unplanned-check-form">
+        <section class="workflow-checks"><div class="checks-heading"><h4>計画外変化点の事後チェック</h4><span>${escapeHtml(boardStatus(item))}</span></div>
+          <div class="form-row"><div class="form-group"><label for="postCategory">5M分類</label><select id="postCategory" ${disabled}><option value="">選択</option>${CHANGE_CATEGORIES.map(x=>`<option ${item.category===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div>
+          <div class="form-group"><label for="postDepartment">発信部署</label><select id="postDepartment" ${disabled}><option value="">選択</option>${[...new Set([...masterDepartments,item.planneddepartment].filter(Boolean))].map(x=>`<option ${item.planneddepartment===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div></div>
+          <div class="actual-switch-fields"><div><label for="postDate">実際の切替日</label><input id="postDate" type="date" value="${escapeAttr(item.actualSwitchDate || '')}" ${disabled}></div><div><label for="postTime">切替時刻</label><input id="postTime" type="time" value="${escapeAttr(item.actualSwitchTime || '')}" ${disabled}></div></div>
+          <div class="checklist-panel">${unplannedChecklist(item).slice(0,3).map(x=>`<div class="checklist-row"><label class="check-label" for="${x.key}">${escapeHtml(x.label)}</label><select id="${x.key}" ${disabled}><option value="">未判定</option><option value="ok" ${x.receiverResult==='ok'?'selected':''}>確認済</option><option value="ng" ${x.receiverResult==='ng'?'selected':''}>NG</option></select></div>`).join('')}
+          <div class="form-group" style="padding:12px"><label for="postTemporary">暫定の場合、暫定期間は明確になっているか</label><select id="postTemporary" ${disabled}><option value="">暫定対応の有無を選択</option><option value="no" ${item.temporaryChange===false?'selected':''}>暫定ではない（該当なし）</option><option value="yes" ${item.temporaryChange===true?'selected':''}>暫定対応</option></select>
+          <div id="postTemporaryFields" ${item.temporaryChange===true?'':'hidden'}><label for="postUntil">暫定期限</label><input id="postUntil" type="date" value="${escapeAttr(item.temporaryUntil || '')}" ${disabled}><label for="post_temporary">期間の確認</label><select id="post_temporary" ${disabled}><option value="">未判定</option><option value="ok" ${unplannedChecklist(item)[3].receiverResult==='ok'?'selected':''}>確認済</option><option value="ng" ${unplannedChecklist(item)[3].receiverResult==='ng'?'selected':''}>NG</option></select></div></div></div>
+          <div class="form-group"><label for="postComment">所見コメント・判断結果</label><textarea id="postComment" maxlength="4000" ${disabled}>${escapeHtml(item.workflowComment || '')}</textarea></div>
+        </section>
+        <section class="workflow-signoff"><div class="stamp-heading"><strong>${editable?'事後確認':'発信部署の上司承認'}</strong></div>
+        ${editable || approvable ? `<label for="postActor">氏名</label><input id="postActor" maxlength="80" value="${escapeAttr(localStorage.getItem('changepointActorName') || '')}"><div class="post-actions">${editable?'<button type="button" class="btn btn-secondary" onclick="saveUnplannedForm(false)">一時保存</button><button type="button" class="btn btn-primary" onclick="saveUnplannedForm(true)">確認完了・承認依頼</button>':'<button type="button" class="btn btn-primary" onclick="approveUnplanned()">承認して完了する</button>'}</div>`:''}
+        <div class="workflow-stamps">${workflowStampEntries(item).map(s=>`<div class="workflow-stamp ${s.name?'is-stamped':''}"><div class="stamp-role">${escapeHtml(s.department)} ${escapeHtml(s.role)}</div><div class="stamp-seal"><span class="stamp-name">${escapeHtml(s.name || '未記録')}</span><time>${escapeHtml(stampDate(s.at))}</time></div></div>`).join('')}</div><p id="postSaveStatus" role="status"></p></section></form>`;
+      box.querySelector('#unplannedCheckForm').onsubmit=e=>e.preventDefault();
+      box.querySelector('#postTemporary').onchange=e=>{box.querySelector('#postTemporaryFields').hidden=e.target.value!=='yes';};
+    }
+    window.saveUnplannedForm=async function(submit){
+      const item=currentDetailItem;if(!item || unplannedSaves.has(item._id))return;
+      const v=id=>document.getElementById(id)?.value || '';
+      const data={category:v('postCategory'),planneddepartment:v('postDepartment'),actualSwitchDate:v('postDate'),actualSwitchTime:v('postTime'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:v('post_'+key)}))};
+      const who=v('postActor').trim();
+      if(submit){try{validateUnplannedCheck(data);}catch(e){alert(e.message);return;}}
+      if(!who){alert('氏名を入力してください。');return;}
+      if(submit && !confirm('事後確認を完了し、発信部署の上司へ承認を依頼しますか？'))return;
+      unplannedSaves.add(item._id);document.querySelectorAll('#unplannedCheckForm button').forEach(b=>b.disabled=true);
+      try{const saved=await saveUnplannedRecord(item._id,item.postCheckRevision || 0,data,who,submit);localStorage.setItem('changepointActorName',who);if(currentDetailItem?._id===item._id){currentDetailItem=saved;renderApprovalWorkflow(saved);document.getElementById('postSaveStatus').textContent=submit?'承認を依頼しました。':'一時保存しました。';}}
+      catch(e){alert('保存できませんでした：'+e.message);}
+      finally{unplannedSaves.delete(item._id);document.querySelectorAll('#unplannedCheckForm button').forEach(b=>b.disabled=false);}
+    };
+    window.approveUnplanned=async function(){
+      const item=currentDetailItem,who=document.getElementById('postActor')?.value.trim();
+      if(!item || unplannedSaves.has(item._id))return;
+      if(!who){alert('氏名を入力してください。');return;}
+      if(!confirm(`${who} さんの発信部署承認スタンプを登録して完了しますか？`))return;
+      unplannedSaves.add(item._id);
+      try{const saved=await approveUnplannedRecord(item._id,item.postCheckRevision || 0,who);if(currentDetailItem?._id===item._id){currentDetailItem=saved;renderApprovalWorkflow(saved);}}
+      catch(e){alert('承認できませんでした：'+e.message);}finally{unplannedSaves.delete(item._id);}
+    };
+    window.startUnplannedPostcheck=async function(){
+      const item=currentDetailItem;
+      if(!item || item.type!=='sudden' || !confirm('従来のチェック・スタンプを履歴として残し、4項目の事後チェックと発信部署の上司承認に切り替えますか？'))return;
+      try{const saved=await runTransaction(db,async tx=>{
+        const ref=doc(db,'changepoints',item._id),snap=await tx.get(ref);if(!snap.exists())throw new Error('対象が見つかりません。');
+        const latest=snap.data();if(latest.type!=='sudden' || isUnplannedPostcheck(latest) || boardCompleted(latest) || boardCanceled(latest))throw new Error('状態が変更されています。');
+        const fields={workflowKind:'unplanned_postcheck_v1',workflowManaged:true,approvalStatus:'post_check',approvalRequestedAt:null,postCheckRevision:0,checklistItems:unplannedChecklist({}),excludedChecklistItems:[],senderApprovedBy:null,senderApprovedAt:null,receiverConfirmedBy:null,receiverConfirmedAt:null,receiverApprovedBy:null,receiverApprovedAt:null,
+          previousWorkflow:{approvalStatus:latest.approvalStatus || '',checklistItems:latest.checklistItems || [],excludedChecklistItems:latest.excludedChecklistItems || [],stamps:workflowStampEntries(latest).map(s=>({...s,name:s.name || '',at:s.at || null}))},updatedBy:getActorName(),updatedAt:serverTimestamp()};
+        tx.update(ref,fields);return {...latest,...fields,_id:item._id};
+      });if(currentDetailItem?._id===item._id)showDetail(saved);}catch(e){alert('開始できませんでした：'+e.message);}
+    };
+
+    const APPROVAL_STAGES = ['draft', 'sender_approved', 'receiver_confirmed', 'approved', 'post_check'];
 
     function approvalStatusOf(item){
       return APPROVAL_STAGES.includes(item?.approvalStatus) ? item.approvalStatus : 'draft';
     }
 
     function approvalStatusLabel(status){
-      return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 対応待ち', receiver_confirmed:'発生部署 承認待ち', approved:'承認完了' })[status] || '未承認';
+      return ({ draft:'発信部署 承認待ち', sender_approved:'発生部署 対応待ち', receiver_confirmed:'発生部署 承認待ち', approved:'承認完了', post_check:'事後チェック待ち' })[status] || '未承認';
     }
 
     function formatAuditTime(value){
@@ -3278,6 +3415,11 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     function workflowStampEntries(item){
+      if (item.workflowKind === 'unplanned_postcheck_v1') return [
+        {department:'発信部署',role:'作成者',name:item.createdBy,at:item.createdAtLocal || item.createdAt},
+        {department:'担当者',role:'事後確認',name:item.postCheckedBy,at:item.postCheckedAt},
+        {department:'発信部署',role:'承認者',name:item.senderApprovedBy,at:item.senderApprovedAt}
+      ];
       return [
         {department:'発信部署',role:'作成者',name:item.createdBy,at:item.createdAtLocal || item.createdAt},
         {department:'発信部署',role:'承認者',name:item.senderApprovedBy,at:item.senderApprovedAt},
@@ -3319,6 +3461,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     function renderApprovalWorkflow(item){
       const box = document.getElementById('approvalWorkflow');
       if (!box) return;
+      if (item?.type === 'sudden' && !boardCompleted(item) && !boardCanceled(item) && !isUnplannedPostcheck(item)){
+        box.style.display='block'; box.innerHTML='<button type="button" class="btn btn-primary" onclick="startUnplannedPostcheck()">事後チェックを開始する</button>'; return;
+      }
+      if (isUnplannedPostcheck(item)){ renderUnplannedWorkflow(item,box); return; }
       const workflowManaged = item && (item.type === 'planned' || item.workflowManaged === true);
       if (!workflowManaged){ box.style.display = 'none'; box.innerHTML = ''; return; }
       const sameItem = box.dataset.itemId === item._id && box.dataset.status === approvalStatusOf(item);
@@ -3512,6 +3658,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
 
     window.approveSender = async function(){
+      if (currentDetailItem?.workflowKind === 'unplanned_postcheck_v1') return;
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'draft') return;
       const items = getRecordChecklist(currentDetailItem);
       const who = readStampName(false);
@@ -3550,6 +3697,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
 
     window.approveReceiver = async function(){
+      if (currentDetailItem?.workflowKind === 'unplanned_postcheck_v1') return;
       if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'receiver_confirmed') return;
       const items = getRecordChecklist(currentDetailItem);
       const who = readStampName(false);
@@ -3592,7 +3740,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
       const qr = (kind, src, alt, label) => `<div class="qr" data-card-qr="${escapeAttr(item._id || '')}" data-qr-kind="${kind}"><img ${src ? `src="${src}"` : 'hidden'} alt="${alt}">${src ? '' : '<span class="qr-pending">QR準備中</span>'}<b>${label}</b></div>`;
       const cardQrs = `<div class="card-qrs">${qr('workflow',qrDataUrl,'ワークフローQR','チェック・承認')}${qr('production',productionQrDataUrl,'生産日入力QR','生産日入力・変更')}</div>`;
-      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '計画外'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '計画外'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table>${isUnplannedPostcheck(item) ? '' : `<div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div>`}<div class="sign" style="grid-template-columns:repeat(${workflowStampEntries(item).length},minmax(0,1fr))">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
 
     }
 
@@ -3701,12 +3849,35 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return true;
     };
 
+    function relatedAnomalyHtml(anomaly){
+      const fields=[['異常内容',anomaly.anomalyContent],['現場対応',anomaly.actionTaken],['処置方法',anomaly.rootCauseAction]];
+      const photos=[...new Set([...(Array.isArray(anomaly.mfgPhotoUrls)?anomaly.mfgPhotoUrls:[]),...(Array.isArray(anomaly.techPhotoUrls)?anomaly.techPhotoUrls:[])])].filter(url=>{try{return ['https:','http:'].includes(new URL(url).protocol);}catch(_){return false;}});
+      return `<div class="detail-grid"><div><b>発生日</b><p>${escapeHtml(anomaly.occurrenceDate || '-')} ${escapeHtml(anomaly.occurrenceTime || '')}</p></div><div><b>発生部署・ライン</b><p>${escapeHtml(anomaly.department || '-')} / ${escapeHtml(anomaly.lineName || '-')}</p></div><div><b>整理No</b><p>${escapeHtml(anomaly.serialNo || '-')}</p></div></div>`+
+        fields.map(([label,value])=>`<div class="detail-section"><strong>${label}</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(value || '記録なし')}</p></div>`).join('')+
+        (photos.length?`<div class="related-anomaly-photos">${photos.map((url,i)=>`<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeAttr(url)}" alt="関連異常の写真 ${i+1}" loading="lazy"></a>`).join('')}</div>`:'');
+    }
+    async function renderRelatedAnomaly(item){
+      const host=document.getElementById('relatedAnomalyHost');if(!host)return;
+      const id=String(item.relatedAnomalyId || '').trim();
+      if(!id){host.textContent='関連する異常は未設定です。';return;}
+      host.textContent='関連する異常を読み込み中...';
+      try{
+        if(id.includes('/'))throw new Error('invalid-id');
+        const snapshot=await getDoc(doc(db,'anomalies',id));
+        if(currentDetailItem?._id!==item._id || document.getElementById('relatedAnomalyHost')!==host)return;
+        host.innerHTML=snapshot.exists()?relatedAnomalyHtml(snapshot.data()):'関連する異常が見つかりません。削除されている可能性があります。';
+      }catch(e){
+        console.error(e);
+        if(document.getElementById('relatedAnomalyHost')===host){host.textContent='関連異常を取得できません。通信・閲覧権限をご確認ください。';const retry=document.createElement('button');retry.type='button';retry.textContent='再読み込み';retry.onclick=()=>renderRelatedAnomaly(item);host.append(retry);}
+      }
+    }
+
     function showDetail(item){
       currentDetailItem = item;
       const isAnomaly = (item._kind === 'anomaly') || (item.type === 'anomaly');
       const isCP = !isAnomaly;
       const isPlannedCP = isCP && (item.type === 'planned' || item.workflowManaged === true);
-      const qrMode = isPlannedCP && isQrWorkflow(item);
+      const qrMode = isCP && (isPlannedCP || item.type === 'sudden') && isQrWorkflow(item);
       document.getElementById('detailModal').classList.toggle('qr-workflow',qrMode);
       document.getElementById('detailClose').setAttribute('aria-label',qrMode ? '管理ボードへ戻る' : '閉じる');
       document.getElementById('detailCardToolbar').hidden = !isPlannedCP;
@@ -3757,13 +3928,15 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         document.getElementById('detailTitle').textContent='チェック・承認';
         body = `<div class="qr-basic"><div><span>実施日</span><strong>${escapeHtml(item.occurrenceDate || '未定')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div class="qr-basic-content"><span>変化点内容</span><p>${escapeHtml(item.content || '-')}</p></div></div>`;
       }
+      if (isCP && item.type === 'sudden') body += '<section class="detail-section"><h3 class="detail-section-title">関連する異常内容</h3><div id="relatedAnomalyHost" aria-live="polite"></div></section>';
       if (isCP) body += '<section id="evidenceHost" aria-label="評価エビデンス"></section>';
       document.getElementById('detailBody').innerHTML = body;
+      if (isCP && item.type === 'sudden') renderRelatedAnomaly(item);
       if (isCP) renderEvidencePanel(item);
 
       const actionsEl = document.getElementById('detailActions');
       actionsEl.style.display = isPlannedCP ? 'flex' : 'none';
-      renderApprovalWorkflow(isPlannedCP ? item : null);
+      renderApprovalWorkflow(isCP ? item : null);
 
       const decisionBox = document.getElementById('switchDecisionBox');
       const afterBox    = document.getElementById('switchAfterDecisionBox');
@@ -3776,7 +3949,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
 
       const guideEl = document.getElementById('switchFlowGuide');
       const guideText = document.getElementById('switchFlowStatusText');
-      if (guideEl && isPlannedCP){
+      if (guideEl && isPlannedCP && !isUnplannedPostcheck(item)){
         guideEl.style.display = 'block';
         const steps = guideEl.querySelectorAll('.step');
         steps.forEach(s => s.classList.remove('active'));
@@ -3830,6 +4003,11 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         } else {
           if (hintEl) hintEl.textContent = `切替え日：${switchDate || '-'} ／ 状態：${statusLabel(switchStatus)}`;
         }
+      }
+
+      if (isUnplannedPostcheck(item)){
+        if(decisionBox)decisionBox.style.display='none';
+        if(afterBox)afterBox.style.display='none';
       }
 
       const editBtn = document.getElementById('btnDetailEdit');
@@ -3911,6 +4089,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     function openEditModal(id) {
       const item = changepointData.find(x => x._id === id);
       if (!item) return;
+      if(isUnplannedPostcheck(item) && item.approvalStatus!=='post_check'){alert('事後確認後の内容は変更できません。');return;}
       const container = document.getElementById('editFormContainer');
       container.innerHTML = `
         <input type="hidden" id="editId" value="${item._id}">
@@ -3987,9 +4166,20 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       } else {
         updates.excludedChecklistItems = Array.isArray(original.excludedChecklistItems) ? original.excludedChecklistItems : [];
       }
-      if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || (original.type !== 'planned' && !updates.occurrenceDate)){ alert('発信部署、発生部署、分類、ライン、工程、内容、計画外の実施日は必須です'); return; }
+      if (isUnplannedPostcheck(original)){
+        if(updates.type!=='sudden'){alert('事後チェック対象の計画区分は変更できません。');return;}
+        Object.assign(updates,{approvalStatus:'post_check',approvalRequestedAt:null,checklistItems:unplannedChecklist({}),excludedChecklistItems:[],postCheckRevision:(original.postCheckRevision || 0)+1});
+      }
+      if (!updates.planneddepartment || !updates.department || (!updates.category && updates.type==='planned') || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || (updates.type !== 'planned' && !updates.occurrenceDate)){ alert('発信部署、発生部署、計画の分類、ライン、工程、内容、計画外の実施日は必須です'); return; }
       if (!updates.occurrenceDate){ updates.occurrenceDate = null; updates.switchStatus = 'undecided'; }
-      try { await updateDoc(doc(db, 'changepoints', id), updates); alert('保存しました。内容変更のため承認状態を未承認に戻しました'); document.getElementById('editModal').classList.remove('active'); }
+      try {
+        if(isUnplannedPostcheck(original)) await runTransaction(db,async tx=>{
+          const ref=doc(db,'changepoints',id),snap=await tx.get(ref),latest=snap.exists()?snap.data():null;
+          if(!isUnplannedPostcheck(latest) || latest.approvalStatus!=='post_check' || boardCompleted(latest) || boardCanceled(latest) || (latest.postCheckRevision || 0)!==(original.postCheckRevision || 0))throw new Error('状態が変更されています。開き直してください。');
+          tx.update(ref,updates);
+        });
+        else await updateDoc(doc(db, 'changepoints', id), updates);
+        alert('保存しました。内容変更のため確認・承認状態を未完了に戻しました'); document.getElementById('editModal').classList.remove('active'); }
       catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
     });
     document.getElementById('btnEditCancel').addEventListener('click', () => { document.getElementById('editModal').classList.remove('active'); });

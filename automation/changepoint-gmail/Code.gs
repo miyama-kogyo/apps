@@ -138,6 +138,7 @@ function notificationStreams() {
     {kind:'approval_request',field:'approvalRequestedAt',cursor:'CURSOR'},
     {kind:'production_date',field:'productionDateUpdatedAt',cursor:'CURSOR_PRODUCTION_DATE'},
     {kind:'receiver_approved',field:'receiverApprovedAt',cursor:'CURSOR_APPROVED'},
+    {kind:'unplanned_approved',field:'senderApprovedAt',cursor:'CURSOR_UNPLANNED_APPROVED'},
     {kind:'distribution',field:'distributionRequestedAt',cursor:'CURSOR_DISTRIBUTION'}
   ];
 }
@@ -179,13 +180,13 @@ function overdueReminderStage(item, day) {
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= day) return '';
   const parsed = new Date(date+'T00:00:00Z');
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0,10) !== date) return '';
-  return ['draft','sender_approved','receiver_confirmed'].includes(item.approvalStatus) ? item.approvalStatus : '';
+  return ['draft','sender_approved','receiver_confirmed'].includes(item.approvalStatus) || (item.workflowKind === 'unplanned_postcheck_v1' && item.approvalStatus === 'post_check') ? item.approvalStatus : '';
 }
 
 function overdueReminderQuery(cursor) {
   const query = {
     from:[{collectionId:'changepoints'}],
-    where:{fieldFilter:{field:{fieldPath:'approvalStatus'},op:'IN',value:{arrayValue:{values:['draft','sender_approved','receiver_confirmed'].map(x=>({stringValue:x}))}}}},
+    where:{fieldFilter:{field:{fieldPath:'approvalStatus'},op:'IN',value:{arrayValue:{values:['draft','sender_approved','receiver_confirmed','post_check'].map(x=>({stringValue:x}))}}}},
     orderBy:[{field:{fieldPath:'__name__'},direction:'ASCENDING'}],limit:NOTIFIER.batchSize
   };
   if (cursor) query.startAt = {before:false,values:[{referenceValue:cursor}]};
@@ -235,6 +236,7 @@ function isResultNotificationCurrent(item, kind) {
   if (kind === 'distribution') return Boolean(item.distributionRequestedAt);
   if (kind === 'production_date') return Boolean(item.occurrenceDate && item.productionDateUpdatedAt);
   if (kind === 'receiver_approved') return item.approvalStatus === 'approved';
+  if (kind === 'unplanned_approved') return item.workflowKind === 'unplanned_postcheck_v1' && item.approvalStatus === 'approved' && Boolean(item.senderApprovedAt);
   return false;
 }
 
@@ -280,7 +282,7 @@ function collectNotificationStream(stream) {
 function resolveRecipient(item, departments, kind) {
   if (kind === 'distribution') return resolveDistributionRecipient(item,departments);
   if (kind === 'overdue_reminder') {
-    if (item.approvalStatus !== 'sender_approved') return resolveRecipient(item,departments,'approval_request');
+    if (item.approvalStatus !== 'sender_approved' && item.approvalStatus !== 'post_check') return resolveRecipient(item,departments,'approval_request');
     const matches = departments.filter(d=>d.name===item.department);
     if (matches.length !== 1) throw new Error('対応者の部署が未登録、または重複しています。');
     const emails = parseDepartmentEmails(matches[0].distributionEmail);
@@ -342,7 +344,7 @@ function distributionMessage(item, recipient) {
 }
 
 function overdueReminderMessage(item, recipient) {
-  const labels = {draft:'発信部署の承認待ち',sender_approved:'発生部署の対応・チェック待ち',receiver_confirmed:'発生部署の最終承認待ち'};
+  const labels = {draft:'発信部署の承認待ち',sender_approved:'発生部署の対応・チェック待ち',receiver_confirmed:'発生部署の最終承認待ち',post_check:'計画外変化点の事後チェック待ち'};
   return {
     to:recipient.email,name:'変化点管理',
     subject:('【変化点 状況確認】予定日超過 / '+(item.lineName || '-')+' / 整理No '+(item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180),
@@ -357,9 +359,9 @@ function overdueReminderMessage(item, recipient) {
 }
 
 function resultMessage(item, recipient, kind) {
-  const labels = {production_date:'生産予定日の入力・変更',receiver_approved:'発生部署の承認完了'};
-  const actors = {production_date:item.productionDateUpdatedBy,receiver_approved:item.receiverApprovedBy};
-  const fields = {production_date:'productionDateUpdatedAt',receiver_approved:'receiverApprovedAt'};
+  const labels = {production_date:'生産予定日の入力・変更',receiver_approved:'発生部署の承認完了',unplanned_approved:'計画外変化点の発信部署承認完了'};
+  const actors = {production_date:item.productionDateUpdatedBy,receiver_approved:item.receiverApprovedBy,unplanned_approved:item.senderApprovedBy};
+  const fields = {production_date:'productionDateUpdatedAt',receiver_approved:'receiverApprovedAt',unplanned_approved:'senderApprovedAt'};
   const label = labels[kind], timestamp = item[fields[kind]];
   const message = approvalMessage(item,recipient);
   message.subject = ('【変化点通知】' + label + ' / ' + (item.lineName || '-') + ' / 整理No ' + (item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180);
@@ -378,7 +380,7 @@ function resultMessage(item, recipient, kind) {
 function approvalMessage(item, recipient) {
   const stage = item.approvalStatus === 'draft' ? '発信部署承認' : '発生部署承認';
   const id = item._name.split('/').pop();
-  const who = item.approvalStatus === 'draft' ? item.createdBy : item.receiverConfirmedBy;
+  const who = item.workflowKind === 'unplanned_postcheck_v1' ? item.postCheckedBy : item.approvalStatus === 'draft' ? item.createdBy : item.receiverConfirmedBy;
   return {
     to:recipient.email,
     name:'変化点管理',

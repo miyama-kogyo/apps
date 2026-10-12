@@ -51,6 +51,23 @@ function setup() {
   const jobs=()=>Object.entries(state).filter(([k])=>k.startsWith('job_')).map(([key,v])=>({key,...JSON.parse(v)}));
   return {ctx,state,sent,requests,triggers,writes,env,jobs};
 }
+{
+ const u=setup();
+ u.env.records=[record({type:'sudden',workflowManaged:true,workflowKind:'unplanned_postcheck_v1',approvalStatus:'post_check',approvalRequestedAt:undefined,occurrenceDate:'2026-10-01'})];
+ u.ctx.pollApprovalNotifications();assert.equal(u.sent.length,0);
+ assert.equal(u.ctx.overdueReminderStage(u.env.records[0],'2026-10-12'),'post_check');
+ u.env.departments[1].distributionEmail='receiver@example.com';
+ assert.equal(u.ctx.resolveRecipient(u.env.records[0],u.env.departments,'overdue_reminder').email,'receiver@example.com');
+ Object.assign(u.env.records[0],{approvalStatus:'draft',approvalRequestedAt:at,postCheckedBy:'Post Checker'});
+ u.ctx.pollApprovalNotifications();assert.equal(u.sent.length,1);assert.equal(u.sent[0].to,'sender@example.com');assert(u.sent[0].body.includes('Post Checker'));
+ u.state.ALLOWED_RECIPIENTS+=',origin-notify@example.com';
+ Object.assign(u.env.records[0],{approvalStatus:'approved',switchStatus:'completed',senderApprovedAt:at,senderApprovedBy:'Sender Boss'});
+ u.ctx.pollApprovalNotifications();assert.equal(u.sent.length,2);assert.equal(u.sent[1].to,'origin-notify@example.com');assert(u.sent[1].subject.includes('計画外変化点の発信部署承認完了'));
+ u.ctx.pollApprovalNotifications();assert.equal(u.sent.length,2);
+ assert.equal(u.ctx.overdueReminderStage(u.env.records[0],'2026-10-12'),'');
+ assert(!u.ctx.isResultNotificationCurrent(record({approvalStatus:'approved',senderApprovedAt:at}),'unplanned_approved'));
+ console.log('PASS unplanned mail: no premature approval, performer reminder to distribution, only sender approval, completion notification, dedup, planned isolation.');
+}
 let t=setup();
 t.ctx.pollApprovalNotifications();
 assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'sender@example.com');
