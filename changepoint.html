@@ -923,14 +923,18 @@
     .card-qrs { display:flex; gap:10px; flex-shrink:0; }
     .issued-card-preview .card-qrs .qr { display:flex; flex-direction:column; gap:3px; width:68px; }
     .issued-card-preview .card-qrs .qr b { max-width:none; font-size:10px; text-align:center; }
-    #productionDateModal .modal-content { max-width:540px; }
-    #productionDateForm { display:grid; gap:14px; }
+    #productionDateModal .modal-content { min-width:0; max-width:540px; }
+    #productionDateForm { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; }
+    #productionDateForm > * { min-width:0; max-width:100%; }
     #productionDateForm[hidden] { display:none; }
     #productionDateInfo { margin-bottom:18px; }
     #productionDateInfo p { white-space:pre-wrap; overflow-wrap:anywhere; }
     #productionDateStatus { min-height:1.5em; margin:0; white-space:pre-wrap; }
     #productionDateStatus[data-error="true"] { color:#b42318; }
-    #productionDateForm input { min-width:0; width:100%; font-size:16px; }
+    #productionDateForm input { display:block; min-width:0; width:100%; max-width:100%; font-size:16px; }
+    /* Keep the iOS date control's intrinsic width inside the grid track. */
+    #productionDateInput { -webkit-appearance:none; appearance:none; min-height:44px; }
+    #productionDateInput::-webkit-date-and-time-value { min-width:0; text-align:left; }
     #planDateUndecided { width:auto; }
     #masterDepartment .master-table { table-layout:fixed; }
     #masterDepartment .master-table td { overflow-wrap:anywhere; }
