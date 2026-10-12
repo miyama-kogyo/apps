@@ -349,6 +349,20 @@
     .rank-product-detail small{display:block;margin-top:4px;font-size:13px;color:#657079}
     .rank-product-detail .rank-value{flex-shrink:0;white-space:nowrap}
     @media(max-width:480px){#serialRanking .product-rank-row{grid-template-columns:26px 64px minmax(0,1fr);gap:8px}.rank-product-photo{width:64px;height:64px}.rank-product-detail{gap:8px}.rank-photo-register{min-height:64px}}
+    #page-dashboard.morning-layout .dashboard-grid{grid-template-columns:minmax(0,1fr);gap:0}
+    #page-dashboard.morning-layout #departmentChartPanel{display:none}
+    #page-dashboard.morning-layout .dept-list{height:auto;max-height:none;overflow:visible}
+    #page-dashboard.morning-layout .serial-breakdown{gap:8px;align-items:center}
+    @media(min-width:761px){
+      #page-dashboard.morning-layout .dept-name{font-size:22px}
+      #page-dashboard.morning-layout .dept-number{font-size:28px}
+      #page-dashboard.morning-layout .dept-row{padding-top:16px;padding-bottom:16px}
+      #page-dashboard.morning-layout .serial-chip-item{font-size:16px}
+      #page-dashboard.morning-layout .serial-chip-product{grid-template-columns:104px minmax(0,1fr);grid-template-rows:88px auto}
+      #page-dashboard.morning-layout .serial-chip-product .product-thumb{width:104px;height:88px}
+      #page-dashboard.morning-layout .serial-chip-product .serial-chip-count{font-size:24px}
+      #page-dashboard.morning-layout .serial-chip-product .serial-chip-name{font-size:13px}
+    }
   </style>
 </head>
 <body>
@@ -447,7 +461,7 @@
       </div>
     </section>
 
-    <section class="page review-only" id="page-dashboard">
+    <section class="page review-only morning-layout" id="page-dashboard">
       <div class="page-heading dashboard-heading">
         <div><h2 id="dashboardTitle">落下品 朝会レビュー</h2><p id="dashboardDateLabel"></p></div>
         <div class="dashboard-heading-actions">
@@ -485,7 +499,7 @@
         <div class="panel metric"><div class="metric-label">対象日の発生部署</div><div class="metric-value" id="activeDepartments">0</div><div class="metric-sub">部署</div></div>
       </div>
       <div class="dashboard-grid">
-        <section class="panel">
+        <section class="panel" id="departmentChartPanel">
           <div class="section-header"><h3 id="departmentChartTitle">部署別落下品数</h3><span class="full-screen-note">落下品数（個）</span></div>
           <div class="chart-wrap"><canvas id="departmentChart"></canvas></div>
         </section>
@@ -1295,6 +1309,7 @@
       const comparisonKey = localDateKey(previousWeekday(new Date(`${todayKey}T12:00:00`)));
       const isToday = todayKey === localDateKey(today);
       const isReviewDay = todayKey === localDateKey(previousWeekday(today));
+      $('page-dashboard').classList.toggle('morning-layout', !isToday);
       const showComparison = false;
       $('page-dashboard').classList.toggle('review-only', !showComparison);
       $('departmentChartTitle').textContent = showComparison ? '部署別比較' : '部署別落下品数';
