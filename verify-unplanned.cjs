@@ -95,8 +95,31 @@ async function fullApp(){
   const ticket=await p.evaluate(()=>window.__ticket(window.__latest,'原本','発信部署'));assert(ticket.includes('安全面に問題が無いか'));assert(!ticket.includes('関係部署確認'));assert(!ticket.includes('発生部署 承認者'));assert(!ticket.includes('data-card-qr'));assert(!ticket.includes('QR'));assert(ticket.includes('対応部署 承認'));assert(!ticket.includes('チェック項目なし'));
   await p.locator('#postDate').fill('2026-10-12');await p.locator('#postTime').fill('10:00');for(const id of ['post_safety','post_products','post_workability'])await p.locator('#'+id).selectOption('ok');await p.locator('#postTemporary').selectOption('no');await p.locator('#postDepartment').selectOption('製造');await p.getByRole('button',{name:'確認完了・承認依頼'}).click();await p.getByRole('button',{name:'承認して完了する'}).waitFor();assert.equal(await p.evaluate(()=>window.__latest.workflowKind),'unplanned_response_v2');assert.equal(await p.evaluate(()=>window.__latest.responseDepartment),'製造');
   const preview=await b.newPage();await preview.setContent('<style>'+html.match(/<style>([\s\S]*?)<\/style>/)[1]+'</style><div class="issued-card-preview" style="width:510px">'+ticket+'</div>');await preview.screenshot({path:path.join(__dirname,'outputs/unplanned-test/card-no-qr.png')});assert.equal(await preview.locator('.sign > div').count(),1);assert.equal(await preview.locator('.card-qrs').count(),0);await preview.close();
-  const printResult=await p.evaluate(async x=>{const original=window.open;window.open=()=>({closed:false,document:{body:{},open(){},write(h){window.__printed=h},close(){}}});try{return await window.printChangeCard(x)}finally{window.open=original}},legacy);assert(printResult);const printed=await p.evaluate(()=>window.__printed);assert(!printed.includes('data-card-qr'));assert.equal((printed.match(/安全面に問題が無いか/g)||[]).length,2);
+  const printResult=await p.evaluate(async x=>{const original=window.open;window.open=()=>({closed:false,document:{body:{},open(){},write(h){window.__printed=h},close(){}}});try{return await window.printChangeCard(x)}finally{window.open=original}},legacy);assert(printResult);const printed=await p.evaluate(()=>window.__printed);assert(!printed.includes('data-card-qr'));assert.equal((printed.match(/<td>安全面に問題が無いか/g)||[]).length,2);
   const plannedTicket=await p.evaluate(()=>window.__ticket({type:'planned',category:'設備'},'原本','発信部署'));assert.equal((plannedTicket.match(/data-card-qr=/g)||[]).length,2);
+  const checkboxRecord={...legacy,temporaryChange:false,checklistItems:[{key:'post_safety',receiverResult:'ok'},{key:'post_products',receiverResult:'ng'}]};
+  const checkboxTicket=await p.evaluate(x=>window.__ticket(x,'原本','発信部署'),checkboxRecord);
+  assert(!checkboxTicket.includes('未判定'));
+  await p.evaluate(async x=>{const original=window.open;window.open=()=>({closed:false,document:{body:{},open(){},write(h){window.__printed=h},close(){}}});try{await window.printChangeCard(x)}finally{window.open=original}},checkboxRecord);
+  const checkboxPrint=(await p.evaluate(()=>window.__printed)).replace(/<script>[\s\S]*?<\/script>/g,'');
+  const legacyTicket=await p.evaluate(()=>window.__ticket({type:'planned',category:'人',checklistItems:[{label:'旧チェック " <test>',receiverChecked:true}]},'原本','発信部署'));
+  const {webkit}=require('C:/Users/ysugimoto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+  for(const engine of ['chromium','webkit']){
+   const browser=engine==='chromium'?b:await webkit.launch({headless:true});
+   try{const page=await browser.newPage({viewport:{width:510,height:900}});
+    await page.setContent('<style>'+html.match(/<style>([\s\S]*?)<\/style>/)[1]+'</style><div class="issued-card-preview">'+checkboxTicket+'</div>');
+    assert.equal(await page.locator('.ticket-checkbox').count(),4);assert.equal(await page.locator('.ticket-checkbox:checked').count(),1);assert.equal(await page.locator('.ticket-checkbox:disabled').count(),4);
+    assert.deepEqual(await page.locator('.ticket-check').allTextContents(),['','NG','','該当なし']);
+    assert.equal(await page.locator('.ticket-checkbox:checked').evaluate(el=>getComputedStyle(el,'::after').borderRightWidth),'2px');
+    for(const width of [320,510]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:path.join(__dirname,`outputs/unplanned-test/checkbox-${engine}-${width}.png`)});}
+    await page.setContent('<div>'+legacyTicket+'</div>');assert.equal(await page.locator('.ticket-checkbox:checked').count(),1);assert.equal(await page.locator('test').count(),0);
+    await page.setContent(checkboxPrint);await page.setViewportSize({width:800,height:1123});await page.emulateMedia({media:'print'});
+    assert.equal(await page.locator('.ticket-checkbox').count(),8);assert.equal(await page.locator('.ticket-checkbox:checked').count(),2);
+    assert(await page.locator('.ticket-checkbox').first().evaluate(el=>parseFloat(getComputedStyle(el).borderTopWidth)>=1));
+    await page.screenshot({path:path.join(__dirname,`outputs/unplanned-test/checkbox-print-${engine}.png`),fullPage:true});await page.close();
+   }finally{if(engine==='webkit')await browser.close();}
+  }
+  console.log('PASS card checkboxes: blank/OK/NG/NA, legacy checked state, escaped label, read-only, 320px layout and printed original/copy in Chromium/WebKit.');
   await p.screenshot({path:path.join(__dirname,'outputs/unplanned-test/related-anomaly-mobile.png')});
   await p.evaluate(()=>window.showDetail({_id:'planned',type:'planned',workflowManaged:true,category:'設備',approvalStatus:'draft',checklistItems:[],department:'製造',planneddepartment:'品質'}));assert.equal(await p.locator('.workflow-stamp').count(),4);assert(await p.getByRole('button',{name:'承認スタンプを押す',exact:true}).isVisible());assert.equal(await p.locator('#relatedAnomalyHost').count(),0);assert.deepEqual(errors,[]);
   console.log('PASS full application: init, planned master checklist, unplanned registration without 5M, four check persistence, related anomaly detail, legacy opt-in migration, print and planned four-stamp regression.');

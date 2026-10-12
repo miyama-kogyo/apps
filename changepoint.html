@@ -952,6 +952,9 @@
       .distribution-option small { font-size:11px; }
     }
     .issued-card-preview td[colspan] { width:auto; text-align:left; }
+    .ticket-check { display:inline-flex; align-items:center; gap:4px; }
+    .ticket-checkbox { appearance:none; -webkit-appearance:none; position:relative; display:inline-block; width:18px; height:18px; min-width:18px; margin:0; padding:0; border:1.5px solid #111; border-radius:0; background:#fff; opacity:1; vertical-align:middle; }
+    .ticket-checkbox:checked::after { content:''; position:absolute; left:5px; top:1px; width:5px; height:10px; border:solid #111; border-width:0 2px 2px 0; transform:rotate(45deg); }
     .issued-card-preview .review { border:1px solid #888; padding:5px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
     .issued-card-preview .sign { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
     .issued-card-preview .sign div { border:1px solid #888; padding:5px; min-height:50px; font-size:9px; line-height:1.5; overflow-wrap:anywhere; }
@@ -3736,8 +3739,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const managed = unplanned || item.type === 'planned' || item.workflowManaged === true;
       const items = managed ? getRecordChecklist(item) : (Array.isArray(item.checklistItems) ? item.checklistItems : []);
       const cardStatus = unplanned ? boardStatus(item) : managed ? approvalStatusLabel(approvalStatusOf(item)) : boardStatus(item);
-      const resultLabel = (x, role) => ({ok:unplanned?'確認済':'合格',ng:'NG',na:'該当なし','':'未判定'})[checklistResult(x, role)] || '未判定';
-      const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}${unplanned && x.criteria ? '<br>'+escapeHtml(x.criteria) : ''}</td>${unplanned ? '' : `<td>${escapeHtml(x.criteria || '-')}</td>`}<td>${resultLabel(x,'receiver')}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
+      const resultCheckbox = x => {
+        const result = checklistResult(x, 'receiver');
+        const note = result === 'ng' ? 'NG' : result === 'na' ? '該当なし' : '';
+        const label = `${x.label || '確認項目'}：${note || (result === 'ok' ? '確認済み' : '未確認')}`;
+        return `<span class="ticket-check"><input type="checkbox" class="ticket-checkbox" disabled${result === 'ok' ? ' checked' : ''} aria-label="${escapeAttr(label)}">${note ? `<span>${note}</span>` : ''}</span>`;
+      };
+      const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}${unplanned && x.criteria ? '<br>'+escapeHtml(x.criteria) : ''}</td>${unplanned ? '' : `<td>${escapeHtml(x.criteria || '-')}</td>`}<td>${resultCheckbox(x)}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
       const checks = activeCheckRows + (managed ? `<tr><td colspan="${unplanned?2:3}"><b>実際の切替日時：</b>${escapeHtml(actualSwitchLabel(item))}（日本時間）</td></tr>` : '');
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
@@ -3816,6 +3824,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         th,td{border:1px solid #777;padding:.65mm 1mm;text-align:left;vertical-align:top}
         th:nth-child(3),td:nth-child(3){width:24mm;text-align:center;white-space:nowrap}
         .unplanned-ticket th:last-child,.unplanned-ticket td:last-child:not([colspan]){width:24mm;text-align:center;white-space:nowrap}
+        .ticket-check{display:inline-flex;align-items:center;gap:4px}
+        .ticket-checkbox{appearance:none;-webkit-appearance:none;position:relative;display:inline-block;width:18px;height:18px;min-width:18px;margin:0;padding:0;border:1.5px solid #111;border-radius:0;background:#fff;opacity:1;vertical-align:middle}
+        .ticket-checkbox:checked::after{content:'';position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #111;border-width:0 2px 2px 0;transform:rotate(45deg)}
         .review{font-size:.8em;border:1px solid #777;padding:.8mm 1mm}
         .sign{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1mm;margin-top:auto}
         .sign div{border:1px solid #555;min-height:11mm;padding:.8mm;font-size:.8em}
