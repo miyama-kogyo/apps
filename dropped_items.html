@@ -352,7 +352,7 @@
     #page-dashboard.morning-layout .dashboard-grid{grid-template-columns:minmax(0,1fr);gap:0}
     #page-dashboard.morning-layout #departmentChartPanel{display:none}
     #page-dashboard.morning-layout .dept-list{height:auto;max-height:none;overflow:visible}
-    #page-dashboard.morning-layout .serial-breakdown{gap:8px;align-items:center}
+    #page-dashboard.morning-layout .serial-breakdown{gap:10px;align-items:flex-start}
     @media(min-width:761px){
       #page-dashboard.morning-layout .dept-name{font-size:22px}
       #page-dashboard.morning-layout .dept-number{font-size:28px}
@@ -363,6 +363,17 @@
       #page-dashboard.morning-layout .serial-chip-product .serial-chip-count{font-size:24px}
       #page-dashboard.morning-layout .serial-chip-product .serial-chip-name{font-size:13px}
     }
+    #page-dashboard.morning-layout .serial-chip-with-comments{display:grid;grid-template-columns:minmax(0,1fr) auto;width:260px;align-items:center;row-gap:8px;white-space:normal}
+    #page-dashboard.morning-layout .serial-chip-product.serial-chip-with-comments{grid-template-columns:104px minmax(0,1fr)}
+    .product-comment-summary{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;border-top:1px solid #dce1e4;padding-top:8px;min-width:0}
+    .product-comment-heading{width:100%;font-size:11px;font-weight:500;color:#657079;text-align:left}
+    .product-comment-bubble{display:flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:40px;padding:9px 12px;border-radius:24px;background:#e4edf2;border:1px solid #b6cbd7;color:#263d4a;font-size:14px;line-height:1.45;font-weight:500;text-align:left}
+    .product-comment-bubble:nth-of-type(3n){background:#f3eedf;border-color:#d8cba5;color:#554923}
+    .product-comment-bubble:nth-of-type(3n+1){background:#e9ebec;border-color:#c9ced1;color:#414a50}
+    .product-comment-text{min-width:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+    .product-comment-bubble strong{white-space:nowrap;font-size:12px;flex-shrink:0}
+    .product-comment-more{width:100%;font-size:12px;color:#657079;text-align:right}
+    @media(max-width:760px){#page-dashboard.morning-layout .serial-chip-with-comments{width:100%}#page-dashboard.morning-layout .serial-chip-product.serial-chip-with-comments{grid-template-columns:80px minmax(0,1fr)}}
   </style>
 </head>
 <body>
@@ -1337,7 +1348,9 @@
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
           const product=productFor(name),url=safeUrl(product?.photo?.url);
-          return `<button type="button" class="serial-chip serial-chip-item${url?' serial-chip-product':''}" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${url?'× ':''}${count.toLocaleString('ja-JP')}個</span></button>`;
+          const comments=!isToday?commentCounts(todayRows.filter(row=>row.department===dept && row.serialNo===name)):[];
+          const bubbles=comments.length?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.slice(0,3).map(([comment,total])=>`<span class="product-comment-bubble" style="min-height:${40+12*Math.sqrt(total/comments[0][1])}px" title="${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${total}件</strong></span>`).join('')}${comments.length>3?`<span class="product-comment-more">ほか${comments.length-3}種類</span>`:''}</span>`:'';
+          return `<button type="button" class="serial-chip serial-chip-item${url?' serial-chip-product':''}${comments.length?' serial-chip-with-comments':''}" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${url?'× ':''}${count.toLocaleString('ja-JP')}個</span>${bubbles}</button>`;
         }).join('');
         return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
@@ -1354,6 +1367,11 @@
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
     }
 
+    function commentCounts(rows){
+      const comments=new Map();
+      rows.forEach(row=>{const text=String(row.comment||'').trim();if(text)comments.set(text,(comments.get(text)||0)+1);});
+      return [...comments].sort((a,b)=>b[1]-a[1]);
+    }
     let serialPreviewAnchor;
     function closeSerialPreview(restoreFocus=false){
       const anchor=serialPreviewAnchor;
@@ -1375,10 +1393,9 @@
       $('serialPreviewMeta').textContent=`${anchor.dataset.previewDept} / ${dateKey.replaceAll('-','/')} / ${sumQty(rows).toLocaleString('ja-JP')}個`;
       const causes=['設備','作業','その他'];
       const totals=causes.map(cause=>sumQty(rows.filter(row=>(causes.includes(row.cause)?row.cause:'その他')===cause)));
-      const comments=new Map();
-      rows.forEach(row=>{const text=String(row.comment||'').trim();if(text) comments.set(text,(comments.get(text)||0)+1);});
-      const max=Math.max(1,...comments.values());
-      $('serialCommentBubbles').innerHTML=comments.size ? [...comments].sort((a,b)=>b[1]-a[1]).map(([comment,count])=>`<div class="comment-bubble" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
+      const comments=commentCounts(rows);
+      const max=comments[0]?.[1]||1;
+      $('serialCommentBubbles').innerHTML=comments.length ? comments.map(([comment,count])=>`<div class="comment-bubble" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
       const photos=rows.flatMap(row=>Array.isArray(row.media)?row.media:[]).filter(file=>file.type!=='video' && safeUrl(file.url));
       $('serialPreviewPhotos').innerHTML=photos.length ? photos.map(file=>`<a href="${esc(safeUrl(file.url))}" target="_blank" rel="noopener"><img src="${esc(safeUrl(file.url))}" alt="${esc(anchor.dataset.previewSerial)}の状況写真" loading="lazy"></a>`).join('') : '<p class="serial-preview-empty">写真はありません</p>';
       preview.hidden=false;
