@@ -148,6 +148,7 @@
     .filters .field{min-width:150px;flex:1}
     .filters .field input,.filters .field select{min-height:42px;padding:8px 10px}
     .analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .analysis-grid>.panel{min-width:0}
     .analysis-grid .chart-wrap{height:390px}
     .ranking-list{padding:0 14px 14px}
     .rank-row{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -339,6 +340,15 @@
     .product-reference img{display:block;width:100%;max-height:260px;object-fit:contain;background:#f2f3f4}
     .product-reference p{margin:6px 0;font-size:14px;overflow-wrap:anywhere}
     @media(max-width:760px){.product-master-layout{grid-template-columns:minmax(0,1fr)}.main-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    #serialRanking .product-rank-row{grid-template-columns:34px 84px minmax(0,1fr)}
+    .rank-product-photo{width:84px;height:72px;padding:0;border:0;background:#f2f3f4;cursor:pointer}
+    .rank-product-photo img{display:block;width:100%;height:100%;object-fit:contain}
+    .rank-photo-register{display:flex;align-items:center;justify-content:center;min-height:72px;padding:6px;border:1px dashed #aab5bd;border-radius:4px;color:#315f7c;font-size:13px;text-align:center;text-decoration:underline}
+    .rank-product-detail{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;min-height:72px;width:100%;padding:8px 0;border:0;background:transparent;text-align:left;color:inherit;font:inherit;cursor:pointer}
+    .rank-product-detail .rank-label{min-width:0;overflow-wrap:anywhere}
+    .rank-product-detail small{display:block;margin-top:4px;font-size:13px;color:#657079}
+    .rank-product-detail .rank-value{flex-shrink:0;white-space:nowrap}
+    @media(max-width:480px){#serialRanking .product-rank-row{grid-template-columns:26px 64px minmax(0,1fr);gap:8px}.rank-product-photo{width:64px;height:64px}.rank-product-detail{gap:8px}.rank-photo-register{min-height:64px}}
   </style>
 </head>
 <body>
@@ -702,6 +712,8 @@
         renderInputQr();
         const requestedScreen = new URLSearchParams(location.search).get('screen');
         if(['entry','dashboard','analysis','products'].includes(requestedScreen)) showPage(requestedScreen);
+        const requestedProduct=new URLSearchParams(location.search).get('product');
+        if(requestedScreen==='products' && requestedProduct) openProductRegistration(requestedProduct);
         $('comparisonDate').max = localDateKey(new Date());
         $('comparisonDate').value = localDateKey(previousWeekday(new Date()));
         subscribeItems();
@@ -878,6 +890,7 @@
         $('productMasterFields').disabled=state.productBusy;
         renderProductMasters();
         renderDashboard();
+        renderAnalysis();
       },error=>{
         console.error(error);
         state.productMastersReady=false;
@@ -903,6 +916,13 @@
       $('productMasterForm').reset(); $('productMasterSerial').readOnly=false;
       $('productMasterPreview').hidden=true; $('productMasterPreview').removeAttribute('src');
       $('productMasterFormTitle').textContent='製品写真の登録';
+    }
+    function openProductRegistration(serial){
+      if(state.productBusy){showToast('製品写真の保存が完了するまでお待ちください',true);return;}
+      showPage('products');
+      if(productFor(serial)) editProductMaster(serial);
+      else {resetProductMasterForm();$('productMasterSerial').value=productKey(serial).slice(0,60);}
+      $('productMasterFile').focus({preventScroll:true});
     }
     function editProductMaster(serial){
       if(state.productBusy)return;
@@ -1473,8 +1493,16 @@
       const deptMap=groupSum(rows,r=>r.department),deptRanking=Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
       makeChart('ranking',$('rankingChart'),{type:'bar',data:{labels:deptRanking.map(x=>x[0]),datasets:[{label:'落下品数',data:deptRanking.map(x=>x[1]),backgroundColor:deptRanking.map((_,i)=>i===0?'#3f464b':'#9ba2a7'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=deptRanking[els[0].index][0];openDetail(`${dept} の詳細`,rows.filter(r=>r.department===dept));},plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
       const serialRanking=Object.entries(groupSum(rows,r=>r.serialNo)).sort((a,b)=>b[1]-a[1]);
-      $('serialRanking').innerHTML=serialRanking.length?serialRanking.slice(0,20).map(([serial,count],i)=>`<button class="rank-row" data-rank-serial="${esc(serial)}" style="width:100%;border:0;background:#fff;text-align:left"><span class="rank-no">${i+1}</span><span class="rank-label">${esc(serial)}</span><span class="rank-value">${count.toLocaleString('ja-JP')}個</span></button>`).join(''):'<div class="empty">対象期間のデータがありません</div>';
+      $('serialRanking').innerHTML=serialRanking.length?serialRanking.slice(0,20).map(([serial,count],i)=>{
+        const product=productFor(serial),url=safeUrl(product?.photo?.url);
+        const photo=url?`<button type="button" class="rank-product-photo" data-rank-serial="${esc(serial)}" aria-label="${esc(serial)}の詳細"><img src="${esc(url)}" alt="${esc(product.productName||serial)}の製品写真" loading="lazy"></button>`:`<a class="rank-photo-register" href="?screen=products&amp;product=${encodeURIComponent(serial)}" data-register-product="${esc(serial)}" aria-label="${esc(serial)}の製品写真を登録">写真を登録</a>`;
+        return `<div class="rank-row product-rank-row"><span class="rank-no">${i+1}</span>${photo}<button type="button" class="rank-product-detail" data-rank-serial="${esc(serial)}"><span class="rank-label">${esc(serial)}${product?.productName?`<small>${esc(product.productName)}</small>`:''}</span><span class="rank-value">${count.toLocaleString('ja-JP')}個</span></button></div>`;
+      }).join(''):'<div class="empty">対象期間のデータがありません</div>';
       document.querySelectorAll('[data-rank-serial]').forEach(btn=>btn.addEventListener('click',()=>openDetail(`${btn.dataset.rankSerial} の詳細`,rows.filter(r=>r.serialNo===btn.dataset.rankSerial))));
+      document.querySelectorAll('[data-register-product]').forEach(link=>link.addEventListener('click',event=>{
+        if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+        event.preventDefault();openProductRegistration(link.dataset.registerProduct);
+      }));
     }
 
     function mediaHtml(media=[]){
