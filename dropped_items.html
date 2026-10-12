@@ -249,8 +249,8 @@
     #page-dashboard .dept-list{height:440px;max-height:none;overflow:auto;background:#fff}
     #page-dashboard .dept-row,.dept-column-head{grid-template-columns:minmax(75px,1fr) 70px 70px minmax(0,1.5fr);gap:12px}
     #page-dashboard .dept-row{padding:12px;min-height:62px}
-    #page-dashboard .dept-row:nth-child(even){background:#f7f8f9}
-    #page-dashboard .dept-row:hover{background:#e9edef}
+    #page-dashboard .dept-row{background:var(--department-bg,#f7f8f9)}
+    #page-dashboard .dept-row:hover{background:var(--department-bg,#f7f8f9)}
     #page-dashboard .dept-number small{display:none}
     .dept-column-head{display:grid;align-items:center;min-height:40px;padding:8px 12px;background:#e9edef;font-size:.8rem;font-weight:700;color:#4b5359}
     .dept-column-head span:nth-child(2),.dept-column-head span:nth-child(3){text-align:right}
@@ -1361,6 +1361,7 @@
       $('deptTodayHeading').textContent = `対象日 ${shortDateLabel(todayKey)}`;
       $('deptComparisonHeading').textContent = `比較日 ${shortDateLabel(comparisonKey)}`;
       const departments = state.departments.filter(name => state.dashboardDepartments.has(name));
+      const departmentColors=['#edf5fc','#edf7f0','#fff7e6','#fceff2','#f2effa','#eaf7f7','#f9f1e9','#f2f6e9'];
       const todayByDept = groupSum(todayRows,r=>r.department), comparisonByDept = groupSum(comparisonRows,r=>r.department);
       departments.sort((a,b)=>(todayByDept[b]||0)-(todayByDept[a]||0) || a.localeCompare(b,'ja'));
       renderDepartmentChart(departments,todayRows,comparisonRows,todayKey,comparisonKey,showComparison);
@@ -1372,7 +1373,8 @@
           const bubbles=!isToday?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.length?comments.slice(0,1).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join(''):'<span class="product-card-no-comment">コメントなし</span>'}${comments.length>1?`<span class="product-comment-more">ほか${comments.length-1}種類</span>`:''}</span>`:'';
           return `<button type="button" class="serial-chip serial-chip-item product-summary-card" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="product-card-title" title="${esc(name)}">${esc(name)}</span><span class="product-card-media">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:'<span class="product-card-no-photo">写真未登録</span>'}<span class="product-card-quantity">× ${count.toLocaleString('ja-JP')}個</span></span>${bubbles}</button>`;
         }).join('');
-        return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個</span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
+        const departmentColor=departmentColors[state.departments.indexOf(dept)%departmentColors.length];
+        return `<div class="dept-row" style="--department-bg:${departmentColor}"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個</span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
       document.querySelectorAll('#departmentList .dept-row').forEach(row => row.addEventListener('click', event => {
