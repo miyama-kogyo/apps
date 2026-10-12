@@ -59,10 +59,13 @@ async function browser(){
    await page.setViewportSize({width:390,height:900});
    assert(await page.locator('#postDepartment').isDisabled());
    await page.locator('#postCategory').selectOption('設備');await page.locator('#postDate').fill('2026-10-12');await page.locator('#postTime').fill('09:15');await page.locator('#postActor').fill('担当者');
-   for(const id of ['post_safety','post_products','post_workability'])await page.locator('#'+id).selectOption('ok');
-   await page.locator('#postTemporary').selectOption('yes');assert(await page.locator('#postUntil').isVisible());await page.locator('#postUntil').fill('2026-10-20');await page.locator('#post_temporary').selectOption('ok');
+   for(const id of ['post_safety','post_products','post_workability'])await page.locator('#'+id).check();
+   await page.locator('#post_safety').uncheck();assert(await page.locator('#postDepartment').isDisabled());await page.locator('[data-check-key="post_safety"] .tap-check-label').click();assert(await page.locator('#post_safety').isChecked());
+   await page.locator('#postTemporary').selectOption('yes');assert(await page.locator('#postUntil').isVisible());await page.locator('#postUntil').fill('2026-10-20');await page.locator('#post_temporary').check();
    assert(await page.locator('#postDepartment').isEnabled());await page.locator('#postDepartment').selectOption('保全');
-   await page.getByRole('button',{name:'一時保存',exact:true}).click();assert.equal(await page.locator('#postUntil').inputValue(),'2026-10-20');
+   await page.locator('[data-check-key="post_safety"] summary').click();await page.locator('[data-check-key="post_safety"] select').selectOption('ng');assert(!(await page.locator('#post_safety').isChecked()));assert(await page.locator('#postDepartment').isDisabled());
+   await page.getByRole('button',{name:'一時保存',exact:true}).click();assert.equal(await page.locator('#post_safety').getAttribute('data-result'),'ng');assert.equal(await page.locator('#postUntil').inputValue(),'2026-10-20');
+   await page.locator('#post_safety').check();await page.getByRole('button',{name:'一時保存',exact:true}).click();assert(await page.locator('#post_safety').isChecked());
    await page.getByRole('button',{name:'確認完了・承認依頼',exact:true}).click();assert(await page.getByRole('button',{name:'承認して完了する'}).isVisible());assert(await page.locator('#postCategory').isDisabled());
    await page.locator('#postActor').fill('対応部署の上司');await page.getByRole('button',{name:'承認して完了する'}).click();assert.equal(await page.evaluate(()=>latest.approvalStatus),'approved');assert.equal(await page.locator('.workflow-stamp').count(),1);assert.equal(await page.evaluate(()=>latest.responseDepartment),'保全');
    await page.evaluate(()=>renderRelatedAnomaly(currentDetailItem));assert((await page.locator('#relatedAnomalyHost').textContent()).includes('未設定'));
@@ -73,8 +76,8 @@ async function browser(){
   }finally{await b.close();}
  }
 }
-async function fullApp(){
- const {chromium}=require('C:/Users/ysugimoto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+async function fullApp(engine='chromium'){
+ const {chromium,webkit}=require('C:/Users/ysugimoto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
  const mock=`const initializeApp=()=>({}),getFirestore=()=>({}),getStorage=()=>({}),getAuth=()=>({currentUser:{uid:'test'}}),setPersistence=async()=>{},browserLocalPersistence={},onAuthStateChanged=()=>{},signInAnonymously=async()=>{};
  const collection=(_, ...p)=>p.join('/'),doc=(_, ...p)=>p.join('/'),query=x=>x,orderBy=()=>{},onSnapshot=()=>{},serverTimestamp=()=>new Date(),getDocs=async p=>({docs:(p.includes('department')?[{name:'品質'},{name:'製造'}]:p.includes('changeChecklist')?[{name:'計画用チェック',category:'設備'}]:[]).map((x,i)=>({id:String(i),data:()=>x}))});
  window.__writes=[];window.__latest=null;const addDoc=async(_,x)=>{window.__writes.push(x);return {id:'new-record'}},updateDoc=async()=>{throw Error('Unexpected write')},deleteDoc=async()=>{throw Error('Unexpected delete')};
@@ -84,7 +87,7 @@ async function fullApp(){
  localStorage.setItem('changepointActorName','テスト担当者');`;
  const module=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/import\s*\{[\s\S]*?\}\s*from\s*'[^']+';/g,'');
  const fixture=html.replace(/<script src="[^"]+"><\/script>/g,'').replace(/<script type="module">[\s\S]*?<\/script>/,`<script type="module">${mock}${module}\nawait initApp();document.getElementById('authGate').style.display='none';showScreen('planned');window.__ticket=renderChangeTicket;window.__ready=true;</script>`);
- const b=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+ const b=await (engine==='webkit'?webkit.launch({headless:true}):chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'}));
  try{const p=await b.newPage({viewport:{width:390,height:900}}),errors=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.type()==='confirm'?d.accept():d.dismiss());await p.route('**/*',r=>r.fulfill({contentType:'text/html',body:fixture}));await p.goto('http://127.0.0.1/full');await p.waitForFunction(()=>window.__ready);
   await p.locator('#planType').selectOption('sudden');assert(await p.locator('#planChecklistPreview').isVisible());assert.equal(await p.locator('#planChecklistPreview .checklist-row').count(),4);assert(!(await p.locator('#planCustomCheckText').isVisible()));
   await p.locator('#planDepartment').selectOption('品質');await p.locator('#planDepartmentOccur').selectOption('製造');await p.locator('#planLineName').fill('94-300');await p.locator('#planProcessName').fill('溶接');await p.locator('#planContent').fill('センサー交換');await p.locator('#planDate').fill('2026-10-12');await p.locator('#btnRegisterPlanned').click();await p.locator('#btnConfirmOk').click();await p.locator('#registrationPrintDialog').waitFor();
@@ -93,7 +96,7 @@ async function fullApp(){
   const legacy={_id:'old',type:'sudden',relatedAnomalyId:'abn',category:'設備',department:'製造',content:'センサー交換',lineName:'94-300',serialNo:'7089',occurrenceDate:'2026-10-12'};
   await p.evaluate(x=>{window.__latest=x;window.showDetail(x)},legacy);await p.getByText('センサーが反応しない',{exact:true}).waitFor();assert.equal(await p.getByRole('button',{name:'事後チェックを開始する'}).count(),0);await p.locator('#postCategory').waitFor();assert.equal(await p.locator('#postDepartment').inputValue(),'');assert.equal(await p.evaluate(()=>window.__latest.workflowKind),undefined);
   const ticket=await p.evaluate(()=>window.__ticket(window.__latest,'原本','発信部署'));assert(ticket.includes('安全面に問題が無いか'));assert(!ticket.includes('関係部署確認'));assert(!ticket.includes('発生部署 承認者'));assert(!ticket.includes('data-card-qr'));assert(!ticket.includes('QR'));assert(ticket.includes('対応部署 承認'));assert(!ticket.includes('チェック項目なし'));
-  await p.locator('#postDate').fill('2026-10-12');await p.locator('#postTime').fill('10:00');for(const id of ['post_safety','post_products','post_workability'])await p.locator('#'+id).selectOption('ok');await p.locator('#postTemporary').selectOption('no');await p.locator('#postDepartment').selectOption('製造');await p.getByRole('button',{name:'確認完了・承認依頼'}).click();await p.getByRole('button',{name:'承認して完了する'}).waitFor();assert.equal(await p.evaluate(()=>window.__latest.workflowKind),'unplanned_response_v2');assert.equal(await p.evaluate(()=>window.__latest.responseDepartment),'製造');
+  await p.locator('#postDate').fill('2026-10-12');await p.locator('#postTime').fill('10:00');for(const id of ['post_safety','post_products','post_workability'])await p.locator('#'+id).check();await p.locator('#postTemporary').selectOption('no');await p.locator('#postDepartment').selectOption('製造');await p.getByRole('button',{name:'確認完了・承認依頼'}).click();await p.getByRole('button',{name:'承認して完了する'}).waitFor();assert.equal(await p.evaluate(()=>window.__latest.workflowKind),'unplanned_response_v2');assert.equal(await p.evaluate(()=>window.__latest.responseDepartment),'製造');
   const preview=await b.newPage();await preview.setContent('<style>'+html.match(/<style>([\s\S]*?)<\/style>/)[1]+'</style><div class="issued-card-preview" style="width:510px">'+ticket+'</div>');await preview.screenshot({path:path.join(__dirname,'outputs/unplanned-test/card-no-qr.png')});assert.equal(await preview.locator('.sign > div').count(),1);assert.equal(await preview.locator('.card-qrs').count(),0);await preview.close();
   const printResult=await p.evaluate(async x=>{const original=window.open;window.open=()=>({closed:false,document:{body:{},open(){},write(h){window.__printed=h},close(){}}});try{return await window.printChangeCard(x)}finally{window.open=original}},legacy);assert(printResult);const printed=await p.evaluate(()=>window.__printed);assert(!printed.includes('data-card-qr'));assert.equal((printed.match(/<td>安全面に問題が無いか/g)||[]).length,2);
   const plannedTicket=await p.evaluate(()=>window.__ticket({type:'planned',category:'設備'},'原本','発信部署'));assert.equal((plannedTicket.match(/data-card-qr=/g)||[]).length,2);
@@ -122,7 +125,18 @@ async function fullApp(){
   console.log('PASS card checkboxes: blank/OK/NG/NA, legacy checked state, escaped label, read-only, 320px layout and printed original/copy in Chromium/WebKit.');
   await p.screenshot({path:path.join(__dirname,'outputs/unplanned-test/related-anomaly-mobile.png')});
   await p.evaluate(()=>window.showDetail({_id:'planned',type:'planned',workflowManaged:true,category:'設備',approvalStatus:'draft',checklistItems:[],department:'製造',planneddepartment:'品質'}));assert.equal(await p.locator('.workflow-stamp').count(),4);assert(await p.getByRole('button',{name:'承認スタンプを押す',exact:true}).isVisible());assert.equal(await p.locator('#relatedAnomalyHost').count(),0);assert.deepEqual(errors,[]);
-  console.log('PASS full application: init, planned master checklist, unplanned registration without 5M, four check persistence, related anomaly detail, legacy opt-in migration, print and planned four-stamp regression.');
+  const plannedCheck={_id:'planned-checkbox',type:'planned',workflowManaged:true,category:'人',approvalStatus:'sender_approved',department:'製造',planneddepartment:'品質',checklistItems:[{key:'a',label:'安全面を確認',criteria:'安全に作業できること',receiverResult:''},{key:'b',label:'変化点前後の物を確認',receiverResult:'ng'},{key:'c',label:'作業性を確認',receiverResult:'na'},{key:'d',label:'旧データの確認',receiverChecked:true}]};
+  await p.evaluate(x=>{window.__latest=x;window.showDetail(x)},plannedCheck);
+  const check=key=>p.locator(`[data-check-key="${key}"] input[type="checkbox"]`);
+  assert(await check('d').isChecked());assert(!(await check('c').isChecked()));assert.equal(await p.locator('[data-check-key="c"] summary').textContent(),'該当なし');
+  for(const width of [320,390,768,1440]){await p.setViewportSize({width,height:1000});assert.deepEqual(await p.locator('.tap-check-row').evaluateAll(rows=>rows.filter(r=>r.getBoundingClientRect().right>innerWidth+1).map(r=>r.dataset.checkKey)),[]);await p.screenshot({path:path.join(__dirname,`outputs/unplanned-test/planned-checkbox-${engine}-${width}.png`)});}
+  await p.locator('[data-check-key="a"] .tap-check-label').click();await p.waitForFunction(()=>window.__latest.checklistItems[0].receiverResult==='ok');assert(await check('a').isChecked());
+  await check('a').uncheck();await p.waitForFunction(()=>window.__latest.checklistItems[0].receiverResult==='');
+  await check('b').check();await p.waitForFunction(()=>window.__latest.checklistItems[1].receiverResult==='ok');
+  await p.locator('[data-check-key="b"] summary').click();await p.locator('[data-check-key="b"] select').selectOption('ng');await p.waitForFunction(()=>window.__latest.checklistItems[1].receiverResult==='ng');assert(!(await check('b').isChecked()));
+  await p.evaluate(()=>window.showDetail(window.__latest));assert.equal(await p.locator('[data-check-key="b"] summary').textContent(),'NG');
+  await p.evaluate(()=>window.showDetail({...window.__latest,approvalStatus:'approved'}));assert(await check('a').isDisabled());assert(await p.locator('[data-check-key="a"] select').isDisabled());assert.deepEqual(errors,[]);
+  console.log(`PASS ${engine} full application: init, planned/unplanned checkbox tap and label toggle, saved NG/NA/legacy, closed lock, responsive layout, unplanned migration, print and four-stamp regression.`);
  }finally{await b.close();}
 }
-unit().then(browser).then(fullApp).catch(e=>{console.error(e);process.exitCode=1});
+unit().then(browser).then(()=>fullApp('chromium')).then(()=>fullApp('webkit')).catch(e=>{console.error(e);process.exitCode=1});

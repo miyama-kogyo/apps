@@ -874,6 +874,16 @@
     .responder-checks [data-result="ok"] { background:#e6f4eb; color:#1c643e; border-color:#8abc9e; }
     .responder-checks [data-result="ng"] { background:#fff0ed; color:#a52e25; border-color:#d79892; }
     .responder-checks [data-result="na"] { background:#edf1f4; color:#4d5d68; }
+    .checklist-row.tap-check-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:start; }
+    .tap-check-row .tap-check-label { display:flex; align-items:flex-start; gap:10px; min-height:44px; min-width:0; padding:10px 0; margin:0; cursor:pointer; }
+    .tap-check-label>span { min-width:0; overflow-wrap:anywhere; line-height:1.5; }
+    .tap-check-label input[type="checkbox"] { width:24px; height:24px; min-width:24px; flex:0 0 24px; margin:0; padding:0; accent-color:#176343; }
+    .tap-check-label small { display:block; font-weight:400; color:#596960; margin-top:3px; }
+    .tap-check-label:has(input:disabled) { cursor:default; }
+    .check-options { max-width:100px; font-size:12px; }
+    .check-options summary { min-height:44px; padding:12px 4px; cursor:pointer; }
+    .check-options select { width:100%; min-width:0; margin:0; padding:6px 2px; font-size:12px; }
+    .check-options[data-result="ng"] { color:#a52e25; }
     @media(max-width:700px){
       .workflow-stamps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 8px; }
       .stamp-seal { width:94px; min-height:94px; margin:5px auto; padding:10px 5px; }
@@ -3329,6 +3339,19 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         return {...latest,_id:id,...fields,responseApprovedAt:new Date(),completedAt:new Date()};
       });
     }
+    function renderWorkflowCheck(item, disabled, role = ''){
+      const result=item.receiverResult || '';
+      return `<div class="checklist-row tap-check-row" data-check-key="${escapeAttr(item.key)}" data-check-role="${escapeAttr(role)}"><label class="tap-check-label"><input type="checkbox" ${role ? '' : `id="${escapeAttr(item.key)}"`} data-result="${escapeAttr(result)}" ${result==='ok'?'checked':''} ${disabled?'disabled':''} onchange="setWorkflowCheck(this,this.checked?'ok':'')" aria-label="${escapeAttr(item.label || '確認項目')}"><span>${escapeHtml(item.label || '')}${item.criteria?`<small>合格基準：${escapeHtml(item.criteria)}</small>`:''}</span></label><details class="check-options" data-result="${escapeAttr(result)}"><summary>${result==='ng'?'NG':result==='na'?'該当なし':'その他'}</summary><select aria-label="${escapeAttr(item.label || '確認項目')}の補助判定" ${disabled?'disabled':''} onchange="setWorkflowCheck(this,this.value)"><option value="">未確認</option><option value="ng" ${result==='ng'?'selected':''}>NG</option>${role?`<option value="na" ${result==='na'?'selected':''}>該当なし</option>`:''}</select></details></div>`;
+    }
+    window.setWorkflowCheck=function(control,result){
+      const row=control.closest('[data-check-key]'),check=row.querySelector('input[type="checkbox"]');
+      if(check.disabled)return;
+      check.checked=result==='ok';check.dataset.result=result;
+      const options=row.querySelector('.check-options');
+      options.dataset.result=result;options.querySelector('summary').textContent=result==='ng'?'NG':result==='na'?'該当なし':'その他';
+      options.querySelector('select').value=['ng','na'].includes(result)?result:'';options.open=false;
+      if(row.dataset.checkRole) return window.setApprovalResult(row.dataset.checkKey,row.dataset.checkRole,result);
+    };
     const unplannedSaves=new Set();
     function renderUnplannedWorkflow(item,box){
       const editable=canEditUnplanned(item);
@@ -3339,9 +3362,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         <section class="workflow-checks"><div class="checks-heading"><h4>計画外変化点の事後チェック</h4><span>${escapeHtml(boardStatus(item))}</span></div>
           <div class="form-group"><label for="postCategory">5M分類</label><select id="postCategory" ${disabled}><option value="">選択</option>${CHANGE_CATEGORIES.map(x=>`<option ${item.category===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div>
           <div class="actual-switch-fields"><div><label for="postDate">実際の切替日</label><input id="postDate" type="date" value="${escapeAttr(item.actualSwitchDate || '')}" ${disabled}></div><div><label for="postTime">切替時刻</label><input id="postTime" type="time" value="${escapeAttr(item.actualSwitchTime || '')}" ${disabled}></div></div>
-          <div class="checklist-panel">${unplannedChecklist(item).slice(0,3).map(x=>`<div class="checklist-row"><label class="check-label" for="${x.key}">${escapeHtml(x.label)}</label><select id="${x.key}" ${disabled}><option value="">未判定</option><option value="ok" ${x.receiverResult==='ok'?'selected':''}>確認済</option><option value="ng" ${x.receiverResult==='ng'?'selected':''}>NG</option></select></div>`).join('')}
+          <div class="checklist-panel">${unplannedChecklist(item).slice(0,3).map(x=>renderWorkflowCheck(x,!editable)).join('')}
           <div class="form-group" style="padding:12px"><label for="postTemporary">暫定の場合、暫定期間は明確になっているか</label><select id="postTemporary" ${disabled}><option value="">暫定対応の有無を選択</option><option value="no" ${item.temporaryChange===false?'selected':''}>暫定ではない（該当なし）</option><option value="yes" ${item.temporaryChange===true?'selected':''}>暫定対応</option></select>
-          <div id="postTemporaryFields" ${item.temporaryChange===true?'':'hidden'}><label for="postUntil">暫定期限</label><input id="postUntil" type="date" value="${escapeAttr(item.temporaryUntil || '')}" ${disabled}><label for="post_temporary">期間の確認</label><select id="post_temporary" ${disabled}><option value="">未判定</option><option value="ok" ${unplannedChecklist(item)[3].receiverResult==='ok'?'selected':''}>確認済</option><option value="ng" ${unplannedChecklist(item)[3].receiverResult==='ng'?'selected':''}>NG</option></select></div></div></div>
+          <div id="postTemporaryFields" ${item.temporaryChange===true?'':'hidden'}><label for="postUntil">暫定期限</label><input id="postUntil" type="date" value="${escapeAttr(item.temporaryUntil || '')}" ${disabled}>${renderWorkflowCheck({...unplannedChecklist(item)[3],label:'期間の確認',criteria:''},!editable)}</div></div></div>
           <div class="form-group"><label for="postComment">所見コメント・判断結果</label><textarea id="postComment" maxlength="4000" ${disabled}>${escapeHtml(item.workflowComment || '')}</textarea></div>
           <div class="form-group"><label for="postDepartment">対応部署</label><select id="postDepartment" ${disabled}><option value="">選択</option>${[...new Set([...masterDepartments,item.responseDepartment].filter(Boolean))].map(x=>`<option ${item.responseDepartment===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div>
         </section>
@@ -3352,7 +3375,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       box.querySelector('#unplannedCheckForm').onsubmit=e=>e.preventDefault();
       box.querySelector('#postTemporary').onchange=e=>{box.querySelector('#postTemporaryFields').hidden=e.target.value!=='yes';};
       const updateDepartment=()=>{
-        const done=['post_safety','post_products','post_workability'].every(id=>box.querySelector('#'+id).value==='ok') && (box.querySelector('#postTemporary').value==='no' || (box.querySelector('#postTemporary').value==='yes' && box.querySelector('#postUntil').value && box.querySelector('#post_temporary').value==='ok'));
+        const done=['post_safety','post_products','post_workability'].every(id=>box.querySelector('#'+id).checked) && (box.querySelector('#postTemporary').value==='no' || (box.querySelector('#postTemporary').value==='yes' && box.querySelector('#postUntil').value && box.querySelector('#post_temporary').checked));
         box.querySelector('#postDepartment').disabled=!editable || !done;
       };
       box.querySelector('#unplannedCheckForm').addEventListener('change',updateDepartment);
@@ -3361,7 +3384,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.saveUnplannedForm=async function(submit){
       const item=currentDetailItem;if(!item || unplannedSaves.has(item._id))return;
       const v=id=>document.getElementById(id)?.value || '';
-      const data={category:v('postCategory'),responseDepartment:v('postDepartment'),actualSwitchDate:v('postDate'),actualSwitchTime:v('postTime'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:v('post_'+key)}))};
+      const data={category:v('postCategory'),responseDepartment:v('postDepartment'),actualSwitchDate:v('postDate'),actualSwitchTime:v('postTime'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:document.getElementById('post_'+key)?.dataset.result || ''}))};
       const who=v('postActor').trim();
       if(submit){try{validateUnplannedCheck(data);}catch(e){alert(e.message);return;}}
       if(!who){alert('氏名を入力してください。');return;}
@@ -3419,7 +3442,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!list.length) return '<div class="checklist-empty">対象のチェック項目はありません</div>';
       return list.map(item => {
         const result = checklistResult(item, role);
-        return `<div class="checklist-row"><span class="check-label">${escapeHtml(item.label || '')}${item.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(item.criteria)}</small>` : ''}</span><span class="checklist-source">${item.source === 'custom' ? '任意' : 'マスタ'}</span><select class="check-result-select" data-result="${escapeAttr(result)}" aria-label="${escapeAttr(item.label || 'チェック項目')}の判定" ${disabled ? 'disabled' : ''} onchange="setApprovalResult('${escapeAttr(item.key)}','${role}',this.value)"><option value="" ${!result ? 'selected' : ''}>未判定</option><option value="ok" ${result === 'ok' ? 'selected' : ''}>合格</option><option value="ng" ${result === 'ng' ? 'selected' : ''}>NG</option><option value="na" ${result === 'na' ? 'selected' : ''}>該当なし</option></select>${approvalStatusOf(currentDetailItem) === 'draft' ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : ''}</div>`;
+        const row=renderWorkflowCheck({...item,receiverResult:result},disabled,role);
+        return row + (approvalStatusOf(currentDetailItem) === 'draft' ? `<button type="button" class="check-exclude-btn" onclick="excludeApprovalItem('${escapeAttr(item.key)}')">対象外</button>` : '');
       }).join('');
     }
 
@@ -3441,6 +3465,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
     }
     function readStampName(requireSavedComment = true){
+      if(window.setApprovalResult?.pending?.has(currentDetailItem?._id)){
+        workflowNotice('チェック結果を保存中です。保存後にスタンプを押してください。','comment');
+        return '';
+      }
       if (requireSavedComment && currentDetailItem?._id && (workflowCommentSaves.has(currentDetailItem._id) ||
           (workflowCommentDrafts.has(currentDetailItem._id) && workflowCommentDrafts.get(currentDetailItem._id).trim() !== (currentDetailItem.workflowComment || '').trim()))){
         workflowNotice('所見コメントを保存してからスタンプを押してください。','comment');
@@ -3595,13 +3623,30 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
 
     window.setApprovalResult = async function(key, role, result){
       if (role !== 'receiver' || !['sender_approved','receiver_confirmed'].includes(approvalStatusOf(currentDetailItem))) return;
-      const items = getRecordChecklist(currentDetailItem);
-      const item = items.find(x => x.key === key);
-      if (!item || !['','ok','ng','na'].includes(result)) return;
-      item.receiverResult = result;
-      item.receiverChecked = ['ok','na'].includes(result);
-      try{ await saveChecklist(items); }
-      catch(e){ console.error(e); alert('判定の保存に失敗しました'); renderApprovalWorkflow(currentDetailItem); }
+      if (!getRecordChecklist(currentDetailItem).some(x=>x.key===key) || !['','ok','ng','na'].includes(result)) return;
+      const id=currentDetailItem._id;
+      const pending=window.setApprovalResult.pending ||= new Map();
+      // Serialize rapid taps while merging only this judgment into the latest record.
+      const operation=(pending.get(id) || Promise.resolve()).then(async()=>{
+        const saved=await runTransaction(db,async tx=>{
+          const ref=doc(db,'changepoints',id),snapshot=await tx.get(ref);
+          if(!snapshot.exists())throw new Error('対象が見つかりません。');
+          const latest=snapshot.data();
+          if(latest.type==='sudden' || !['sender_approved','receiver_confirmed'].includes(approvalStatusOf(latest)) || boardCompleted(latest) || boardCanceled(latest))throw new Error('状態が変更されています。開き直してください。');
+          const items=getRecordChecklist(latest).map(x=>({...x})),item=items.find(x=>x.key===key);
+          if(!item)throw new Error('チェック項目が変更されています。');
+          item.receiverResult=result;item.receiverChecked=['ok','na'].includes(result);
+          tx.update(ref,{checklistItems:items,updatedAt:serverTimestamp()});
+          return {...latest,_id:id,checklistItems:items};
+        });
+        if(currentDetailItem?._id===id)currentDetailItem=saved;
+      }).catch(e=>{console.error(e);alert('判定の保存に失敗しました：'+e.message);});
+      pending.set(id,operation);
+      await operation;
+      if(pending.get(id)===operation){
+        pending.delete(id);
+        if(currentDetailItem?._id===id)renderApprovalWorkflow(currentDetailItem);
+      }
     };
 
     window.toggleApprovalCheck = async function(key, role, checked){
