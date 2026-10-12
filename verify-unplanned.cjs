@@ -56,6 +56,7 @@ async function browser(){
   try{const page=await b.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.type()==='confirm'?d.accept():d.dismiss());
    await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:fixture}));await page.goto('http://127.0.0.1/fixture');
    for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});assert.equal(await page.locator('#postCategory').count(),1);const overflow=await page.locator('#unplannedCheckForm').evaluate(el=>[el,...el.querySelectorAll('input,select,textarea')].filter(x=>x.getBoundingClientRect().width && x.getBoundingClientRect().right>innerWidth+1).map(x=>x.id));assert.deepEqual(overflow,[]);await page.screenshot({path:path.join(out,`${engine}-${width}.png`)});}
+   assert(await page.locator('.tap-check-label').first().evaluate(label=>label.querySelector('input').getBoundingClientRect().left>=label.querySelector('span').getBoundingClientRect().right));
    await page.setViewportSize({width:390,height:900});
    assert(await page.locator('#postDepartment').isDisabled());
    await page.locator('#postCategory').selectOption('設備');await page.locator('#postDate').fill('2026-10-12');await page.locator('#postTime').fill('09:15');await page.locator('#postActor').fill('担当者');
@@ -130,6 +131,7 @@ async function fullApp(engine='chromium'){
   const check=key=>p.locator(`[data-check-key="${key}"] input[type="checkbox"]`);
   assert(await check('d').isChecked());assert(!(await check('c').isChecked()));assert.equal(await p.locator('[data-check-key="c"] summary').textContent(),'該当なし');
   for(const width of [320,390,768,1440]){await p.setViewportSize({width,height:1000});assert.deepEqual(await p.locator('.tap-check-row').evaluateAll(rows=>rows.filter(r=>r.getBoundingClientRect().right>innerWidth+1).map(r=>r.dataset.checkKey)),[]);await p.screenshot({path:path.join(__dirname,`outputs/unplanned-test/planned-checkbox-${engine}-${width}.png`)});}
+  assert(await p.locator('[data-check-key="a"] .tap-check-label').evaluate(label=>label.querySelector('input').getBoundingClientRect().left>=label.querySelector('span').getBoundingClientRect().right));
   await p.locator('[data-check-key="a"] .tap-check-label').click();await p.waitForFunction(()=>window.__latest.checklistItems[0].receiverResult==='ok');assert(await check('a').isChecked());
   await check('a').uncheck();await p.waitForFunction(()=>window.__latest.checklistItems[0].receiverResult==='');
   await check('b').check();await p.waitForFunction(()=>window.__latest.checklistItems[1].receiverResult==='ok');
