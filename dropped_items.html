@@ -12,7 +12,7 @@
     :root{
       --bg:#f4f5f6;--surface:#fff;--ink:#202428;--muted:#6d757b;--line:#dfe3e6;
       --brand:#4b5359;--brand-dark:#30363b;--accent:#a4abb0;--danger:#ae4b47;
-      --work:#657782;--equipment:#7d7484;--other:#858c91;--shadow:0 4px 16px rgba(32,36,40,.07);
+      --work:#b18b46;--equipment:#527f98;--other:#8b9298;--shadow:0 4px 16px rgba(32,36,40,.07);
     }
     *{box-sizing:border-box}
     html{background:var(--bg)}
@@ -298,10 +298,10 @@
     #page-dashboard.review-only .dept-column-head>span:nth-child(3),
     #page-dashboard.review-only .dept-row>span:nth-child(3){display:none}
     #page-dashboard.review-only .dept-row,
-    #page-dashboard.review-only .dept-column-head{grid-template-columns:80px 70px minmax(0,1fr)}
+    #page-dashboard.review-only .dept-column-head{grid-template-columns:80px 120px minmax(0,1fr)}
     @media(max-width:760px){
       #page-dashboard.review-only .dept-row,
-      #page-dashboard.review-only .dept-column-head{grid-template-columns:minmax(0,1fr) 66px}
+      #page-dashboard.review-only .dept-column-head{grid-template-columns:minmax(0,1fr) 130px}
     }
     .dept-detail-trigger{border:0;background:transparent;color:inherit;text-align:left;font:inherit;font-weight:800;padding:8px 0;cursor:pointer}
     .serial-preview{position:fixed;z-index:1000;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;background:#fff;border:1px solid #b9c1c6;border-radius:8px;box-shadow:0 12px 40px #0003;padding:18px}
@@ -313,8 +313,6 @@
     .serial-preview-chart{height:205px;position:relative}
     .comment-bubbles{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
     .comment-bubble{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;min-height:76px;max-width:100%;padding:16px;background:#e4edf2;border:1px solid #b6cbd7;border-radius:50%;font-size:14px;text-align:center;overflow-wrap:anywhere}
-    .comment-bubble:nth-child(3n+2){background:#f3eedf;border-color:#d8cba5}
-    .comment-bubble:nth-child(3n){background:#e9ebec;border-color:#c9ced1}
     .preview-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
     .preview-photos img{display:block;width:100%;height:120px;object-fit:contain;background:#f2f3f4}
     .serial-preview-empty{font-size:14px;color:#667078;padding:10px 0}
@@ -354,7 +352,7 @@
     #page-dashboard.morning-layout .dept-list{height:auto;max-height:none;overflow:visible}
     #page-dashboard.morning-layout .serial-breakdown{gap:10px;align-items:flex-start}
     @media(min-width:761px){
-      #page-dashboard.morning-layout .dept-name{font-size:22px}
+      #page-dashboard.morning-layout .dept-name{font-size:34px}
       #page-dashboard.morning-layout .dept-number{font-size:28px}
       #page-dashboard.morning-layout .dept-row{padding-top:16px;padding-bottom:16px}
       #page-dashboard.morning-layout .serial-chip-item{font-size:16px}
@@ -368,12 +366,17 @@
     .product-comment-summary{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;border-top:1px solid #dce1e4;padding-top:8px;min-width:0}
     .product-comment-heading{width:100%;font-size:11px;font-weight:500;color:#657079;text-align:left}
     .product-comment-bubble{display:flex;align-items:center;gap:7px;max-width:100%;min-width:0;min-height:40px;padding:9px 12px;border-radius:24px;background:#e4edf2;border:1px solid #b6cbd7;color:#263d4a;font-size:14px;line-height:1.45;font-weight:500;text-align:left}
-    .product-comment-bubble:nth-of-type(3n){background:#f3eedf;border-color:#d8cba5;color:#554923}
-    .product-comment-bubble:nth-of-type(3n+1){background:#e9ebec;border-color:#c9ced1;color:#414a50}
+    .comment-bubble.cause-equipment,.product-comment-bubble.cause-equipment{background:#e4edf2;border-color:var(--equipment);color:#263d4a}
+    .comment-bubble.cause-work,.product-comment-bubble.cause-work{background:#f3eedf;border-color:var(--work);color:#554923}
+    .comment-bubble.cause-other,.product-comment-bubble.cause-other{background:#e9ebec;border-color:var(--other);color:#414a50}
     .product-comment-text{min-width:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
     .product-comment-bubble strong{white-space:nowrap;font-size:12px;flex-shrink:0}
     .product-comment-more{width:100%;font-size:12px;color:#657079;text-align:right}
     @media(max-width:760px){#page-dashboard.morning-layout .serial-chip-with-comments{width:100%}#page-dashboard.morning-layout .serial-chip-product.serial-chip-with-comments{grid-template-columns:80px minmax(0,1fr)}}
+    #page-dashboard .dept-name{font-size:28px;line-height:1.25}
+    #page-dashboard .dept-number.dept-total{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;gap:3px;font-size:14px}
+    #page-dashboard .dept-total-value{font-size:24px;overflow-wrap:anywhere;min-width:0}
+    @media(min-width:761px){#page-dashboard.morning-layout .dept-total-value{font-size:28px}}
   </style>
 </head>
 <body>
@@ -1349,10 +1352,10 @@
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
           const product=productFor(name),url=safeUrl(product?.photo?.url);
           const comments=!isToday?commentCounts(todayRows.filter(row=>row.department===dept && row.serialNo===name)):[];
-          const bubbles=comments.length?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.slice(0,3).map(([comment,total])=>`<span class="product-comment-bubble" style="min-height:${40+12*Math.sqrt(total/comments[0][1])}px" title="${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${total}件</strong></span>`).join('')}${comments.length>3?`<span class="product-comment-more">ほか${comments.length-3}種類</span>`:''}</span>`:'';
+          const bubbles=comments.length?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.slice(0,3).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" style="min-height:${40+12*Math.sqrt(total/comments[0][1])}px" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join('')}${comments.length>3?`<span class="product-comment-more">ほか${comments.length-3}種類</span>`:''}</span>`:'';
           return `<button type="button" class="serial-chip serial-chip-item${url?' serial-chip-product':''}${comments.length?' serial-chip-with-comments':''}" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${url?'× ':''}${count.toLocaleString('ja-JP')}個</span>${bubbles}</button>`;
         }).join('');
-        return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number">${todayByDept[dept]||0}<small>${shortDateLabel(todayKey)}</small></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
+        return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個</span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
       document.querySelectorAll('#departmentList .dept-row').forEach(row => row.addEventListener('click', event => {
@@ -1369,8 +1372,13 @@
 
     function commentCounts(rows){
       const comments=new Map();
-      rows.forEach(row=>{const text=String(row.comment||'').trim();if(text)comments.set(text,(comments.get(text)||0)+1);});
-      return [...comments].sort((a,b)=>b[1]-a[1]);
+      rows.forEach(row=>{
+        const text=String(row.comment||'').trim();if(!text)return;
+        const cause=['設備','作業','その他'].includes(row.cause)?row.cause:'その他';
+        const key=JSON.stringify([cause,text]),entry=comments.get(key);
+        if(entry)entry[1]++;else comments.set(key,[text,1,cause]);
+      });
+      return [...comments.values()].sort((a,b)=>b[1]-a[1]);
     }
     let serialPreviewAnchor;
     function closeSerialPreview(restoreFocus=false){
@@ -1395,7 +1403,7 @@
       const totals=causes.map(cause=>sumQty(rows.filter(row=>(causes.includes(row.cause)?row.cause:'その他')===cause)));
       const comments=commentCounts(rows);
       const max=comments[0]?.[1]||1;
-      $('serialCommentBubbles').innerHTML=comments.length ? comments.map(([comment,count])=>`<div class="comment-bubble" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
+      $('serialCommentBubbles').innerHTML=comments.length ? comments.map(([comment,count,cause])=>`<div class="comment-bubble ${causeClass(cause)}" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${esc(cause)}・${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
       const photos=rows.flatMap(row=>Array.isArray(row.media)?row.media:[]).filter(file=>file.type!=='video' && safeUrl(file.url));
       $('serialPreviewPhotos').innerHTML=photos.length ? photos.map(file=>`<a href="${esc(safeUrl(file.url))}" target="_blank" rel="noopener"><img src="${esc(safeUrl(file.url))}" alt="${esc(anchor.dataset.previewSerial)}の状況写真" loading="lazy"></a>`).join('') : '<p class="serial-preview-empty">写真はありません</p>';
       preview.hidden=false;
