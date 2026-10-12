@@ -377,6 +377,16 @@
     #page-dashboard .dept-number.dept-total{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;gap:3px;font-size:14px}
     #page-dashboard .dept-total-value{font-size:24px;overflow-wrap:anywhere;min-width:0}
     @media(min-width:761px){#page-dashboard.morning-layout .dept-total-value{font-size:28px}}
+    #page-dashboard .serial-chip-item.product-summary-card{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:48px 96px;align-content:start;gap:8px;flex:0 0 auto;width:260px;max-width:100%;height:182px;padding:10px;background:#fff;text-align:left;white-space:normal;border-radius:6px;overflow:hidden}
+    #page-dashboard.morning-layout .serial-chip-item.product-summary-card{height:416px;grid-template-rows:48px 96px minmax(0,1fr)}
+    .product-card-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:22px;line-height:24px;font-weight:800;color:#202428}
+    .product-card-media{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;align-items:center;min-width:0}
+    .product-card-media .product-thumb,.product-card-no-photo{display:flex;align-items:center;justify-content:center;width:104px;height:96px;object-fit:contain;background:#f2f3f4}
+    .product-card-no-photo{font-size:13px;font-weight:500;color:#657079}
+    .product-card-quantity{font-size:24px;font-weight:800;overflow-wrap:anywhere;color:#202428}
+    .product-summary-card .product-comment-summary{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:6px;grid-column:1;overflow:hidden}
+    .product-summary-card .product-comment-bubble{width:100%;height:52px;padding:6px 10px}
+    .product-card-no-comment{font-size:13px;font-weight:500;color:#657079}
   </style>
 </head>
 <body>
@@ -1352,8 +1362,8 @@
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
           const product=productFor(name),url=safeUrl(product?.photo?.url);
           const comments=!isToday?commentCounts(todayRows.filter(row=>row.department===dept && row.serialNo===name)):[];
-          const bubbles=comments.length?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.slice(0,3).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" style="min-height:${40+12*Math.sqrt(total/comments[0][1])}px" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join('')}${comments.length>3?`<span class="product-comment-more">ほか${comments.length-3}種類</span>`:''}</span>`:'';
-          return `<button type="button" class="serial-chip serial-chip-item${url?' serial-chip-product':''}${comments.length?' serial-chip-with-comments':''}" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:''}<span class="serial-chip-name">${esc(name)}</span><span class="serial-chip-count">${url?'× ':''}${count.toLocaleString('ja-JP')}個</span>${bubbles}</button>`;
+          const bubbles=!isToday?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.length?comments.slice(0,3).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join(''):'<span class="product-card-no-comment">コメントなし</span>'}${comments.length>3?`<span class="product-comment-more">ほか${comments.length-3}種類</span>`:''}</span>`:'';
+          return `<button type="button" class="serial-chip serial-chip-item product-summary-card" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="product-card-title" title="${esc(name)}">${esc(name)}</span><span class="product-card-media">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:'<span class="product-card-no-photo">写真未登録</span>'}<span class="product-card-quantity">× ${count.toLocaleString('ja-JP')}個</span></span>${bubbles}</button>`;
         }).join('');
         return `<div class="dept-row"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個</span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
