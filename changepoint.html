@@ -1040,7 +1040,7 @@
         <div class="board-filter"><label for="topicsDeptFilter">発生部署</label><select id="topicsDeptFilter"><option value="">すべての部署</option></select></div>
         <div class="board-filter"><label for="boardLineFilter">発生ライン</label><select id="boardLineFilter"><option value="">すべてのライン</option></select></div>
         <div class="board-filter"><label for="boardCategoryFilter">分類</label><select id="boardCategoryFilter"><option value="">すべての分類</option><option>人</option><option>設備</option><option>材料</option><option>方法</option><option>金型</option></select></div>
-        <div class="board-filter"><label for="boardTypeFilter">区分</label><select id="boardTypeFilter"><option value="">計画・突発</option><option value="planned">計画</option><option value="sudden">突発</option></select></div>
+        <div class="board-filter"><label for="boardTypeFilter">区分</label><select id="boardTypeFilter"><option value="">計画・計画外</option><option value="planned">計画</option><option value="sudden">計画外</option></select></div>
         <div class="board-filter board-search"><label for="boardSearch">整理No.・内容</label><input type="search" id="boardSearch" placeholder="検索" autocomplete="off"></div>
         <label class="board-open-filter"><input type="checkbox" id="boardOpenOnly">未完了のみ</label>
         <button type="button" id="boardReset" class="board-reset">条件を解除</button>
@@ -1115,7 +1115,7 @@
             <select id="filterType">
               <option value="all">すべて</option>
               <option value="anomaly">異常のみ</option>
-              <option value="sudden">突発変化点のみ</option>
+              <option value="sudden">計画外変化点のみ</option>
               <option value="planned">計画変化点のみ</option>
             </select>
           </div>
@@ -1139,7 +1139,7 @@
       <div class="stats-row">
         <div class="stat-card"><div class="number" id="statTotal">0</div><div class="label">総件数</div></div>
         <div class="stat-card anomaly"><div class="number" id="statAnomaly">0</div><div class="label">異常</div></div>
-        <div class="stat-card sudden"><div class="number" id="statSudden">0</div><div class="label">突発変化点</div></div>
+        <div class="stat-card sudden"><div class="number" id="statSudden">0</div><div class="label">計画外変化点</div></div>
         <div class="stat-card planned"><div class="number" id="statPlanned">0</div><div class="label">計画変化点</div></div>
       </div>
 
@@ -1195,7 +1195,7 @@
     <div class="container" style="max-width:1400px;">
       <div class="card">
         <h2 style="margin-bottom:10px;color:#333;">変化点カードの登録</h2>
-        <div class="workflow-rule-box">変化点が判明したら発信部署が速やかに登録します。事前に内容と実施日が分かる場合は「計画」、それ以外は「突発」です。登録日は起票日として自動記録されます。</div>
+        <div class="workflow-rule-box">変化点が判明したら発信部署が速やかに登録します。事前に内容と実施日が分かる場合は「計画」、それ以外は「計画外」です。登録日は起票日として自動記録されます。</div>
 
         <form id="plannedForm">
           <div class="form-row">
@@ -1203,7 +1203,7 @@
               <label>計画区分<span class="required">*</span></label>
               <select id="planType" required>
                 <option value="planned">計画</option>
-                <option value="sudden">突発</option>
+                <option value="sudden">計画外</option>
               </select>
             </div>
             <div class="form-group">
@@ -1253,7 +1253,7 @@
               <label>実施予定日・実施日</label>
               <input type="date" id="planDate">
               <label><input type="checkbox" id="planDateUndecided"> 切替え日未確定</label>
-              <div class="hint">計画は予定日、突発は実施日を入力</div>
+              <div class="hint">計画は予定日、計画外は実施日を入力</div>
             </div>
           </div>
 
@@ -1881,7 +1881,7 @@
           margin-bottom:8px;
         ">📅 ${esc(labelKey)}</div>`;
         html += buildSection(items.anomaly,  '#e53935', '⚠️', '異常');
-        html += buildSection(items.sudden,   '#c79a00', '🔄', '突発変化点');
+        html += buildSection(items.sudden,   '#c79a00', '🔄', '計画外変化点');
         html += buildSection(items.planned,  '#1565c0', '📋', '計画変化点');
 
         tipEl.innerHTML = `<div style="
@@ -1915,7 +1915,7 @@
           labels,
           datasets: [
             { label:'異常',        data: anomaly, backgroundColor:'rgba(229,57,53,.65)', borderColor:'#c62828', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
-            { label:'突発変化点', data: sudden,  backgroundColor:'rgba(249,196,0,.75)', borderColor:'#c79a00', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
+            { label:'計画外変化点', data: sudden,  backgroundColor:'rgba(249,196,0,.75)', borderColor:'#c79a00', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
             { label:'計画変化点',  data: planned, backgroundColor:'rgba(33,150,243,.65)', borderColor:'#1565c0', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 0.7 },
           ]
         },
@@ -2267,7 +2267,7 @@
     function renderBoardCard(p){
       const color=boardColors[p.category] || '#d6ded8';
       return `<button type="button" class="board-change" data-change-id="${escapeAttr(p._id)}" style="--category-color:${color}">
-        <span class="board-change-top"><span><span class="board-category">${escapeHtml(p.category||'未分類')}</span> ${p.type==='planned'?'計画':'突発'}</span><span>${escapeHtml(p.occurrenceTime||'')}</span></span>
+        <span class="board-change-top"><span><span class="board-category">${escapeHtml(p.category||'未分類')}</span> ${p.type==='planned'?'計画':'計画外'}</span><span>${escapeHtml(p.occurrenceTime||'')}</span></span>
         <span class="board-change-line">${escapeHtml(p.lineName||'ライン未設定')}</span>
         <span class="board-change-serial">整理No. ${escapeHtml(p.serialNo||'未設定')}</span>
         <span class="board-change-content">${escapeHtml(p.content||'内容未登録')}</span>
@@ -2437,7 +2437,7 @@
             summary = '📋 ' + (item.content || '').replace(/\n/g,' ').slice(0, 55);
           } else {
             cls += ' cp-sudden';
-            badges = `<span class="badge badge-sudden">突発</span><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
+            badges = `<span class="badge badge-sudden">計画外</span><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
             summary = '🔄 ' + (item.content || '').replace(/\n/g,' ').slice(0, 55);
           }
         }
@@ -2617,7 +2617,7 @@
       const content  = document.getElementById('planContent').value || '';
       const occurrenceDate = document.getElementById('planDate').value || '';
       document.getElementById('confirmContent').innerHTML = `
-        <div class="confirm-item"><div class="confirm-label">計画区分</div><div class="confirm-value">${type === 'planned' ? '計画' : '突発'}</div></div>
+        <div class="confirm-item"><div class="confirm-label">計画区分</div><div class="confirm-value">${type === 'planned' ? '計画' : '計画外'}</div></div>
         <div class="confirm-item"><div class="confirm-label">発信部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点分類</div><div class="confirm-value">${escapeHtml(category)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点発生部署</div><div class="confirm-value">${escapeHtml(department)}</div></div>
@@ -2645,7 +2645,7 @@
       lines.push('下記の通り、変化点カードを登録しましたのでお知らせいたします。'); lines.push('');
       lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       lines.push('【登録内容】'); lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━'); lines.push('');
-      if (data.type) lines.push('■ 計画区分　　：' + (data.type === 'planned' ? '計画' : '突発'));
+      if (data.type) lines.push('■ 計画区分　　：' + (data.type === 'planned' ? '計画' : '計画外'));
       if (data.planneddepartment) lines.push('■ 発信部署　　：' + data.planneddepartment);
       if (data.department) lines.push('■ 発生部署　　：' + data.department);
       if (data.category) lines.push('■ 分類　　　　：' + data.category);
@@ -2838,7 +2838,7 @@
             ${plannedOnly.slice(0, 20).map(item => `
               <tr>
                 <td>${escapeHtml(item.occurrenceDate || '')}</td>
-                <td>${item.type === 'planned' ? '計画' : '突発'}</td>
+                <td>${item.type === 'planned' ? '計画' : '計画外'}</td>
                 <td><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span></td>
                 <td>${escapeHtml(item.planneddepartment || '')}</td>
                 <td>${escapeHtml(item.department || '')}</td>
@@ -3592,7 +3592,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
       const qr = (kind, src, alt, label) => `<div class="qr" data-card-qr="${escapeAttr(item._id || '')}" data-qr-kind="${kind}"><img ${src ? `src="${src}"` : 'hidden'} alt="${alt}">${src ? '' : '<span class="qr-pending">QR準備中</span>'}<b>${label}</b></div>`;
       const cardQrs = `<div class="card-qrs">${qr('workflow',qrDataUrl,'ワークフローQR','チェック・承認')}${qr('production',productionQrDataUrl,'生産日入力QR','生産日入力・変更')}</div>`;
-      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '突発'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      return `<section class="ticket" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '計画外'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table><div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div><div class="sign">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
 
     }
 
@@ -3723,7 +3723,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (isAnomaly){ badges += `<span class="badge badge-anomaly">異常</span>`; }
       else {
         if (item.type === 'planned') badges += `<span class="badge badge-planned">計画</span>`;
-        else badges += `<span class="badge badge-sudden">突発</span>`;
+        else badges += `<span class="badge badge-sudden">計画外</span>`;
         badges += `<span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span>`;
       }
       document.getElementById('detailBadges').innerHTML = badges;
@@ -3741,7 +3741,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         if (item.rootCauseAction) body += `<div class="detail-section"><div class="detail-section-title">📋 処置方法</div><div class="detail-section-content">${escapeHtml(item.rootCauseAction)}</div></div>`;
       } else {
         body = `<div class="detail-grid" style="margin-bottom:20px;">
-          <div class="detail-grid-item"><div class="label">計画区分</div><div class="value">${item.type === 'planned' ? '計画' : '突発'}</div></div>
+          <div class="detail-grid-item"><div class="label">計画区分</div><div class="value">${item.type === 'planned' ? '計画' : '計画外'}</div></div>
           <div class="detail-grid-item"><div class="label">分類</div><div class="value">${escapeHtml(item.category || '-')}</div></div>
           <div class="detail-grid-item"><div class="label">起票日</div><div class="value">${escapeHtml(item.issuedDate || toLocalDateString(item.createdAt) || '-')}</div></div>
           <div class="detail-grid-item"><div class="label">発生部署</div><div class="value">${escapeHtml(item.department || '-')}</div></div>
@@ -3915,7 +3915,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       container.innerHTML = `
         <input type="hidden" id="editId" value="${item._id}">
         <div class="form-row">
-          <div class="form-group"><label>計画区分</label><select id="editType"><option value="planned" ${item.type === 'planned' ? 'selected' : ''}>計画</option><option value="sudden" ${item.type === 'sudden' ? 'selected' : ''}>突発</option></select></div>
+          <div class="form-group"><label>計画区分</label><select id="editType"><option value="planned" ${item.type === 'planned' ? 'selected' : ''}>計画</option><option value="sudden" ${item.type === 'sudden' ? 'selected' : ''}>計画外</option></select></div>
           <div class="form-group"><label>工程名・作業内容</label><input type="text" id="editProcessName" value="${escapeAttr(item.processName || '')}"></div>
         </div>
         <div class="form-row">
@@ -3987,7 +3987,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       } else {
         updates.excludedChecklistItems = Array.isArray(original.excludedChecklistItems) ? original.excludedChecklistItems : [];
       }
-      if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || (original.type !== 'planned' && !updates.occurrenceDate)){ alert('発信部署、発生部署、分類、ライン、工程、内容、突発の実施日は必須です'); return; }
+      if (!updates.planneddepartment || !updates.department || !updates.category || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || (original.type !== 'planned' && !updates.occurrenceDate)){ alert('発信部署、発生部署、分類、ライン、工程、内容、計画外の実施日は必須です'); return; }
       if (!updates.occurrenceDate){ updates.occurrenceDate = null; updates.switchStatus = 'undecided'; }
       try { await updateDoc(doc(db, 'changepoints', id), updates); alert('保存しました。内容変更のため承認状態を未承認に戻しました'); document.getElementById('editModal').classList.remove('active'); }
       catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
