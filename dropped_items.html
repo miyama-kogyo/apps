@@ -394,6 +394,8 @@
     .product-summary-card .product-comment-summary{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;align-self:stretch;gap:6px;grid-column:1;overflow:hidden}
     .product-summary-card .product-comment-bubble{width:100%;height:52px;padding:6px 10px}
     .product-card-no-comment{font-size:13px;font-weight:500;color:#657079}
+    .comment-tooltip{position:fixed;z-index:1100;width:max-content;max-width:min(420px,calc(100vw - 24px));padding:12px 14px;border:1px solid;border-radius:6px;box-shadow:0 6px 20px #0002;font-size:16px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto}
+    .comment-tooltip[hidden]{display:none}
   </style>
 </head>
 <body>
@@ -590,6 +592,7 @@
     </section>
   </main>
 
+  <div id="commentTooltip" class="comment-tooltip" role="tooltip" hidden></div>
   <aside id="serialPreview" class="serial-preview" role="dialog" aria-modal="false" aria-labelledby="serialPreviewTitle" hidden>
     <div class="serial-preview-head"><div><h3 id="serialPreviewTitle"></h3><p id="serialPreviewMeta" class="serial-preview-meta"></p></div><button id="closeSerialPreview" type="button" class="icon-btn" aria-label="品番プレビューを閉じる" title="閉じる"><i data-lucide="x"></i></button></div>
     <h4>製品写真</h4><div id="serialProductPhoto"></div>
@@ -789,6 +792,11 @@
     }
 
     function bindEvents(){
+      $('commentTooltip').addEventListener('pointerenter',()=>clearTimeout(commentTooltipTimer));
+      $('commentTooltip').addEventListener('pointerleave',hideCommentTooltip);
+      window.addEventListener('resize',hideCommentTooltip);
+      document.addEventListener('scroll',event=>{if(!$('commentTooltip').contains(event.target))hideCommentTooltip();},true);
+      document.addEventListener('keydown',event=>{if(event.key==='Escape')hideCommentTooltip();});
       $('productMasterForm').addEventListener('submit', saveProductMaster);
       $('productMasterFile').addEventListener('change', selectProductPhoto);
       $('cancelProductMaster').addEventListener('click', resetProductMasterForm);
@@ -1381,6 +1389,14 @@
         if(!event.target.closest('button')) row.querySelector('[data-dept]').click();
       }));
       document.querySelectorAll('[data-preview-serial]').forEach(btn => {
+        const bubble=btn.querySelector('.product-comment-bubble');
+        if(bubble){
+          bubble.removeAttribute('title');
+          bubble.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse')showCommentTooltip(bubble);});
+          bubble.addEventListener('pointerleave',scheduleCommentTooltipHide);
+          btn.addEventListener('focus',()=>{if(btn.matches(':focus-visible'))showCommentTooltip(bubble);});
+          btn.addEventListener('blur',hideCommentTooltip);
+        }
         const show = () => openSerialPreview(btn, todayRows.filter(row => row.department===btn.dataset.previewDept && row.serialNo===btn.dataset.previewSerial), todayKey);
         btn.addEventListener('click', () => { show(); $('closeSerialPreview').focus({preventScroll:true}); });
       });
@@ -1389,6 +1405,32 @@
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
     }
 
+    let commentTooltipTimer,commentTooltipAnchor;
+    function hideCommentTooltip(){
+      clearTimeout(commentTooltipTimer);
+      commentTooltipAnchor?.removeAttribute('aria-describedby');
+      commentTooltipAnchor=null;
+      $('commentTooltip').hidden=true;
+    }
+    function scheduleCommentTooltipHide(){
+      clearTimeout(commentTooltipTimer);
+      commentTooltipTimer=setTimeout(hideCommentTooltip,180);
+    }
+    function showCommentTooltip(bubble){
+      hideCommentTooltip();
+      const text=bubble.querySelector('.product-comment-text');
+      if(text.scrollWidth<=text.clientWidth && text.scrollHeight<=text.clientHeight)return;
+      const tooltip=$('commentTooltip'),rect=bubble.getBoundingClientRect(),style=getComputedStyle(bubble);
+      commentTooltipAnchor=bubble.closest('button');
+      commentTooltipAnchor.setAttribute('aria-describedby','commentTooltip');
+      tooltip.textContent=`${text.textContent}\n${bubble.querySelector('strong').textContent}`;
+      tooltip.style.backgroundColor=style.backgroundColor;tooltip.style.borderColor=style.borderColor;tooltip.style.color=style.color;
+      const below=innerHeight-rect.bottom-20,above=rect.top-20;
+      tooltip.style.maxHeight=`${Math.max(80,Math.max(below,above))}px`;
+      tooltip.hidden=false;
+      tooltip.style.left=`${Math.max(12,Math.min(rect.left,innerWidth-tooltip.offsetWidth-12))}px`;
+      tooltip.style.top=`${below>=tooltip.offsetHeight?rect.bottom+6:Math.max(12,rect.top-tooltip.offsetHeight-6)}px`;
+    }
     function commentCounts(rows){
       const comments=new Map();
       rows.forEach(row=>{
@@ -1401,6 +1443,7 @@
     }
     let serialPreviewAnchor;
     function closeSerialPreview(restoreFocus=false){
+      hideCommentTooltip();
       const anchor=serialPreviewAnchor;
       if(restoreFocus && anchor?.isConnected) anchor.focus({preventScroll:true});
       anchor?.setAttribute('aria-expanded','false');
