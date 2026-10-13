@@ -17,7 +17,7 @@ const setup=`await initApp();document.getElementById('authGate').style.display='
  window.__setRecords=items=>{changepointData=items;window.changepointData=items;buildTopicsDeptOptions();updateTopics();};
  window.__records=records;window.__setRecords(records);setupTopicsDeptFilter();showScreen('menu');window.__ready=true;`;
 const fixture=html.replace(/<script src="[^"]+"><\/script>/g,'').replace(/<script type="module">[\s\S]*?<\/script>/,`<script type="module">${mock}${moduleSource}\n${setup}</script>`);
-const out=path.resolve('outputs/board-overview');fs.mkdirSync(out,{recursive:true});
+const out=path.resolve('outputs/board-compact');fs.mkdirSync(out,{recursive:true});
 async function main(){
  for(const engine of ['chromium','webkit']){
   const browser=await (engine==='chromium'?chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'}):webkit.launch({headless:true}));
@@ -25,31 +25,37 @@ async function main(){
    const page=await browser.newPage({timezoneId:'Asia/Tokyo'}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.dismiss());
    await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:fixture}));await page.goto('http://127.0.0.1/board-fixture');await page.waitForFunction(()=>window.__ready);
    assert.equal(await page.locator('#boardTodayCount').textContent(),'24件');assert.equal(await page.locator('#boardCarryCount').textContent(),'18件');
+   assert.equal(await page.locator('.board-overview,.board-panel-scroll').count(),0);
+   assert.equal(await page.locator('#topicsToday .ticket').count(),24);
    for(const [width,height] of [[1920,1080],[1440,900],[1366,768],[1024,600],[768,1024],[390,844],[320,568],[844,390]]){
     await page.setViewportSize({width,height});
-    const bounds=await page.locator('[data-board-panel]').evaluateAll(panels=>panels.map(el=>{const r=el.getBoundingClientRect(),scroll=el.querySelector('.board-panel-scroll');return {id:el.id,x:r.x,y:r.y,right:r.right,bottom:r.bottom,height:r.height,scrollHeight:scroll.clientHeight,visible:getComputedStyle(el).display!=='none'};}));
-    assert.equal(bounds.length,3);
-    for(const box of bounds){assert(box.visible&&box.height>0&&box.scrollHeight>=40,JSON.stringify({width,height,box}));assert(box.x>=0&&box.y>=0&&box.right<=width+1&&box.bottom<=height+1,JSON.stringify({width,height,box}));}
-    assert(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1&&document.documentElement.scrollWidth<=innerWidth+1),`page overflow ${width}x${height}`);
-    assert(await page.locator('.board-panel-scroll').evaluateAll(panels=>panels.every(el=>el.scrollWidth<=el.clientWidth+1)),`list overflow ${width}x${height}`);
+    await page.evaluate(()=>scrollTo(0,0));
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`horizontal overflow ${width}x${height}`);
+    assert(await page.locator('#topicsToday .ticket table').evaluateAll(tables=>tables.every(el=>getComputedStyle(el).display==='none')));
+    const card=page.locator('#topicsToday .ticket').first();
+    const size=await card.boundingBox();assert(size.height<410,JSON.stringify({width,height,size}));
+    assert(await card.locator('.content').isVisible());assert(await card.locator('.sign').isVisible());
+    if(width>700){
+     const boxes=await page.locator('[data-board-panel]').evaluateAll(panels=>panels.map(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom};}));
+     assert(boxes[1].top>=boxes[0].bottom && boxes[2].top>=boxes[1].bottom,'vertical sections restored');
+    }
+    if(width===1366){const tops=await page.locator('#topicsToday .board-lane').first().locator('.ticket').evaluateAll(cards=>cards.slice(0,3).map(c=>c.getBoundingClientRect().top));assert.equal(new Set(tops).size,1,'three compact cards per row');}
     await page.screenshot({path:path.join(out,`${engine}-${width}x${height}.png`)});
-    await page.locator('#boardCarry').evaluate(el=>el.scrollTop=el.scrollHeight);assert(await page.locator('#boardCarry').evaluate(el=>el.scrollTop>0));
-    await page.locator('#boardCarry').evaluate(el=>el.scrollTop=0);
    }
    await page.setViewportSize({width:390,height:844});
-   await page.locator('#topicsToday [data-change-id="today-0"]').click();await page.locator('#detailModal.active').waitFor();assert((await page.locator('#detailBody').textContent()).includes('7106'));await page.locator('#detailClose').click();
+   await page.locator('#topicsToday [data-change-id="today-0"]').click();await page.locator('#detailModal.active').waitFor();assert((await page.locator('#detailBody').textContent()).includes('7106'));assert(await page.locator('#post_safety').isVisible());await page.locator('#detailClose').click();
+   await page.locator('button[data-board-view="week"]').click();assert(await page.locator('#boardWeekPanel').isVisible());assert(!(await page.locator('#boardTodayPanel').isVisible()));
+   await page.locator('button[data-board-view="carry"]').click();assert(await page.locator('#boardCarryPanel').isVisible());
    await page.locator('[data-board-more="boardCarry"]').scrollIntoViewIfNeeded();await page.locator('[data-board-more="boardCarry"]').click();assert.equal(await page.locator('#boardCarry .board-change').count(),18);
+   await page.locator('button[data-board-view="today"]').click();
    await page.locator('#boardFilterToggle').click();await page.locator('#topicsDeptFilter').selectOption('製造2課');assert.equal(await page.locator('#boardTodayCount').textContent(),'12件');
    await page.locator('#boardSearch').fill('not-found-xyz');assert.equal(await page.locator('#boardTodayCount').textContent(),'0件');await page.locator('#boardReset').click();
-   await page.locator('#boardFilterToggle').focus();await page.keyboard.press('Escape');assert.equal(await page.locator('#boardFilterToggle').getAttribute('aria-expanded'),'false');
-   await page.locator('button[data-today-format="card"]').click();assert.equal(await page.locator('#topicsToday .ticket').count(),24);await page.locator('#topicsToday').evaluate(el=>el.scrollTop=el.scrollHeight);assert(await page.locator('#topicsToday').evaluate(el=>el.scrollTop>0));
-   assert(await page.locator('#boardWeekTitle').isVisible());assert(await page.locator('#boardCarryTitle').isVisible());
-   await page.locator('button[data-today-format="list"]').click();assert.equal(await page.locator('#topicsToday .ticket').count(),0);
-   await page.locator('.board-additional summary').filter({hasText:'日程未確定'}).click();await page.locator('#topicsUndecided [data-change-id="undated"]').click();await page.locator('#detailModal.active').waitFor();await page.locator('#detailClose').click();
-   await page.locator('.board-additional summary').filter({hasText:'日程未確定'}).focus();await page.keyboard.press('Escape');assert.equal(await page.locator('.board-additional details[open]').count(),0);
+   await page.locator('#boardFilterToggle').click();assert.equal(await page.locator('#boardFilterToggle').getAttribute('aria-expanded'),'false');
+   await page.locator('.board-details summary').filter({hasText:'日程未確定'}).click();await page.locator('#topicsUndecided [data-change-id="undated"]').click();await page.locator('#detailModal.active').waitFor();await page.locator('#detailClose').click();
+   await page.locator('.board-details summary').filter({hasText:'日程未確定'}).click();
    await page.locator('[data-screen="planned"]').click();assert(await page.locator('#plannedScreen').isVisible());await page.locator('#plannedScreen [data-back]').click();assert(await page.locator('#mainMenu').isVisible());
-   await page.evaluate(()=>window.__setRecords([]));assert.equal(await page.locator('#boardTodayCount').textContent(),'0件');assert(await page.locator('#boardCarry .board-empty').isVisible());
-   assert.deepEqual(errors,[]);console.log(`PASS ${engine}: three panels visible in one viewport, 8 desktop/mobile sizes, internal scrolling, more, filters, card/list, details, navigation, empty state; no database writes.`);
+   await page.evaluate(()=>window.__setRecords([]));assert.equal(await page.locator('#boardTodayCount').textContent(),'0件');assert(await page.locator('#topicsToday .board-empty').isVisible());
+   assert.deepEqual(errors,[]);console.log(`PASS ${engine}: previous vertical board and mobile tabs, compact cards without visible checklist, details retain checks, 8 viewport sizes, more, filters, navigation and empty state; no database writes.`);
   }finally{await browser.close();}
  }
 }

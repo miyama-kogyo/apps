@@ -120,7 +120,8 @@ async function fullApp(engine='chromium'){
   for(const engine of ['chromium','webkit']){
    const browser=engine==='chromium'?b:await webkit.launch({headless:true});
    try{const page=await browser.newPage({viewport:{width:510,height:900}});
-    await page.setContent('<style>'+html.match(/<style>([\s\S]*?)<\/style>/)[1]+'</style><div class="issued-card-preview">'+checkboxTicket+'</div>');
+    await page.setContent('<style>'+html.match(/<style>([\s\S]*?)<\/style>/)[1]+'</style><article class="board-issued-card"><div class="issued-card-preview">'+checkboxTicket+'</div></article>');
+    assert.equal(await page.locator('.ticket table').isVisible(),false);
     assert.equal(await page.locator('.ticket-checkbox').count(),4);assert.equal(await page.locator('.ticket-checkbox:checked').count(),1);assert.equal(await page.locator('.ticket-checkbox:disabled').count(),4);
     assert.deepEqual(await page.locator('.ticket-check').allTextContents(),['','NG','','該当なし']);
     assert.equal(await page.locator('.ticket-checkbox:checked').evaluate(el=>getComputedStyle(el,'::after').borderRightWidth),'2px');
