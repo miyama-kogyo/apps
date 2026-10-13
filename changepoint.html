@@ -1000,7 +1000,7 @@
     .qr-basic-content { grid-column:1/-1; border-bottom:1px solid #d5dfd7; padding-bottom:10px; }
     .qr-basic p { font-size:14px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
     .qr-workflow #approvalWorkflow.qr-mode { display:flex!important; flex-direction:column; border:0; padding:0; margin:0 16px 20px; }
-    .qr-mode .workflow-signoff { order:1; border:0; padding:0; margin:0 0 14px; display:flex; flex-direction:column; }
+    .qr-mode .workflow-signoff { order:4; border-top:1px solid #d4ded7; padding-top:14px; margin:14px 0 0; display:flex; flex-direction:column; }
     .qr-mode .stamp-heading { order:1; margin:0 0 8px; }
     .qr-mode .workflow-stamps { order:2; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
     .qr-mode .stamp-action { order:3; margin:10px 0 0; padding:10px 0 0; }
@@ -1013,9 +1013,9 @@
     .qr-mode .stamp-action>div { flex-wrap:nowrap; }
     .qr-mode .stamp-action input { flex:1; max-width:none; }
     .qr-mode .stamp-action button { width:auto; flex-shrink:0; padding:8px 10px; font-size:13px; }
-    .qr-mode .workflow-checks { order:2; padding-top:12px; border-top:1px solid #d4ded7; }
+    .qr-mode .workflow-checks { order:1; padding-top:12px; border-top:1px solid #d4ded7; }
     .qr-mode .workflow-comment { order:3; }
-    .qr-mode .workflow-fold { order:4; }
+    .qr-mode .workflow-fold { order:2; }
     .qr-mode .responder-checks h4,.qr-mode .checklist-source { display:none; }
     .qr-mode .checklist-row { font-size:13px; }
     .qr-mode .checks-heading h4 { font-size:15px; }
@@ -1048,6 +1048,8 @@
     .board-issued-card .issued-card-preview table,.board-issued-card .issued-card-preview .review { display:none; }
     .board-issued-card .issued-card-preview .sign { gap:3px; }
     .board-issued-card .issued-card-preview .sign div { padding:3px; min-height:40px; }
+    .stamp-readiness { margin:8px 0; font-size:13px; color:#5d6b62; }
+    .stamp-action button:disabled,.post-actions button:disabled { opacity:.5; cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -3263,6 +3265,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const item = currentDetailItem;
       const draft = actualSwitchDrafts.get(item._id) || {actualSwitchDate:item.actualSwitchDate || '',actualSwitchTime:item.actualSwitchTime || ''};
       actualSwitchDrafts.set(item._id,{...draft,[field]:value});
+      updateReceiverStampReadiness();
     };
 
     function validateActualSwitch(date, time){
@@ -3385,22 +3388,38 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const updateDepartment=()=>{
         const done=['post_safety','post_products','post_workability'].every(id=>box.querySelector('#'+id).checked) && (box.querySelector('#postTemporary').value==='no' || (box.querySelector('#postTemporary').value==='yes' && box.querySelector('#postUntil').value && box.querySelector('#post_temporary').checked));
         box.querySelector('#postDepartment').disabled=!editable || !done;
+        const submit=box.querySelector('button[onclick="saveUnplannedForm(true)"]');
+        if(submit){
+          let ready=false;
+          try{validateUnplannedCheck(readUnplannedForm());ready=true;}catch(_){}
+          submit.disabled=!ready || unplannedSaves.has(item._id);
+        }
       };
+      box.querySelector('#unplannedCheckForm').addEventListener('input',updateDepartment);
       box.querySelector('#unplannedCheckForm').addEventListener('change',updateDepartment);
       updateDepartment();
     }
+    function readUnplannedForm(){
+      const v=id=>document.getElementById(id)?.value || '';
+      return {category:v('postCategory'),responseDepartment:v('postDepartment'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:document.getElementById('post_'+key)?.dataset.result || ''}))};
+    }
     window.saveUnplannedForm=async function(submit){
       const item=currentDetailItem;if(!item || unplannedSaves.has(item._id))return;
-      const v=id=>document.getElementById(id)?.value || '';
-      const data={category:v('postCategory'),responseDepartment:v('postDepartment'),temporaryChange:v('postTemporary')==='yes'?true:v('postTemporary')==='no'?false:null,temporaryUntil:v('postUntil'),workflowComment:v('postComment').trim(),checklistItems:UNPLANNED_CHECKS.map(([key])=>({key:'post_'+key,receiverResult:document.getElementById('post_'+key)?.dataset.result || ''}))};
-      const who=v('postActor').trim();
+      const data=readUnplannedForm();
+      const who=document.getElementById('postActor')?.value.trim() || '';
       if(submit){try{validateUnplannedCheck(data);}catch(e){alert(e.message);return;}}
       if(!who){alert('氏名を入力してください。');return;}
       if(submit && !confirm(`事後確認を完了し、対応部署「${data.responseDepartment}」の上司へ承認を依頼しますか？`))return;
       unplannedSaves.add(item._id);document.querySelectorAll('#unplannedCheckForm button').forEach(b=>b.disabled=true);
       try{const saved=await saveUnplannedRecord(item._id,item.postCheckRevision || 0,data,who,submit,item);localStorage.setItem('changepointActorName',who);if(currentDetailItem?._id===item._id){currentDetailItem=saved;renderApprovalWorkflow(saved);document.getElementById('postSaveStatus').textContent=submit?'承認を依頼しました。':'一時保存しました。';}}
       catch(e){alert('保存できませんでした：'+e.message);}
-      finally{unplannedSaves.delete(item._id);document.querySelectorAll('#unplannedCheckForm button').forEach(b=>b.disabled=false);}
+      finally{
+        unplannedSaves.delete(item._id);
+        if(currentDetailItem?._id===item._id){
+          document.querySelectorAll('#unplannedCheckForm button').forEach(b=>b.disabled=false);
+          document.getElementById('unplannedCheckForm')?.dispatchEvent(new Event('change'));
+        }
+      }
     };
     window.approveUnplanned=async function(){
       const item=currentDetailItem,who=document.getElementById('postActor')?.value.trim();
@@ -3501,6 +3520,20 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (details){ if (details.tagName === 'DETAILS') details.open=true; details.scrollIntoView({block:'start'}); }
       alert(message);
     }
+    function updateReceiverStampReadiness(){
+      const item=currentDetailItem,button=document.getElementById('receiverStampButton');
+      if(!button || !item || approvalStatusOf(item)!=='sender_approved')return;
+      const messages=[];
+      if(!allRoleChecksDone(getRecordChecklist(item),'receiver'))messages.push('チェック未完了');
+      if(window.setApprovalResult?.pending?.has(item._id))messages.push('チェック保存中');
+      const actual=actualSwitchDrafts.get(item._id) || item;
+      try{validateActualSwitch(actual.actualSwitchDate || '',actual.actualSwitchTime || '');}catch(_){messages.push('切替日時未入力');}
+      if(workflowCommentSaves.has(item._id))messages.push('コメント保存中');
+      else if(workflowCommentDrafts.has(item._id) && workflowCommentDrafts.get(item._id).trim()!==(item.workflowComment || '').trim())messages.push('コメント未保存');
+      button.disabled=messages.length>0 || receiverStampSaves.has(item._id);
+      const status=document.getElementById('receiverStampReadiness');
+      if(status)status.textContent=messages.length ? messages.join('・') : 'チェック完了';
+    }
     function renderApprovalWorkflow(item){
       const box = document.getElementById('approvalWorkflow');
       if (!box) return;
@@ -3542,7 +3575,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
             <div class="actual-switch" data-workflow-section="actual-switch"><strong>実際の切替日時（日本時間）${status === 'sender_approved' ? ' *' : ''}</strong>
             ${status === 'sender_approved' ? `<div class="actual-switch-fields"><div><label for="actualSwitchDate">切替日</label><input type="date" id="actualSwitchDate" required value="${escapeAttr(actual.actualSwitchDate || '')}" ${stamping ? 'disabled' : ''} oninput="setActualSwitchDraft('actualSwitchDate',this.value)"></div><div><label for="actualSwitchTime">切替時刻</label><input type="time" id="actualSwitchTime" step="60" required value="${escapeAttr(actual.actualSwitchTime || '')}" ${stamping ? 'disabled' : ''} oninput="setActualSwitchDraft('actualSwitchTime',this.value)"></div></div>` : `<p>${escapeHtml(actualSwitchLabel(item))}</p>`}
             </div>
-            <div class="checklist-panel">${renderApprovalChecklist(items, 'receiver', !receiverEnabled || receiverLocked)}</div>
+            <div class="checklist-panel">${renderApprovalChecklist(items, 'receiver', !receiverEnabled || receiverLocked || stamping)}</div>
             ${!senderLocked ? `<div class="approval-add"><input id="senderCustomCheck" placeholder="確認項目を追加"><button type="button" onclick="addApprovalCustom('sender')">追加</button></div>` : ''}
             ${receiverEnabled && !receiverLocked ? `<div class="approval-add"><input id="receiverCustomCheck" placeholder="任意チェック項目"><button type="button" onclick="addApprovalCustom('receiver')">追加</button></div>` : ''}
           </section>
@@ -3572,7 +3605,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
         ${next ? `<div class="stamp-action">
           <label for="workflowStampName">次：${next[0]}</label>
-          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" ${stamping ? 'disabled' : ''} onclick="${next[2]}">${stamping ? '保存中...' : next[1]}</button></div>
+          ${status==='sender_approved' ? '<p id="receiverStampReadiness" class="stamp-readiness" role="status"></p>' : ''}
+          <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" ${status==='sender_approved' ? 'id="receiverStampButton"' : ''} ${stamping ? 'disabled' : ''} onclick="${next[2]}">${stamping ? '保存中...' : next[1]}</button></div>
         </div>` : ''}
         <div class="workflow-stamps">${workflowStampEntries(item).map((stamp,index)=>`<div class="workflow-stamp ${stamp.name ? 'is-stamped' : ''} ${index===stage+1 && next ? 'is-next' : ''}">
           <div class="stamp-role"><small>${escapeHtml(stamp.department)}</small><strong>${index+1}. ${escapeHtml(stamp.role)}</strong></div>
@@ -3580,10 +3614,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
           <div class="stamp-department">${escapeHtml(index<2 ? item.planneddepartment || '-' : item.department || '-')}</div>
         </div>`).join('')}</div>
         </section>`;
+      updateReceiverStampReadiness();
     }
 
     window.setWorkflowCommentDraft = function(value){
       if (currentDetailItem?._id) workflowCommentDrafts.set(currentDetailItem._id,value);
+      updateReceiverStampReadiness();
     };
     window.saveWorkflowComment = async function(){
       const item = currentDetailItem;
@@ -3595,6 +3631,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if (!who) return;
       workflowCommentDrafts.set(item._id,value);
       workflowCommentSaves.add(item._id);
+      updateReceiverStampReadiness();
       const button = document.getElementById('btnSaveWorkflowComment');
       input.disabled = true;
       if (button){ button.disabled=true; button.textContent='保存中...'; }
@@ -3618,6 +3655,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
           const field=document.getElementById('workflowCommentText'),save=document.getElementById('btnSaveWorkflowComment');
           if(field) field.disabled=approvalStatusOf(currentDetailItem)==='approved';
           if(save){ save.disabled=approvalStatusOf(currentDetailItem)==='approved'; save.textContent='コメントを保存'; }
+          updateReceiverStampReadiness();
         }
       }
     };
@@ -3650,6 +3688,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         if(currentDetailItem?._id===id)currentDetailItem=saved;
       }).catch(e=>{console.error(e);alert('判定の保存に失敗しました：'+e.message);});
       pending.set(id,operation);
+      updateReceiverStampReadiness();
       await operation;
       if(pending.get(id)===operation){
         pending.delete(id);
