@@ -203,7 +203,7 @@ service cloud.firestore {
     }
     match /masters/{masterId}/items/{itemId} {
       allow read, create, update, delete: if canUseChangePointApp()
-        && ['department', 'line', 'changeChecklist'].hasAny([masterId]);
+        && ['department', 'line', 'changeChecklist', 'changeDistribution'].hasAny([masterId]);
     }
     match /{document=**} {
       allow read, write: if canUseApp();

@@ -1607,6 +1607,15 @@
     </div>
   </div>
 
+  <dialog id="distributionEditDialog" aria-labelledby="distributionEditTitle" style="max-width:540px;width:calc(100% - 32px);margin:auto;border:0;border-radius:8px;padding:24px;">
+    <form onsubmit="event.preventDefault();saveDistributionGroup()">
+      <h2 id="distributionEditTitle" style="font-size:18px;margin-bottom:16px;">展開先</h2>
+      <label for="distributionEmailInput">メールアドレス（複数可・カンマ区切り）</label>
+      <textarea id="distributionEmailInput" rows="4" maxlength="6000" style="width:100%;margin-top:8px;padding:10px;font-size:16px;"></textarea>
+      <p id="distributionEditStatus" role="status" style="margin:8px 0;color:#a33832;"></p>
+      <div class="confirm-modal-buttons"><button type="button" class="btn btn-secondary" onclick="document.getElementById('distributionEditDialog').close()">キャンセル</button><button type="submit" class="btn btn-primary" id="saveDistributionButton">保存</button></div>
+    </form>
+  </dialog>
   <dialog id="registrationPrintDialog" aria-labelledby="registrationPrintTitle" style="max-width:540px;width:calc(100% - 32px);margin:auto;border:0;border-radius:8px;padding:24px;">
     <h2 id="registrationPrintTitle" style="font-size:18px;margin:0 0 16px;">変化点カードを登録しました</h2>
     <p>変化点カードを印刷して現場リーダーへ渡してください</p>
@@ -3052,22 +3061,34 @@
       }catch(error){ console.error(error); alert('展開先の保存に失敗しました'); }
     };
 
-    window.editDistributionGroup = async function(name){
+    window.editDistributionGroup = function(name){
       if(!DISTRIBUTION_GROUPS.includes(name))return;
       const item=distributionDocs.find(x=>x.id===name);
-      const input=prompt(`${name}の展開先メールアドレス（複数はカンマ区切り。空欄で解除）`,item?.distributionEmail || '');
-      if(input===null)return;
+      const dialog=document.getElementById('distributionEditDialog');
+      dialog.dataset.group=name;
+      document.getElementById('distributionEditTitle').textContent=name+'の展開先';
+      document.getElementById('distributionEmailInput').value=item?.distributionEmail || '';
+      document.getElementById('distributionEditStatus').textContent='';
+      dialog.showModal();
+    };
+    window.saveDistributionGroup = async function(){
+      const dialog=document.getElementById('distributionEditDialog'),name=dialog.dataset.group;
+      const button=document.getElementById('saveDistributionButton'),status=document.getElementById('distributionEditStatus');
+      if(!DISTRIBUTION_GROUPS.includes(name) || button.disabled)return;
       let address;
-      try{address=parseDepartmentEmails(input).join(',');}catch(error){alert(error.message);return;}
+      try{address=parseDepartmentEmails(document.getElementById('distributionEmailInput').value).join(',');}catch(error){status.textContent=error.message;return;}
+      button.disabled=true;status.textContent='保存中...';
       try{
         await runTransaction(db,async tx=>{
           const target=doc(db,'masters','changeDistribution','items',name);
           const snap=await tx.get(target);
-          const fields={name,distributionEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()};
+          const fields={name,distributionEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName(false)};
           if(snap.exists())tx.update(target,fields);else tx.set(target,fields);
         });
         await loadMasters();renderMasterTables();
-      }catch(error){console.error(error);alert('展開先の保存に失敗しました');}
+        dialog.close();
+      }catch(error){console.error(error);status.textContent='保存できませんでした。通信・アクセス権限を確認してください。';}
+      finally{button.disabled=false;}
     };
 
     window.deleteMaster = async function(type, id){

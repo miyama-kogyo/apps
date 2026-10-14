@@ -21,10 +21,10 @@ async function main(){
    await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:fixture}));await page.goto('http://127.0.0.1/distribution-test');await page.waitForFunction(()=>window.__ready);
    await page.evaluate(()=>window.__render());await page.locator('[data-tab="distribution"]').click();assert.equal(await page.locator('#distributionTableBody tr').count(),2);
    const row=name=>page.locator('#distributionTableBody tr').filter({hasText:name});
-   answer='PROCESS@example.com; second@example.com, process@example.com';await row('工程変更').getByRole('button',{name:'変更'}).click();
+   answer='PROCESS@example.com; second@example.com, process@example.com';await row('工程変更').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill(answer);await page.locator('#saveDistributionButton').click();
    await page.waitForFunction(()=>window.__groups['工程変更']?.distributionEmail==='process@example.com,second@example.com');
-   answer='initial@example.com';await row('初期管理').getByRole('button',{name:'変更'}).click();await page.waitForFunction(()=>!!window.__groups['初期管理']);
-   answer='invalid';await row('工程変更').getByRole('button',{name:'変更'}).click();assert.equal(await page.evaluate(()=>window.__masterWrites.length),2);
+   answer='initial@example.com';await row('初期管理').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill(answer);await page.locator('#saveDistributionButton').click();await page.waitForFunction(()=>!!window.__groups['初期管理']);
+   answer='invalid';await row('工程変更').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill(answer);await page.locator('#saveDistributionButton').click();assert.equal(await page.evaluate(()=>window.__masterWrites.length),2);assert((await page.locator('#distributionEditStatus').textContent()).includes('誤り'));await page.getByRole('button',{name:'キャンセル',exact:true}).filter({visible:true}).click();
    for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.resolve(`outputs/distribution-groups/master-${engine}-${width}.png`),fullPage:true});}
    await page.locator('#masterScreen [data-back]').click();await page.locator('.menu-card[data-screen="planned"]').click();await page.locator('#planType').selectOption('sudden');
    assert.equal(await page.locator('#planDepartment option').allTextContents().then(xs=>xs.includes('工程変更')),false);
