@@ -151,7 +151,8 @@ function notificationStreams() {
     {kind:'receiver_approved',field:'receiverApprovedAt',cursor:'CURSOR_APPROVED'},
     {kind:'unplanned_approved',field:'senderApprovedAt',cursor:'CURSOR_UNPLANNED_APPROVED'},
     {kind:'response_approved',field:'responseApprovedAt',cursor:'CURSOR_RESPONSE_APPROVED'},
-    {kind:'distribution',field:'distributionRequestedAt',cursor:'CURSOR_DISTRIBUTION'}
+    {kind:'distribution',field:'distributionRequestedAt',cursor:'CURSOR_DISTRIBUTION'},
+    {kind:'quality_result',field:'qualityEvaluationUpdatedAt',cursor:'CURSOR_QUALITY_RESULT'}
   ];
 }
 
@@ -247,6 +248,9 @@ function isResultNotificationCurrent(item, kind) {
   if (!item || !(item.type === 'planned' || item.workflowManaged === true)) return false;
   if (item.switchStatus === 'canceled' || item.switchState === 'canceled') return false;
   if (kind === 'distribution') return Boolean(item.distributionRequestedAt);
+  if (kind === 'quality_result') return item.qualityEvaluationRequired === true && Boolean(item.qualityEvaluationUpdatedAt) &&
+    ['pass','conditional','fail'].includes(item.qualityEvaluationVerdict) && Boolean(item.qualityEvaluationBy) &&
+    (item.qualityEvaluationVerdict !== 'conditional' || Boolean(item.qualityEvaluationCondition));
   if (kind === 'production_date') return Boolean(item.occurrenceDate && item.productionDateUpdatedAt);
   if (kind === 'receiver_approved') return item.approvalStatus === 'approved';
   if (kind === 'unplanned_approved') return item.workflowKind === 'unplanned_postcheck_v1' && item.approvalStatus === 'approved' && Boolean(item.senderApprovedAt);
@@ -294,7 +298,7 @@ function collectNotificationStream(stream) {
 }
 
 function resolveRecipient(item, departments, kind) {
-  if (kind === 'distribution') return resolveDistributionRecipient(item,departments,item.distributionGroups && item.distributionGroups.length ? readDistributionGroups() : []);
+  if (kind === 'distribution' || kind === 'quality_result') return resolveDistributionRecipient(item,departments,item.qualityEvaluationRequired === true || item.distributionGroups && item.distributionGroups.length ? readDistributionGroups() : []);
   if (kind === 'overdue_reminder') {
     if (item.approvalStatus !== 'sender_approved' && item.approvalStatus !== 'post_check') return resolveRecipient(item,departments,'approval_request');
     const targetDepartment = item.workflowKind === 'unplanned_response_v2' ? item.responseDepartment || item.department : item.department;
@@ -331,8 +335,8 @@ function resolveDistributionRecipient(item, departments, groups = []) {
     addresses.push(...emails);
   });
   const selected = item.distributionGroups === undefined ? [] : item.distributionGroups;
-  if (!Array.isArray(selected) || selected.some(name => !['工程変更','初期管理'].includes(name))) throw new Error('展開先区分が不正です。');
-  [...new Set(selected)].forEach(name => {
+  if (!Array.isArray(selected) || selected.some(name => !['工程変更','初期管理','品技G'].includes(name))) throw new Error('展開先区分が不正です。');
+  [...new Set(selected.concat(item.qualityEvaluationRequired === true ? ['品技G'] : []))].forEach(name => {
     const matches = groups.filter(group => group._name.split('/').pop() === name && group.name === name);
     if (matches.length !== 1) throw new Error('展開先マスターが未登録、または重複しています: ' + name);
     const emails = parseDepartmentEmails(matches[0].distributionEmail);
@@ -363,9 +367,27 @@ function distributionMessage(item, recipient) {
       '発信部署: ' + (item.planneddepartment || '-'),'発生部署: ' + (item.department || '-'),
       '作成者: ' + (item.createdBy || '-'),'','変化点内容:',String(item.content || '').slice(0,4000),'',
       '変化点情報リンク:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()),
+      ...(item.qualityEvaluationRequired === true ? ['', '品質評価：要', '品技Gの皆様：評価結果はこちらに保存してください。',
+        '評価資料を添付し、○（切替可）・△（条件付き切替可）・×（切替不可）を判定してください。',
+        '品質評価入力リンク:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(item._name.split('/').pop()) + '&qualityEvaluation=1'] : []),
       ...productionDateMessageLines(item),
       '','変化点管理アプリからの自動通知です。'].join('\n')
   };
+}
+
+function qualityResultMessage(item, recipient) {
+  const labels={pass:'○ 切替可',conditional:'△ 条件付き切替可',fail:'× 切替不可'};
+  return {to:recipient.email,name:'変化点管理',
+    subject:('【品質評価結果】'+(item.lineName || '-')+' / 整理No '+(item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180),
+    body:[recipient.name+' 各位','','評価結果が保存されました。','',
+      '判定: '+labels[item.qualityEvaluationVerdict],
+      ...(item.qualityEvaluationVerdict==='conditional'?['切替条件: '+String(item.qualityEvaluationCondition || '').slice(0,2000)]:[]),
+      '評価者: '+(item.qualityEvaluationBy || '-'),'評価結果・所見:',String(item.qualityEvaluationNote || '記載なし').slice(0,4000),'',
+      '実施予定日: '+(item.occurrenceDate || '未確定'),'ライン: '+(item.lineName || '-'),'工程: '+(item.processName || '-'),
+      '整理No: '+(item.serialNo || '-'),'発信部署: '+(item.planneddepartment || '-'),'発生部署: '+(item.department || '-'),
+      '','変化点内容:',String(item.content || '').slice(0,4000),'','変化点情報リンク:',
+      NOTIFIER.appUrl+'?changepointId='+encodeURIComponent(item._name.split('/').pop())+'&qualityEvaluation=1',
+      '','評価資料はリンク先の「評価エビデンス」から確認できます。','変化点管理アプリからの自動通知です。'].join('\n')};
 }
 
 function overdueReminderMessage(item, recipient) {
@@ -456,6 +478,7 @@ function processApprovalJobs() {
       }
       const message = kind === 'approval_request' ? approvalMessage(item, recipient)
         : kind === 'distribution' ? distributionMessage(item,recipient)
+        : kind === 'quality_result' ? qualityResultMessage(item,recipient)
         : reminder ? overdueReminderMessage(item,recipient) : resultMessage(item,recipient,kind);
       if (reminder) { job.stage = item.approvalStatus; job.occurrenceDate = item.occurrenceDate; }
       job.state = 'sending'; job.recipient = recipient.email;

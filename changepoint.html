@@ -983,6 +983,14 @@
 
     .workflow-comment { margin-top:16px; border-top:1px solid #d4ded7; padding-top:14px; scroll-margin-top:100px; }
     .workflow-comment>label { display:block; font-size:14px; font-weight:700; margin-bottom:8px; }
+    #qualityEvaluationHost { border-top:1px solid #ccd8d0; margin-top:16px; padding-top:14px; }
+    #qualityEvaluationHost h4 { font-size:16px; margin:0 0 8px; }
+    #qualityEvaluationHost p { white-space:pre-wrap; overflow-wrap:anywhere; }
+    #qualityEvaluationHost label { display:block; margin-bottom:5px; font-size:13px; }
+    #qualityEvaluationHost input,#qualityEvaluationHost select,#qualityEvaluationHost textarea { width:100%; min-width:0; box-sizing:border-box; font:inherit; font-size:16px; padding:8px; border:1px solid #bdcbc2; border-radius:4px; }
+    #qualityEvaluationHost .quality-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:12px 0; }
+    #qualityEvaluationHost .quality-wide { grid-column:1/-1; }
+    #qualityEvaluationStatus { font-size:13px; }
     .workflow-comment textarea { width:100%; resize:vertical; min-height:80px; border:1px solid #bdcbc2; border-radius:4px; padding:10px; font:inherit; font-size:16px; line-height:1.5; }
     .workflow-comment-actions { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
     .workflow-comment-actions>span { font-size:12px; color:#5d6b62; }
@@ -1267,6 +1275,10 @@
                 <option value="金型">金型</option>
                 <option value="設備">設備</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label for="planQualityEvaluation">品質評価<span class="required">*</span></label>
+              <select id="planQualityEvaluation" required><option value="no">不要</option><option value="yes">要</option></select>
             </div>
           </div>
 
@@ -1665,7 +1677,7 @@
     let masterLines = [];
     let deptDocs = [];
     let distributionDocs = [];
-    const DISTRIBUTION_GROUPS = ['工程変更','初期管理'];
+    const DISTRIBUTION_GROUPS = ['工程変更','初期管理','品技G'];
     let lineDocs = [];
     let checklistDocs = [];
     let plannedCustomChecklist = [];
@@ -2668,6 +2680,9 @@
 
     const additionalDistributionDepartments = new Set();
     const additionalDistributionGroups = new Set();
+    function selectedDistributionGroups(){
+      return [...new Set([...additionalDistributionGroups,...(document.getElementById('planQualityEvaluation').value==='yes'?['品技G']:[])])];
+    }
     function selectedDistributionDepartments(){
       return [...new Set([
         document.getElementById('planDepartment').value,
@@ -2689,10 +2704,11 @@
         const entry=distributionDocs.find(x=>x.id===name);
         let available=false;
         try{available=parseDepartmentEmails(entry?.distributionEmail).length>0;}catch(_){}
-        return `<label class="distribution-option"><input type="checkbox" data-distribution-group value="${escapeAttr(name)}" ${additionalDistributionGroups.has(name)?'checked':''}><span>${escapeHtml(name)}${available?'':'<small>展開先アドレス未設定</small>'}</span></label>`;
+        const mandatory=name==='品技G' && document.getElementById('planQualityEvaluation').value==='yes';
+        return `<label class="distribution-option"><input type="checkbox" data-distribution-group value="${escapeAttr(name)}" ${selectedDistributionGroups().includes(name)?'checked':''} ${mandatory?'disabled':''}><span>${escapeHtml(name)}${mandatory?'（必須）':''}${available?'':'<small>展開先アドレス未設定</small>'}</span></label>`;
       }).join(''));
     }
-    ['planDepartment','planDepartmentOccur'].forEach(id => document.getElementById(id).addEventListener('change',renderDistributionDepartments));
+    ['planDepartment','planDepartmentOccur','planQualityEvaluation'].forEach(id => document.getElementById(id).addEventListener('change',renderDistributionDepartments));
     document.getElementById('planDistributionDepartments').addEventListener('change',event => {
       if (event.target.type !== 'checkbox' || event.target.disabled) return;
       const selected=event.target.hasAttribute('data-distribution-group')?additionalDistributionGroups:additionalDistributionDepartments;
@@ -2715,7 +2731,8 @@
         <div class="confirm-item"><div class="confirm-label">発信部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点分類</div><div class="confirm-value">${escapeHtml(category)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点発生部署</div><div class="confirm-value">${escapeHtml(department)}</div></div>
-        <div class="confirm-item"><div class="confirm-label">展開先</div><div class="confirm-value">${[...selectedDistributionDepartments(),...additionalDistributionGroups].map(escapeHtml).join('、')}</div></div>
+        <div class="confirm-item"><div class="confirm-label">品質評価</div><div class="confirm-value">${document.getElementById('planQualityEvaluation').value==='yes'?'要':'不要'}</div></div>
+        <div class="confirm-item"><div class="confirm-label">展開先</div><div class="confirm-value">${[...selectedDistributionDepartments(),...selectedDistributionGroups()].map(escapeHtml).join('、')}</div></div>
         <div class="confirm-item"><div class="confirm-label">対象ライン名</div><div class="confirm-value">${escapeHtml(lineName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">工程名・作業内容</div><div class="confirm-value">${escapeHtml(processName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
@@ -2888,7 +2905,8 @@
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null, switchStatus: occurrenceDate ? 'scheduled' : 'undecided',
         document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', approvalRequestedAt: serverTimestamp(), specialHandlingStatus: '', relatedReviewCompleted: false,
         continuedManagementRequired: false, managementUntil: '', createdBy,
-        createdAt: serverTimestamp(), distributionDepartments, distributionGroups:[...additionalDistributionGroups], distributionRequestedAt:serverTimestamp() };
+        createdAt: serverTimestamp(), distributionDepartments, distributionGroups:selectedDistributionGroups(), distributionRequestedAt:serverTimestamp(),
+        qualityEvaluationRequired:document.getElementById('planQualityEvaluation').value==='yes' };
       if (type === 'sudden') Object.assign(data,{workflowKind:'unplanned_response_v2',approvalStatus:'post_check',approvalRequestedAt:null,postCheckRevision:0,excludedChecklistItems:[]});
       registrationSaving = true;
       document.getElementById('btnRegisterPlanned').disabled = true;
@@ -3199,6 +3217,78 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
     const evidenceDrafts = new Map();
 
+    const QUALITY_VERDICTS = {pass:'○ 切替可',conditional:'△ 条件付き切替可',fail:'× 切替不可'};
+    const qualityDrafts = new Map();
+    function qualityDraft(item){
+      if(!qualityDrafts.has(item._id)) qualityDrafts.set(item._id,{
+        verdict:item.qualityEvaluationVerdict || '',actor:item.qualityEvaluationBy || localStorage.getItem('changepointActorName') || '',
+        note:item.qualityEvaluationNote || '',condition:item.qualityEvaluationCondition || '',
+        revision:item.qualityEvaluationRevision || 0,busy:false,dirty:false,message:''
+      });
+      return qualityDrafts.get(item._id);
+    }
+    function renderQualityEvaluation(item){
+      const host=document.getElementById('qualityEvaluationHost');if(!host)return;
+      if(!item.qualityEvaluationRequired){host.innerHTML='<h4>品質評価：不要</h4>';return;}
+      const draft=qualityDraft(item);
+      const history=Array.isArray(item.qualityEvaluationHistory)?item.qualityEvaluationHistory:[];
+      host.innerHTML=`<h4>品質評価（品技G）</h4><p>保存済み判定：${escapeHtml(QUALITY_VERDICTS[item.qualityEvaluationVerdict] || '未判定')}</p>
+        ${item.qualityEvaluationBy?`<p class="evidence-meta">${escapeHtml(item.qualityEvaluationBy)} / ${escapeHtml(stampDate(item.qualityEvaluationUpdatedAt))}</p>`:''}
+        ${item.qualityEvaluationCondition?`<p>切替条件：${escapeHtml(item.qualityEvaluationCondition)}</p>`:''}
+        <form id="qualityEvaluationForm"><fieldset style="border:0;padding:0;min-width:0" ${draft.busy?'disabled':''}><div class="quality-fields">
+        <div><label for="qualityVerdict">判定 *</label><select id="qualityVerdict" required><option value="">選択してください</option>${Object.entries(QUALITY_VERDICTS).map(([value,label])=>`<option value="${value}" ${draft.verdict===value?'selected':''}>${label}</option>`).join('')}</select></div>
+        <div><label for="qualityActor">評価者名 *</label><input id="qualityActor" maxlength="80" required value="${escapeAttr(draft.actor)}"></div>
+        <div class="quality-wide" id="qualityConditionField" ${draft.verdict==='conditional'?'':'hidden'}><label for="qualityCondition">切替条件 *</label><textarea id="qualityCondition" rows="2" maxlength="2000" ${draft.verdict==='conditional'?'required':''}>${escapeHtml(draft.condition)}</textarea></div>
+        <div class="quality-wide"><label for="qualityNote">評価結果・所見</label><textarea id="qualityNote" rows="3" maxlength="4000">${escapeHtml(draft.note)}</textarea></div></div>
+        <button class="btn btn-primary" type="submit">${draft.busy?'保存中...':'評価結果を保存・通知'}</button></fieldset><p id="qualityEvaluationStatus" role="status">${escapeHtml(draft.message)}</p></form>
+        ${history.length?`<details><summary>評価履歴（${history.length}件）</summary>${history.slice().reverse().map(entry=>`<p>${escapeHtml(QUALITY_VERDICTS[entry.verdict] || '-')} / ${escapeHtml(entry.actor || '')} / ${escapeHtml(stampDate(entry.savedAtLocal))}\n${escapeHtml(entry.condition || '')}\n${escapeHtml(entry.note || '')}</p>`).join('')}</details>`:''}`;
+      for(const [field,id] of [['verdict','qualityVerdict'],['actor','qualityActor'],['condition','qualityCondition'],['note','qualityNote']]){
+        document.getElementById(id).addEventListener('input',e=>{
+          draft[field]=e.target.value;draft.dirty=true;
+          if(field==='verdict'){
+            document.getElementById('qualityConditionField').hidden=draft.verdict!=='conditional';
+            document.getElementById('qualityCondition').required=draft.verdict==='conditional';
+          }
+        });
+      }
+      document.getElementById('qualityEvaluationForm').addEventListener('submit',e=>{e.preventDefault();saveQualityEvaluation(item._id);});
+    }
+    async function saveQualityEvaluation(id){
+      const item=currentDetailItem;if(item?._id!==id || !item.qualityEvaluationRequired)return;
+      const draft=qualityDraft(item);if(draft.busy)return;
+      const verdict=draft.verdict,actor=draft.actor.trim(),note=draft.note.trim(),condition=verdict==='conditional'?draft.condition.trim():'';
+      if(!Object.hasOwn(QUALITY_VERDICTS,verdict) || !actor || actor.length>80 || note.length>4000 || condition.length>2000 || (verdict==='conditional'&&!condition)){
+        draft.message='判定・評価者名・条件付きの場合は切替条件を入力してください。';renderQualityEvaluation(item);return;
+      }
+      draft.busy=true;draft.message='保存しています...';renderQualityEvaluation(item);
+      try{
+        const evidence=evidenceDraft(id);
+        if(evidence.busy)throw Error('添付を保存中です。完了後に再度保存してください。');
+        if(evidence.jobs.length){
+          if(!evidence.actor.trim())evidence.actor=actor;
+          await saveEvidenceFiles(id);
+          if(evidence.jobs.length)throw Error('未保存の添付があります。添付を再試行してから判定を保存してください。');
+        }
+        const result=await runTransaction(db,async tx=>{
+          const reference=doc(db,'changepoints',id),snapshot=await tx.get(reference);
+          if(!snapshot.exists())throw Error('変化点が削除されています。');
+          const latest=snapshot.data();
+          if(!latest.qualityEvaluationRequired)throw Error('品質評価の対象ではありません。情報を開き直してください。');
+          if((latest.qualityEvaluationRevision || 0)!==draft.revision)throw Error('別の評価結果が保存されています。情報を開き直して確認してください。');
+          const history=Array.isArray(latest.qualityEvaluationHistory)?latest.qualityEvaluationHistory:[];
+          if(history.length>=100)throw Error('評価履歴が100件に達しました。管理者へご連絡ください。');
+          const entry={verdict,actor,note,condition,savedAtLocal:new Date().toISOString(),attachmentIds:evidenceFiles(latest).map(f=>f.id).filter(Boolean)};
+          const fields={qualityEvaluationVerdict:verdict,qualityEvaluationBy:actor,qualityEvaluationNote:note,qualityEvaluationCondition:condition,
+            qualityEvaluationRevision:draft.revision+1,qualityEvaluationHistory:[...history,entry],qualityEvaluationUpdatedAt:serverTimestamp()};
+          tx.update(reference,fields);return {...latest,...fields,qualityEvaluationUpdatedAt:new Date(),_id:id};
+        });
+        draft.revision=result.qualityEvaluationRevision;draft.dirty=false;draft.message='評価結果を保存しました。展開先への自動通知を予約しました。';
+        localStorage.setItem('changepointActorName',actor);
+        const stored=changepointData.find(x=>x._id===id);if(stored)Object.assign(stored,result);
+        if(currentDetailItem?._id===id)currentDetailItem={...currentDetailItem,...result};
+      }catch(error){draft.message='保存できませんでした。'+error.message;}
+      finally{draft.busy=false;if(currentDetailItem?._id===id)renderQualityEvaluation(currentDetailItem);}
+    }
     function evidenceDraft(id){
       if (!evidenceDrafts.has(id)) evidenceDrafts.set(id,{category:EVIDENCE_TYPES[0],note:'',actor:localStorage.getItem('changepointActorName') || '',jobs:[],busy:false,open:false,message:'',error:false,progress:0});
       return evidenceDrafts.get(id);
@@ -3322,7 +3412,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       }
     }
     window.addEventListener('beforeunload',event=>{
-      if([...evidenceDrafts.values()].some(d=>d.busy || d.jobs.length)){event.preventDefault();event.returnValue='';}
+      if([...evidenceDrafts.values()].some(d=>d.busy || d.jobs.length) || [...qualityDrafts.values()].some(d=>d.busy || d.dirty)){event.preventDefault();event.returnValue='';}
     });
     const workflowCommentDrafts = new Map();
     const workflowCommentSaves = new Set();
@@ -4057,6 +4147,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     function showDetail(item){
+      const oldQuality=qualityDrafts.get(item._id);
+      if(oldQuality && !oldQuality.busy)qualityDrafts.delete(item._id);
       currentDetailItem = item;
       const isAnomaly = (item._kind === 'anomaly') || (item.type === 'anomaly');
       const isCP = !isAnomaly;
@@ -4114,9 +4206,15 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       }
       if (isCP && item.type === 'sudden') body += '<section class="detail-section"><h3 class="detail-section-title">関連する異常内容</h3><div id="relatedAnomalyHost" aria-live="polite"></div></section>';
       if (isCP) body += '<section id="evidenceHost" aria-label="評価エビデンス"></section>';
+      if (isCP) body += '<section id="qualityEvaluationHost" aria-label="品質評価"></section>';
       document.getElementById('detailBody').innerHTML = body;
       if (isCP && item.type === 'sudden') renderRelatedAnomaly(item);
       if (isCP) renderEvidencePanel(item);
+      if (isCP) renderQualityEvaluation(item);
+      if(isCP && new URLSearchParams(location.search).get('qualityEvaluation')==='1'){
+        document.getElementById('detailTitle').textContent='品質評価';
+        document.getElementById('evidencePanel').open=true;
+      }
 
       const actionsEl = document.getElementById('detailActions');
       actionsEl.style.display = isPlannedCP ? 'flex' : 'none';

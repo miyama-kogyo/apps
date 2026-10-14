@@ -216,6 +216,26 @@ for(const bad of ['missing','invalid','unallowed','unknown','notArray']){
   t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);assert.equal(t.jobs()[0].state,'pending');
 }
 console.log('PASS: optional distribution groups, latest master recipients, deduplication, no unselected recipients and no partial delivery on invalid settings.');
+function qualitySetup(overrides={}){
+  const t=distributionSetup({qualityEvaluationRequired:true,...overrides});
+  t.env.distributionGroups=[{_name:prefix+'/masters/changeDistribution/items/品技G',name:'品技G',distributionEmail:'aishikawa@miyama-unitec.co.jp,skinoshita@miyama-unitec.co.jp,tkaneko@miyama-unitec.co.jp,tnakagawa@miyama-unitec.co.jp'}];
+  t.state.AUTO_ALLOW_DEPARTMENT_RECIPIENTS='true';
+  t.state.ALLOWED_RECIPIENTS+=','+t.env.distributionGroups[0].distributionEmail;
+  return t;
+}
+t=qualitySetup();t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);assert.equal(t.sent[0].to.split(',').length,7);assert(t.sent[0].body.includes('評価結果はこちらに保存してください'));assert(t.sent[0].body.includes('&qualityEvaluation=1'));
+for(const verdict of ['pass','conditional','fail']){
+  t=qualitySetup({distributionRequestedAt:undefined,qualityEvaluationVerdict:verdict,qualityEvaluationBy:'Evaluator',qualityEvaluationCondition:'First article',qualityEvaluationNote:'Test result',qualityEvaluationUpdatedAt:at});
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);assert.equal(t.sent[0].to.split(',').length,7);assert(t.sent[0].body.includes('評価結果が保存されました'));assert(t.sent[0].body.includes({pass:'○ 切替可',conditional:'△ 条件付き切替可',fail:'× 切替不可'}[verdict]));assert(t.state.CURSOR_QUALITY_RESULT);
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);
+  t.env.records[0].qualityEvaluationUpdatedAt='2026-10-08T02:00:00Z';t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,2);
+}
+for(const changes of [{qualityEvaluationRequired:false},{qualityEvaluationVerdict:''},{qualityEvaluationBy:''},{qualityEvaluationVerdict:'conditional',qualityEvaluationCondition:''},{switchStatus:'canceled'}]){
+  t=qualitySetup({distributionRequestedAt:undefined,qualityEvaluationVerdict:'pass',qualityEvaluationBy:'Evaluator',qualityEvaluationUpdatedAt:at,...changes});t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);
+}
+t=qualitySetup();t.env.distributionGroups=[];t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);assert.equal(t.jobs()[0].state,'pending');
+t=qualitySetup({distributionRequestedAt:undefined,qualityEvaluationVerdict:'pass',qualityEvaluationBy:'Evaluator',qualityEvaluationUpdatedAt:at});t.ctx.collectApprovalRequests();t.env.records[0].qualityEvaluationUpdatedAt='2026-10-08T02:00:00Z';t.ctx.processApprovalJobs();assert.equal(t.sent.length,0);assert.equal(t.jobs()[0].state,'skipped');
+console.log('PASS quality evaluation: mandatory quality recipients, request link, all verdicts, result broadcast, independent cursor, dedup, updated results, invalid and stale events.');
 function reminderSetup(stage='sender_approved'){
   const t=setup();t.env.now='2026-10-09T00:05:00Z';
   Object.assign(t.state,{REMINDERS_ENABLED:'true',REMINDERS_START_DAY:'2026-10-09',REMINDER_WEEKDAYS_ONLY:'false'});
