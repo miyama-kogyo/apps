@@ -1049,6 +1049,14 @@
     .board-issued-card .issued-card-preview .sign { gap:3px; }
     .board-issued-card .issued-card-preview .sign div { padding:3px; min-height:40px; }
     .stamp-readiness { margin:8px 0; font-size:13px; color:#5d6b62; }
+    .master-tabs { flex-wrap:wrap; }
+    .master-tab { white-space:nowrap; flex-shrink:0; }
+    #masterDistribution .master-table { table-layout:fixed; }
+    #masterDistribution th,#masterDistribution td { padding:8px; }
+    #masterDistribution th:first-child { width:80px; }
+    #masterDistribution th:last-child { width:64px; }
+    #masterDistribution td:first-child,#masterDistribution button { white-space:nowrap; }
+    #masterDistribution button { padding:6px 8px; }
     .stamp-action button:disabled,.post-actions button:disabled { opacity:.5; cursor:not-allowed; }
   </style>
 </head>
@@ -1312,7 +1320,7 @@
           </div>
 
           <div class="form-group">
-            <label id="distributionLabel">展開先部署<span class="required">*</span></label>
+            <label id="distributionLabel">展開先<span class="required">*</span></label>
             <div id="planDistributionDepartments" class="distribution-options" role="group" aria-labelledby="distributionLabel"></div>
           </div>
 
@@ -1429,6 +1437,7 @@
       <div class="card">
         <div class="master-tabs">
           <button class="master-tab active" data-tab="department">部署</button>
+          <button class="master-tab" data-tab="distribution">展開先</button>
           <button class="master-tab" data-tab="line">ライン</button>
           <button class="master-tab" data-tab="checklist">5Mチェック項目</button>
         </div>
@@ -1440,6 +1449,12 @@
           <table class="master-table">
             <thead><tr><th style="width:25%;">部署名</th><th>メール送信先</th><th style="width:100px;">操作</th></tr></thead>
             <tbody id="deptTableBody"></tbody>
+          </table>
+        </div>
+        <div id="masterDistribution" class="master-content" style="display:none;">
+          <table class="master-table">
+            <thead><tr><th>展開先</th><th>メールアドレス</th><th>操作</th></tr></thead>
+            <tbody id="distributionTableBody"></tbody>
           </table>
         </div>
         <div id="masterLine" class="master-content" style="display:none;">
@@ -1640,6 +1655,8 @@
     let masterDepartments = [];
     let masterLines = [];
     let deptDocs = [];
+    let distributionDocs = [];
+    const DISTRIBUTION_GROUPS = ['工程変更','初期管理'];
     let lineDocs = [];
     let checklistDocs = [];
     let plannedCustomChecklist = [];
@@ -2102,6 +2119,10 @@
           .filter(d => CHANGE_CATEGORIES.includes(d.category) && d.name)
           .sort((a,b) => CHANGE_CATEGORIES.indexOf(a.category) - CHANGE_CATEGORIES.indexOf(b.category) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(String(b.name),'ja'));
         masterDepartments = deptDocs.map(d => d.name).filter(Boolean).sort();
+        try{
+          const snap=await getDocs(collection(db,'masters','changeDistribution','items'));
+          distributionDocs=snap.docs.map(d=>({id:d.id,...d.data()}));
+        }catch(error){distributionDocs=[];console.error('展開先マスター読み込みエラー:',error);}
         masterLines = lineDocs.map(d => d.name).filter(Boolean).sort();
         document.getElementById('filterLine').innerHTML =
           '<option value="">選択...</option>' +
@@ -2637,6 +2658,7 @@
     }
 
     const additionalDistributionDepartments = new Set();
+    const additionalDistributionGroups = new Set();
     function selectedDistributionDepartments(){
       return [...new Set([
         document.getElementById('planDepartment').value,
@@ -2654,12 +2676,19 @@
         try{ available = matches.length === 1 && parseDepartmentEmails(matches[0].distributionEmail).length > 0; }catch(_){}
         return `<label class="distribution-option"><input type="checkbox" value="${escapeAttr(name)}" ${required.has(name) || additionalDistributionDepartments.has(name) ? 'checked' : ''} ${required.has(name) ? 'disabled' : ''}><span>${escapeHtml(name)}${required.has(name) ? '（必須）' : ''}${available ? '' : '<small>展開先アドレス未設定</small>'}</span></label>`;
       }).join('');
+      document.getElementById('planDistributionDepartments').insertAdjacentHTML('beforeend',DISTRIBUTION_GROUPS.map(name=>{
+        const entry=distributionDocs.find(x=>x.id===name);
+        let available=false;
+        try{available=parseDepartmentEmails(entry?.distributionEmail).length>0;}catch(_){}
+        return `<label class="distribution-option"><input type="checkbox" data-distribution-group value="${escapeAttr(name)}" ${additionalDistributionGroups.has(name)?'checked':''}><span>${escapeHtml(name)}${available?'':'<small>展開先アドレス未設定</small>'}</span></label>`;
+      }).join(''));
     }
     ['planDepartment','planDepartmentOccur'].forEach(id => document.getElementById(id).addEventListener('change',renderDistributionDepartments));
     document.getElementById('planDistributionDepartments').addEventListener('change',event => {
       if (event.target.type !== 'checkbox' || event.target.disabled) return;
-      if (event.target.checked) additionalDistributionDepartments.add(event.target.value);
-      else additionalDistributionDepartments.delete(event.target.value);
+      const selected=event.target.hasAttribute('data-distribution-group')?additionalDistributionGroups:additionalDistributionDepartments;
+      if (event.target.checked) selected.add(event.target.value);
+      else selected.delete(event.target.value);
     });
 
     function showConfirmDialog(){
@@ -2677,7 +2706,7 @@
         <div class="confirm-item"><div class="confirm-label">発信部署</div><div class="confirm-value">${escapeHtml(planneddepartment)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点分類</div><div class="confirm-value">${escapeHtml(category)}</div></div>
         <div class="confirm-item"><div class="confirm-label">変化点発生部署</div><div class="confirm-value">${escapeHtml(department)}</div></div>
-        <div class="confirm-item"><div class="confirm-label">展開先部署</div><div class="confirm-value">${selectedDistributionDepartments().map(escapeHtml).join('、')}</div></div>
+        <div class="confirm-item"><div class="confirm-label">展開先</div><div class="confirm-value">${[...selectedDistributionDepartments(),...additionalDistributionGroups].map(escapeHtml).join('、')}</div></div>
         <div class="confirm-item"><div class="confirm-label">対象ライン名</div><div class="confirm-value">${escapeHtml(lineName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">工程名・作業内容</div><div class="confirm-value">${escapeHtml(processName)}</div></div>
         <div class="confirm-item"><div class="confirm-label">整理No</div><div class="confirm-value">${escapeHtml(serialNo || '(なし)')}</div></div>
@@ -2850,7 +2879,7 @@
         occurrenceDate: occurrenceDate || null, occurrenceTime: occurrenceTime || null, switchStatus: occurrenceDate ? 'scheduled' : 'undecided',
         document: '', documentUrl: '', checklistItems, excludedChecklistItems, approvalStatus: 'draft', approvalRequestedAt: serverTimestamp(), specialHandlingStatus: '', relatedReviewCompleted: false,
         continuedManagementRequired: false, managementUntil: '', createdBy,
-        createdAt: serverTimestamp(), distributionDepartments, distributionRequestedAt:serverTimestamp() };
+        createdAt: serverTimestamp(), distributionDepartments, distributionGroups:[...additionalDistributionGroups], distributionRequestedAt:serverTimestamp() };
       if (type === 'sudden') Object.assign(data,{workflowKind:'unplanned_response_v2',approvalStatus:'post_check',approvalRequestedAt:null,postCheckRevision:0,excludedChecklistItems:[]});
       registrationSaving = true;
       document.getElementById('btnRegisterPlanned').disabled = true;
@@ -2867,6 +2896,7 @@
         setExportButtonEnabled(true);
         document.getElementById('plannedForm').reset();
         additionalDistributionDepartments.clear();
+        additionalDistributionGroups.clear();
         renderDistributionDepartments();
         document.getElementById('planDate').value = '';
         document.getElementById('planDateUndecided').checked = false;
@@ -2921,7 +2951,7 @@
         tab.addEventListener('click', () => {
           document.querySelectorAll('.master-tab').forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
-          const targets = { department:'masterDepartment', line:'masterLine', checklist:'masterChecklist' };
+          const targets = { department:'masterDepartment', distribution:'masterDistribution', line:'masterLine', checklist:'masterChecklist' };
           Object.entries(targets).forEach(([key,id]) => { document.getElementById(id).style.display = (tab.dataset.tab === key) ? 'block' : 'none'; });
         });
       });
@@ -2953,6 +2983,10 @@
     }
 
     function renderMasterTables(){
+      document.getElementById('distributionTableBody').innerHTML=DISTRIBUTION_GROUPS.map(name=>{
+        const item=distributionDocs.find(x=>x.id===name);
+        return `<tr><td>${escapeHtml(name)}</td><td style="white-space:pre-line;overflow-wrap:anywhere">${escapeHtml((item?.distributionEmail || '未設定').replace(/,\s*/g,'\n'))}</td><td><button class="btn btn-sm" onclick="editDistributionGroup('${escapeAttr(name)}')">変更</button></td></tr>`;
+      }).join('');
       document.getElementById('deptTableBody').innerHTML = deptDocs.map(d =>
         `<tr><td>${escapeHtml(d.name || '')}</td><td><div class="department-approver"><b>承認依頼先：${escapeHtml(d.approverName || '未設定')}</b><span>${escapeHtml((d.approverEmail || '').replace(/,\s*/g,'\n'))}</span><b>生産日・承認完了の通知先</b><span>${escapeHtml((d.notificationEmail || '未設定').replace(/,\s*/g,'\n'))}</span><b>登録時の展開先</b><span>${escapeHtml((d.distributionEmail || '未設定').replace(/,\s*/g,'\n'))}</span></div></td><td><div class="department-actions"><button class="btn btn-sm" onclick="editDepartmentApprover('${escapeAttr(d.id)}')">承認先</button><button class="btn btn-sm" onclick="editDepartmentNotification('${escapeAttr(d.id)}')">通知先</button><button class="btn btn-sm" onclick="editDepartmentDistribution('${escapeAttr(d.id)}')">展開先</button><button class="btn btn-danger btn-sm" onclick="deleteMaster('department', '${escapeAttr(d.id)}')">削除</button></div></td></tr>`
       ).join('');
@@ -3016,6 +3050,24 @@
         await updateDoc(doc(db,'masters','department','items',id), {distributionEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()});
         await loadMasters(); renderMasterTables();
       }catch(error){ console.error(error); alert('展開先の保存に失敗しました'); }
+    };
+
+    window.editDistributionGroup = async function(name){
+      if(!DISTRIBUTION_GROUPS.includes(name))return;
+      const item=distributionDocs.find(x=>x.id===name);
+      const input=prompt(`${name}の展開先メールアドレス（複数はカンマ区切り。空欄で解除）`,item?.distributionEmail || '');
+      if(input===null)return;
+      let address;
+      try{address=parseDepartmentEmails(input).join(',');}catch(error){alert(error.message);return;}
+      try{
+        await runTransaction(db,async tx=>{
+          const target=doc(db,'masters','changeDistribution','items',name);
+          const snap=await tx.get(target);
+          const fields={name,distributionEmail:address,updatedAt:serverTimestamp(),updatedBy:getActorName()};
+          if(snap.exists())tx.update(target,fields);else tx.set(target,fields);
+        });
+        await loadMasters();renderMasterTables();
+      }catch(error){console.error(error);alert('展開先の保存に失敗しました');}
     };
 
     window.deleteMaster = async function(type, id){

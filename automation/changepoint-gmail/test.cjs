@@ -34,6 +34,7 @@ function setup() {
       assert.ok(['get','post'].includes(options.method));
       let data;
       if(url.includes('/masters/department/items'))data={documents:env.departments.map(encoded)};
+      else if(url.includes('/masters/changeDistribution/items'))data={documents:(env.distributionGroups || []).map(encoded)};
       else if(url.endsWith(':runQuery')){
         const query=JSON.parse(options.payload).structuredQuery;
         const field=query.where.fieldFilter.field.fieldPath;
@@ -201,6 +202,20 @@ t=distributionSetup({distributionRequestedAt:'2020-01-01T00:00:00Z'});t.ctx.poll
 t=distributionSetup({approvalStatus:'sender_approved'});t.ctx.collectApprovalRequests();t.env.records[0].approvalStatus='approved';t.ctx.processApprovalJobs();assert.equal(t.sent.length,1,'approval advancing does not lose distribution');
 t=distributionSetup();t.ctx.collectApprovalRequests();t.env.records=[];t.ctx.processApprovalJobs();assert.equal(t.jobs()[0].state,'skipped');
 console.log('PASS: registration distribution; mandatory departments; all-recipient safety; array decoding; no historical flood; deduplication and independent cursor.');
+for(const selected of [[],['工程変更'],['初期管理'],['工程変更','初期管理']]){
+  t=distributionSetup({distributionGroups:selected});
+  t.env.distributionGroups=[{_name:prefix+'/masters/changeDistribution/items/工程変更',name:'工程変更',distributionEmail:'process@example.com,SENDER@example.com'},{_name:prefix+'/masters/changeDistribution/items/初期管理',name:'初期管理',distributionEmail:'initial@example.com,process@example.com'}];
+  t.state.ALLOWED_RECIPIENTS+=',process@example.com,initial@example.com';
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);
+  const expected=['sender@example.com','receiver@example.com','extra@example.com',...(selected.length?['process@example.com']:[]),...(selected.includes('初期管理')?['initial@example.com']:[])];
+  assert.deepEqual(t.sent[0].to.split(',').sort(),expected.sort());
+}
+for(const bad of ['missing','invalid','unallowed','unknown','notArray']){
+  t=distributionSetup({distributionGroups:bad==='unknown'?['未登録']:bad==='notArray'?'工程変更':['工程変更']});
+  t.env.distributionGroups=bad==='missing'?[]:[{_name:prefix+'/masters/changeDistribution/items/工程変更',name:'工程変更',distributionEmail:bad==='invalid'?'invalid':'external@example.com'}];
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);assert.equal(t.jobs()[0].state,'pending');
+}
+console.log('PASS: optional distribution groups, latest master recipients, deduplication, no unselected recipients and no partial delivery on invalid settings.');
 function reminderSetup(stage='sender_approved'){
   const t=setup();t.env.now='2026-10-09T00:05:00Z';
   Object.assign(t.state,{REMINDERS_ENABLED:'true',REMINDERS_START_DAY:'2026-10-09',REMINDER_WEEKDAYS_ONLY:'false'});

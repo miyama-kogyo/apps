@@ -63,6 +63,16 @@ function allowedRecipients() {
     .split(/[,;\s、，；]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
 }
 
+function readDistributionGroups() {
+  let token = '', result = [];
+  do {
+    const page = firestoreRead('/masters/changeDistribution/items?pageSize=100' + (token ? '&pageToken=' + encodeURIComponent(token) : ''));
+    result = result.concat((page.documents || []).map(decodeDocument));
+    token = page.nextPageToken || '';
+  } while (token);
+  return result;
+}
+
 function automaticMasterRecipientsEnabled() {
   return notifierProperties().getProperty('AUTO_ALLOW_MASTER_RECIPIENTS') === 'true';
 }
@@ -284,7 +294,7 @@ function collectNotificationStream(stream) {
 }
 
 function resolveRecipient(item, departments, kind) {
-  if (kind === 'distribution') return resolveDistributionRecipient(item,departments);
+  if (kind === 'distribution') return resolveDistributionRecipient(item,departments,item.distributionGroups && item.distributionGroups.length ? readDistributionGroups() : []);
   if (kind === 'overdue_reminder') {
     if (item.approvalStatus !== 'sender_approved' && item.approvalStatus !== 'post_check') return resolveRecipient(item,departments,'approval_request');
     const targetDepartment = item.workflowKind === 'unplanned_response_v2' ? item.responseDepartment || item.department : item.department;
@@ -308,7 +318,7 @@ function resolveRecipient(item, departments, kind) {
   return {email:emails.join(','),emails:emails,name:name,department:department};
 }
 
-function resolveDistributionRecipient(item, departments) {
+function resolveDistributionRecipient(item, departments, groups = []) {
   if (!Array.isArray(item.distributionDepartments) || item.distributionDepartments.some(name => typeof name !== 'string' || !name.trim()) ||
       !item.planneddepartment || !item.department) throw new Error('展開先部署が不正です。');
   const names = [...new Set([item.planneddepartment,item.department].concat(item.distributionDepartments))];
@@ -319,6 +329,16 @@ function resolveDistributionRecipient(item, departments) {
     const emails = parseDepartmentEmails(matches[0].distributionEmail);
     if (!emails.length) throw new Error('展開先メールアドレスが未設定です: ' + name);
     addresses.push(...emails);
+  });
+  const selected = item.distributionGroups === undefined ? [] : item.distributionGroups;
+  if (!Array.isArray(selected) || selected.some(name => !['工程変更','初期管理'].includes(name))) throw new Error('展開先区分が不正です。');
+  [...new Set(selected)].forEach(name => {
+    const matches = groups.filter(group => group._name.split('/').pop() === name && group.name === name);
+    if (matches.length !== 1) throw new Error('展開先マスターが未登録、または重複しています: ' + name);
+    const emails = parseDepartmentEmails(matches[0].distributionEmail);
+    if (!emails.length) throw new Error('展開先メールアドレスが未設定です: ' + name);
+    addresses.push(...emails);
+    names.push(name);
   });
   const emails = parseDepartmentEmails(addresses.join(','));
   if (!areDepartmentRecipientsAllowed(emails)) throw new Error('許可されていない展開先アドレスが含まれています。');
