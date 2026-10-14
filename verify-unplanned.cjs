@@ -4,7 +4,7 @@ const slice=(a,b)=>{const i=html.indexOf(a),j=html.indexOf(b,i);assert(i>=0&&j>i
 const core=slice('    function isUnplannedPostcheck','    const APPROVAL_STAGES');
 const guards=slice('    function boardCompleted','    function buildTopicsDeptOptions');
 const validate=slice('    function validateActualSwitch','    async function saveReceiverStamp');
-const escaping=slice('    function escapeHtml','    function csvEscape');
+const escaping=slice('    function escapeHtml','    function csvEscape')+slice('    function categoryOptions','    function refreshChangeCategories');
 const stamps=slice('    function workflowStampEntries','    function readStampName');
 const related=slice('    function relatedAnomalyHtml','    function showDetail');
 const categories=['人','設備','材料','方法','金型'];

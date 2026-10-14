@@ -437,6 +437,17 @@
     .master-table tr:hover{ background:#f8f9ff; }
     .master-add{ display:flex; gap:12px; margin-bottom:20px; }
     .master-add input{ flex:1; }
+    #categoryMasterForm .master-add { flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+    #addChangeCategory { min-width:0; flex:1 1 180px; }
+    #btnAddChangeCategory { flex-shrink:0; }
+    #masterChecklist input,#masterChecklist select { min-width:0; min-height:42px; padding:8px; font:inherit; font-size:16px; border:1px solid #bdcbc2; border-radius:4px; }
+    #masterChecklist select { width:100%; }
+    #changeCategoryList { display:flex; flex-wrap:wrap; gap:6px 16px; }
+    #changeCategoryList span { max-width:100%; overflow-wrap:anywhere; }
+    .checklist-table-wrap { overflow-x:auto; }
+    .checklist-table-wrap table { min-width:620px; table-layout:fixed; }
+    .checklist-table-wrap td { overflow-wrap:anywhere; }
+    .checklist-table-wrap .approval-status-badge { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 
     /* モーダル */
     .switch-flow-guide{
@@ -1337,7 +1348,7 @@
           </div>
 
           <div class="form-group">
-            <label>5Mチェック項目</label>
+            <label>分類別チェック項目</label>
             <div class="hint" style="margin-bottom:8px;">対象外の項目はチェックを外せます。発信部署独自の確認項目も追加できます。</div>
             <div id="planChecklistPreview" class="checklist-panel"><div class="checklist-empty">変化点分類を選択してください</div></div>
             <div class="approval-add" style="margin-top:10px;">
@@ -1451,7 +1462,7 @@
           <button class="master-tab active" data-tab="department">部署</button>
           <button class="master-tab" data-tab="distribution">展開先</button>
           <button class="master-tab" data-tab="line">ライン</button>
-          <button class="master-tab" data-tab="checklist">5Mチェック項目</button>
+          <button class="master-tab" data-tab="checklist">分類・チェック項目</button>
         </div>
         <div id="masterDepartment" class="master-content">
           <div class="master-add">
@@ -1480,18 +1491,29 @@
           </table>
         </div>
         <div id="masterChecklist" class="master-content" style="display:none;">
+          <form id="categoryMasterForm" style="margin-bottom:20px;">
+            <label for="addChangeCategory" style="display:block;font-weight:600;margin-bottom:8px;">分類（5M＋追加分類）</label>
+            <div class="master-add">
+              <input id="addChangeCategory" type="text" maxlength="40" required placeholder="新しい分類名" aria-label="新しい分類名">
+              <button type="submit" class="btn btn-primary" id="btnAddChangeCategory">分類を追加</button>
+            </div>
+            <p id="categoryMasterStatus" role="status" style="font-size:13px;overflow-wrap:anywhere;"></p>
+            <p id="changeCategoryList" style="margin-top:8px;overflow-wrap:anywhere;"></p>
+          </form>
           <div class="master-check-filter">
-            <select id="addChecklistCategory">
+            <select id="addChecklistCategory" aria-label="チェック項目の分類">
               <option value="人">人</option><option value="設備">設備</option><option value="材料">材料</option><option value="方法">方法</option><option value="金型">金型</option>
             </select>
             <input type="text" id="addChecklistName" placeholder="新しいチェック項目を入力...">
             <input type="text" id="addChecklistCriteria" placeholder="合格判定基準を入力...">
             <button class="btn btn-primary" id="btnAddChecklist">追加</button>
           </div>
+          <div class="checklist-table-wrap">
           <table class="master-table">
             <thead><tr><th style="width:90px;">分類</th><th>チェック項目</th><th>合格判定基準</th><th style="width:150px;">操作</th></tr></thead>
             <tbody id="checklistTableBody"></tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>
@@ -1683,6 +1705,8 @@
     let plannedCustomChecklist = [];
     let plannedExcludedChecklist = new Map();
     const CHANGE_CATEGORIES = ['人', '設備', '材料', '方法', '金型'];
+    const BASE_CHANGE_CATEGORIES = [...CHANGE_CATEGORIES];
+    let additionalChangeCategories = [];
     const CHANGE_CATEGORY_GUIDANCE = {
       '人':'新人配属、未経験者の応援、多能工化、1か月以上作業から離れた人の復帰',
       '設備':'設備・治具・検査機の修理、改修、設定変更',
@@ -2136,9 +2160,12 @@
         ]);
         deptDocs = deptSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         lineDocs = lineSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        checklistDocs = checklistSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .filter(d => CHANGE_CATEGORIES.includes(d.category) && d.name)
-          .sort((a,b) => CHANGE_CATEGORIES.indexOf(a.category) - CHANGE_CATEGORIES.indexOf(b.category) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(String(b.name),'ja'));
+        const checklistRecords = checklistSnap.docs.map(d => ({ ...d.data(), id:d.id }));
+        const registry = checklistRecords.find(d => d.id === '_categories');
+        additionalChangeCategories = Array.isArray(registry?.categories) ? registry.categories.filter(x => typeof x === 'string' && x.trim()) : [];
+        checklistDocs = checklistRecords.filter(d => d.id !== '_categories' && typeof d.category === 'string' && d.category.trim() && d.name);
+        refreshChangeCategories();
+        checklistDocs.sort((a,b) => CHANGE_CATEGORIES.indexOf(a.category) - CHANGE_CATEGORIES.indexOf(b.category) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(String(b.name),'ja'));
         masterDepartments = deptDocs.map(d => d.name).filter(Boolean).sort();
         try{
           const snap=await getDocs(collection(db,'masters','changeDistribution','items'));
@@ -2163,6 +2190,45 @@
       }catch(err){ console.error('マスタ読み込みエラー:', err); }
     }
 
+    function categoryOptions(categories, selected=''){
+      return [...new Set([...categories,...(selected?[selected]:[])])].map(name=>`<option value="${escapeAttr(name)}" ${name===selected?'selected':''}>${escapeHtml(name)}</option>`).join('');
+    }
+    function refreshChangeCategories(){
+      const extra=[...new Set([...additionalChangeCategories,...checklistDocs.map(x=>x.category)])].filter(x=>!BASE_CHANGE_CATEGORIES.includes(x)).sort((a,b)=>a.localeCompare(b,'ja'));
+      CHANGE_CATEGORIES.splice(0,CHANGE_CATEGORIES.length,...BASE_CHANGE_CATEGORIES,...extra);
+      const historical=changepointData.map(x=>x.category).filter(x=>typeof x==='string' && x.trim());
+      for(const [id,placeholder] of [['planCategory','選択してください'],['addChecklistCategory',null],['boardCategoryFilter','すべての分類'],['calendarCatFilter','すべての分類']]){
+        const select=document.getElementById(id);if(!select)continue;
+        const selected=select.value;
+        const categories=id.endsWith('Filter')?[...CHANGE_CATEGORIES,...historical,...(id==='calendarCatFilter'?['その他']:[])]:CHANGE_CATEGORIES;
+        select.innerHTML=(placeholder?`<option value="">${placeholder}</option>`:'')+categoryOptions(categories,selected);
+        select.value=selected || (placeholder?'':CHANGE_CATEGORIES[0]);
+      }
+      const list=document.getElementById('changeCategoryList');if(list)list.innerHTML=CHANGE_CATEGORIES.map(name=>`<span>${escapeHtml(name)}</span>`).join('');
+    }
+    function normalizeChangeCategory(value){
+      const name=String(value || '').normalize('NFKC').trim().replace(/\s+/g,' ');
+      if(!name || name.length>40 || /[\u0000-\u001f\u007f]/.test(name))throw Error('分類名は1〜40文字で入力してください。');
+      return name;
+    }
+    async function addChangeCategory(value){
+      const name=normalizeChangeCategory(value);
+      if(CHANGE_CATEGORIES.some(x=>x.normalize('NFKC').trim()===name))throw Error('同じ分類が登録されています。');
+      const categories=await runTransaction(db,async transaction=>{
+        const reference=doc(db,'masters','changeChecklist','items','_categories');
+        const snapshot=await transaction.get(reference);
+        const existing=snapshot.exists()?snapshot.data():{};
+        if(existing.categories!==undefined && !Array.isArray(existing.categories))throw Error('分類マスターの形式を確認してください。');
+        const names=existing.categories || [];
+        if(names.some(x=>typeof x!=='string'))throw Error('分類マスターの形式を確認してください。');
+        if([...BASE_CHANGE_CATEGORIES,...names].some(x=>x.normalize('NFKC').trim()===name))throw Error('同じ分類が登録されています。');
+        if(names.length>=100)throw Error('追加分類は100件までです。');
+        const next=[...names,name],fields={kind:'categoryRegistry',categories:next,updatedAt:serverTimestamp(),updatedBy:getActorName(false)};
+        if(snapshot.exists())transaction.update(reference,fields);else transaction.set(reference,fields);
+        return next;
+      });
+      additionalChangeCategories=categories;refreshChangeCategories();return name;
+    }
     function masterChecklistFor(category){
       return checklistDocs.filter(d => d.category === category).map(d => ({
         key: `master_${d.id}`,
@@ -2219,16 +2285,16 @@
       if (!box) return;
       const unplanned = document.getElementById('planType')?.value === 'sudden';
       document.getElementById('planCategory').required = !unplanned;
-      document.getElementById('planCategory').previousElementSibling.innerHTML = unplanned ? '5M分類（後日選択可）' : '変化点分類<span class="required">*</span>';
+      document.getElementById('planCategory').previousElementSibling.innerHTML = unplanned ? '変化点分類（後日選択可）' : '変化点分類<span class="required">*</span>';
       document.getElementById('planCustomCheckText').parentElement.hidden = unplanned;
       document.getElementById('planCustomCheckList').hidden = unplanned;
       box.previousElementSibling.hidden = unplanned;
-      box.parentElement.querySelector('label').textContent = unplanned ? '事後チェック項目' : '5Mチェック項目';
+      box.parentElement.querySelector('label').textContent = unplanned ? '事後チェック項目' : '分類別チェック項目';
       if (unplanned){ box.innerHTML = unplannedChecklist({}).map(x=>`<div class="checklist-row">${escapeHtml(x.label)}</div>`).join(''); return; }
       const category = document.getElementById('planCategory')?.value || '';
       if (!category){ box.innerHTML = '<div class="checklist-empty">変化点分類を選択してください</div>'; return; }
       const items = masterChecklistFor(category);
-      const guidance = `<div style="padding:8px 10px;margin-bottom:8px;background:#fff;border-left:3px solid #2563eb;font-size:.84rem;"><b>${escapeHtml(category)}の対象</b><br>${escapeHtml(CHANGE_CATEGORY_GUIDANCE[category] || '')}</div>`;
+      const guidance = Object.hasOwn(CHANGE_CATEGORY_GUIDANCE,category) ? `<div style="padding:8px 10px;margin-bottom:8px;background:#fff;border-left:3px solid #2563eb;font-size:.84rem;"><b>${escapeHtml(category)}の対象</b><br>${escapeHtml(CHANGE_CATEGORY_GUIDANCE[category])}</div>` : '';
       box.innerHTML = items.length
         ? guidance + items.map(x => { const excluded = plannedExcludedChecklist.get(x.masterId); return `<label class="checklist-row"><input type="checkbox" ${excluded ? '' : 'checked'} onchange="togglePlanChecklistItem('${escapeAttr(x.masterId)}',this.checked)"><span class="check-label">${escapeHtml(x.label)}${x.criteria ? `<small style="display:block;color:#64748b;margin-top:3px;">合格基準：${escapeHtml(x.criteria)}</small>` : ''}</span><span class="checklist-source">${excluded ? '対象外' : '対象'}</span></label>`; }).join('')
         : `<div class="checklist-empty">「${escapeHtml(category)}」のマスタ項目は未登録です。マスタ管理から追加できます。</div>`;
@@ -2260,6 +2326,7 @@
       });
       onSnapshot(query(collection(db, 'changepoints'), orderBy('occurrenceDate', 'desc')), (snap) => {
         changepointData = snap.docs.map(d => ({ _id: d.id, docType: 'changepoint', ...d.data() }));
+        refreshChangeCategories();
         window.changepointData = changepointData; // ★ グローバル参照を更新
         refreshEvidenceFromSnapshot();
         setupTopicsDeptFilter();
@@ -2362,7 +2429,7 @@
       setInterval(()=>{ if(root.style.display!=='none') updateTopics(); },60000);
     }
     function renderBoardCard(p){
-      const color=boardColors[p.category] || '#d6ded8';
+      const color=Object.hasOwn(boardColors,p.category)?boardColors[p.category]:'#d6ded8';
       return `<button type="button" class="board-change" data-change-id="${escapeAttr(p._id)}" style="--category-color:${color}">
         <span class="board-change-top"><span><span class="board-category">${escapeHtml(p.category||'未分類')}</span> ${p.type==='planned'?'計画':'計画外'}</span><span>${escapeHtml(p.occurrenceTime||'')}</span></span>
         <span class="board-change-line">${escapeHtml(p.lineName||'ライン未設定')}</span>
@@ -2592,7 +2659,7 @@
         let eventsHtml = dayEvents.slice(0,3).map(e => {
           const info = [e.department, e.lineName, e.serialNo].filter(Boolean).join(' / ');
           const contentPreview = (e.content || '').slice(0, 30) + ((e.content || '').length > 30 ? '...' : '');
-          return `<div class="calendar-event category-${escapeAttr(e.category || 'その他')}" data-id="${escapeAttr(e._id)}" title="${escapeAttr(e.content || '')}">
+          return `<div class="calendar-event category-${escapeAttr(BASE_CHANGE_CATEGORIES.includes(e.category)?e.category:'その他')}" data-id="${escapeAttr(e._id)}" title="${escapeAttr(e.content || '')}">
             <div style="font-weight:600;font-size:.75rem;">${escapeHtml(e.category || '')}</div>
             <div style="font-size:.65rem;opacity:.9;">${escapeHtml(info || '-')}</div>
             <div style="font-size:.65rem;margin-top:2px;line-height:1.3;">${escapeHtml(contentPreview)}</div>
@@ -2974,6 +3041,18 @@
     }
 
     function setupMasterTabs(){
+      document.getElementById('categoryMasterForm').addEventListener('submit',async event=>{
+        event.preventDefault();
+        const button=document.getElementById('btnAddChangeCategory'),status=document.getElementById('categoryMasterStatus');
+        if(button.disabled)return;
+        button.disabled=true;status.textContent='保存中...';
+        try{
+          const name=await addChangeCategory(document.getElementById('addChangeCategory').value);
+          document.getElementById('addChangeCategory').value='';document.getElementById('addChecklistCategory').value=name;
+          status.textContent=`「${name}」を追加しました。`;
+        }catch(error){status.textContent='追加できませんでした。'+error.message;}
+        finally{button.disabled=false;}
+      });
       document.querySelectorAll('.master-tab').forEach(tab => {
         tab.addEventListener('click', () => {
           document.querySelectorAll('.master-tab').forEach(t => t.classList.remove('active'));
@@ -2998,6 +3077,7 @@
         const category = document.getElementById('addChecklistCategory').value;
         const name = document.getElementById('addChecklistName').value.trim();
         const criteria = document.getElementById('addChecklistCriteria').value.trim();
+        if(!CHANGE_CATEGORIES.includes(category)){alert('分類を選択してください');return;}
         if (!name || !criteria){ alert('チェック項目と合格判定基準を入力してください'); return; }
         if (checklistDocs.some(x => x.category === category && x.name === name)){ alert('同じチェック項目が登録されています'); return; }
         try{
@@ -3472,7 +3552,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         criteria:key === 'temporary' && item.temporaryChange === true ? '暫定期限：'+(item.temporaryUntil || '未入力') : ''}));
     }
     function validateUnplannedCheck(data){
-      if (!CHANGE_CATEGORIES.includes(data.category)) throw new Error('5M分類を選択してください。');
+      if (!CHANGE_CATEGORIES.includes(data.category)) throw new Error('変化点分類を選択してください。');
       if (!data.responseDepartment?.trim()) throw new Error('対応部署を選択してください。');
       if (typeof data.temporaryChange !== 'boolean') throw new Error('暫定対応の有無を選択してください。');
       if (data.temporaryChange){
@@ -3535,7 +3615,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       box.style.display='block';box.classList.toggle('qr-mode',isQrWorkflow(item));
       box.innerHTML=`<form id="unplannedCheckForm" class="unplanned-check-form">
         <section class="workflow-checks"><div class="checks-heading"><h4>計画外変化点の事後チェック</h4><span>${escapeHtml(boardStatus(item))}</span></div>
-          <div class="form-group"><label for="postCategory">5M分類</label><select id="postCategory" ${disabled}><option value="">選択</option>${CHANGE_CATEGORIES.map(x=>`<option ${item.category===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div>
+          <div class="form-group"><label for="postCategory">変化点分類</label><select id="postCategory" ${disabled}><option value="">選択</option>${categoryOptions(CHANGE_CATEGORIES,item.category)}</select></div>
           <div class="checklist-panel">${unplannedChecklist(item).slice(0,3).map(x=>renderWorkflowCheck(x,!editable)).join('')}
           <div class="form-group" style="padding:12px"><label for="postTemporary">暫定の場合、暫定期間は明確になっているか</label><select id="postTemporary" ${disabled}><option value="">暫定対応の有無を選択</option><option value="no" ${item.temporaryChange===false?'selected':''}>暫定ではない（該当なし）</option><option value="yes" ${item.temporaryChange===true?'selected':''}>暫定対応</option></select>
           <div id="postTemporaryFields" ${item.temporaryChange===true?'':'hidden'}><label for="postUntil">暫定期限</label><input id="postUntil" type="date" value="${escapeAttr(item.temporaryUntil || '')}" ${disabled}>${renderWorkflowCheck({...unplannedChecklist(item)[3],label:'期間の確認',criteria:''},!editable)}</div></div></div>
@@ -4003,7 +4083,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const activeCheckRows = items.length ? items.map(x => `<tr><td>${escapeHtml(x.label || '')}${unplanned && x.criteria ? '<br>'+escapeHtml(x.criteria) : ''}</td>${unplanned ? '' : `<td>${escapeHtml(x.criteria || '-')}</td>`}<td>${resultCheckbox(x)}</td></tr>`).join('') : '<tr><td colspan="3">チェック項目なし</td></tr>';
       const checks = activeCheckRows + (managed ? `<tr><td colspan="${unplanned?2:3}"><b>実際の切替日時：</b>${escapeHtml(actualSwitchLabel(item))}（日本時間）</td></tr>` : '');
       const cardColors = { '設備':['#22c55e','グリーン'], '金型':['#ffffff','ホワイト'], '方法':['#f9a8d4','ピンク'], '材料':['#facc15','イエロー'], '人':['#fb923c','オレンジ'] };
-      const [cardColor, cardColorName] = cardColors[item.category] || ['#e2e8f0','指定なし'];
+      const [cardColor, cardColorName] = Object.hasOwn(cardColors,item.category)?cardColors[item.category]:['#e2e8f0',item.category?'追加分類':'指定なし'];
       const qr = (kind, src, alt, label) => `<div class="qr" data-card-qr="${escapeAttr(item._id || '')}" data-qr-kind="${kind}"><img ${src ? `src="${src}"` : 'hidden'} alt="${alt}">${src ? '' : '<span class="qr-pending">QR準備中</span>'}<b>${label}</b></div>`;
       const cardQrs = unplanned ? '' : `<div class="card-qrs">${qr('workflow',qrDataUrl,'ワークフローQR','チェック・承認')}${qr('production',productionQrDataUrl,'生産日入力QR','生産日入力・変更')}</div>`;
       return `<section class="ticket${unplanned ? ' unplanned-ticket' : ''}" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '計画外'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div><table><thead><tr><th>確認項目</th>${unplanned ? '' : '<th>合格判定基準</th>'}<th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table>${unplanned ? '' : `<div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div>`}<div class="sign" style="grid-template-columns:repeat(${workflowStampEntries(item).length},minmax(0,1fr))">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}${unplanned ? '：'+escapeHtml(item.responseDepartment || '未選択') : ''}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div><footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
@@ -4382,11 +4462,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         <div class="form-row">
           <div class="form-group"><label>発信部署（起票部署）</label><select id="editPlannedDept"><option value="">選択</option>${masterDepartments.map(d => `<option value="${d}" ${item.planneddepartment === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
           <div class="form-group"><label>変化点分類</label><select id="editCategory"><option value="">選択</option>
-            <option value="人" ${item.category === '人' ? 'selected' : ''}>人</option>
-            <option value="方法" ${item.category === '方法' ? 'selected' : ''}>方法</option>
-            <option value="材料" ${item.category === '材料' ? 'selected' : ''}>材料</option>
-            <option value="金型" ${item.category === '金型' ? 'selected' : ''}>金型</option>
-            <option value="設備" ${item.category === '設備' ? 'selected' : ''}>設備</option>
+            ${categoryOptions(CHANGE_CATEGORIES,item.category)}
           </select></div>
         </div>
         <div class="form-row">
