@@ -2481,7 +2481,7 @@
     function bulkItems(){
       const dept=document.getElementById('bulkDeptFilter').value,word=document.getElementById('bulkSearch').value.trim().toLowerCase();
       return changepointData.filter(x=>bulkEligible(x) && (!dept || (bulkUnplanned.mode==='approve'?x.responseDepartment:x.department)===dept) && (!word || [x.lineName,x.serialNo,x.content].join(' ').toLowerCase().includes(word)))
-        .sort((a,b)=>String(a.occurrenceDate || '').localeCompare(String(b.occurrenceDate || '')) || String(a._id).localeCompare(String(b._id)));
+        .sort((a,b)=>String(b.occurrenceDate || '').localeCompare(String(a.occurrenceDate || '')) || String(a._id).localeCompare(String(b._id)));
     }
     function openBulkUnplanned(){
       const check=bulkUnplanned.mode==='check';
