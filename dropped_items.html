@@ -396,6 +396,10 @@
     .product-card-no-comment{font-size:13px;font-weight:500;color:#657079}
     .comment-tooltip{position:fixed;z-index:1100;width:max-content;max-width:min(420px,calc(100vw - 24px));padding:12px 14px;border:1px solid;border-radius:6px;box-shadow:0 6px 20px #0002;font-size:16px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto}
     .comment-tooltip[hidden]{display:none}
+    .photo-register-link{display:inline-flex;align-items:center;min-height:36px;color:#265f82;text-decoration:underline;font-size:14px;font-weight:600}
+    .product-card-wrap{position:relative;display:block;width:260px;max-width:100%;flex:0 0 auto}
+    .card-photo-register{position:absolute;top:38px;left:9px;width:80px;height:72px;display:flex;align-items:center;justify-content:center;background:#f2f3f4;color:#265f82;font-size:13px;font-weight:600;text-decoration:underline;border:1px dashed #aab5bc;border-radius:4px}
+    .card-photo-register:focus-visible{outline:3px solid #265f82;outline-offset:2px}
   </style>
 </head>
 <body>
@@ -447,6 +451,7 @@
               <label for="serialNo">整理Noまたは部品名 <span class="required">*</span></label>
               <input id="serialNo" list="serialSuggestions" maxlength="60" autocomplete="off" placeholder="例：A-1234 / ブラケット" required>
               <datalist id="serialSuggestions"></datalist>
+              <span id="entryProductRegistration"></span>
               <small class="field-hint" id="serialSuggestionHint">部署を選択すると過去の入力候補を表示します</small>
             </div>
             <div class="field">
@@ -631,6 +636,7 @@
             <label for="editSerialNo">整理Noまたは部品名 <span class="required">*</span></label>
             <input id="editSerialNo" list="editSerialSuggestions" maxlength="60" autocomplete="off" required>
             <datalist id="editSerialSuggestions"></datalist>
+            <span id="editProductRegistration"></span>
             <small class="field-hint" id="editSerialSuggestionHint"></small>
           </div>
           <div class="field">
@@ -815,6 +821,8 @@
     }
 
     function bindEvents(){
+      $('serialNo').addEventListener('input', updatePhotoRegistrationLinks);
+      $('editSerialNo').addEventListener('input', updatePhotoRegistrationLinks);
       $('commentTooltip').addEventListener('pointerenter',()=>clearTimeout(commentTooltipTimer));
       $('commentTooltip').addEventListener('pointerleave',hideCommentTooltip);
       window.addEventListener('resize',hideCommentTooltip);
@@ -953,15 +961,24 @@
 
     const productKey = value => String(value || '').trim().normalize('NFC');
     function productFor(serial){ return state.productMasters.get(productKey(serial)); }
+    function photoRegistrationLink(serial, className='photo-register-link'){
+      if(!productKey(serial) || safeUrl(productFor(serial)?.photo?.url)) return '';
+      return `<a class="${className}" href="?screen=products&amp;product=${encodeURIComponent(productKey(serial))}" target="_blank" rel="noopener" aria-label="${esc(serial)}の製品写真を登録（別タブ）">写真を登録</a>`;
+    }
+    function updatePhotoRegistrationLinks(){
+      $('entryProductRegistration').innerHTML=photoRegistrationLink($('serialNo').value);
+      $('editProductRegistration').innerHTML=photoRegistrationLink($('editSerialNo').value);
+    }
     function productPhotoHtml(serial){
       const product=productFor(serial),url=safeUrl(product?.photo?.url);
-      if(!url) return '<p class="serial-preview-empty">製品写真は未登録です</p>';
+      if(!url) return photoRegistrationLink(serial);
       return `<div class="product-reference"><a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" alt="${esc(product.productName||serial)}の製品写真" loading="lazy"></a>${product.productName?`<p>${esc(product.productName)}</p>`:''}</div>`;
     }
     function subscribeProductMasters(){
       onSnapshot(collection(db,'droppedProductPhotos'),snap=>{
         state.productMasters=new Map(snap.docs.map(doc=>{const data={...doc.data(),id:doc.id};return [productKey(data.serialNo),data];}));
         state.productMastersReady=true;
+        updatePhotoRegistrationLinks();
         $('productMasterStatus').textContent=`${state.productMasters.size}製品登録済み`;
         $('productMasterFields').disabled=state.productBusy;
         renderProductMasters();
@@ -1194,7 +1211,7 @@
         });
         state.files.forEach(entry => URL.revokeObjectURL(entry.preview)); state.files = [];
         $('entryForm').reset(); $('quantity').value = 1; $('occurredAt').value = localDateTimeValue(new Date());
-        updateEntrySerialSuggestions(); updateLineOptions(); renderPreviews(); showToast('落下品を登録しました');
+        updateEntrySerialSuggestions(); updateLineOptions(); updatePhotoRegistrationLinks(); renderPreviews(); showToast('落下品を登録しました');
       }catch(error){
         console.error(error);
         await Promise.allSettled(uploaded.map(file => deleteObject(storageRef(storage,file.path))));
@@ -1256,6 +1273,7 @@
       updateLineOptions(true, item.lineName || '');
       $('editOccurredAt').value = localDateTimeValue(parseDate(item));
       $('editSerialNo').value = item.serialNo || '';
+      updatePhotoRegistrationLinks();
       $('editQuantity').value = quantity(item) || 1;
       $('editCause').value = ['作業','設備','その他'].includes(item.cause) ? item.cause : 'その他';
       $('editComment').value = item.comment || '';
@@ -1374,7 +1392,7 @@
       const comparisonKey = localDateKey(previousWeekday(new Date(`${todayKey}T12:00:00`)));
       const isToday = todayKey === localDateKey(today);
       const isReviewDay = todayKey === localDateKey(previousWeekday(today));
-      $('page-dashboard').classList.toggle('morning-layout', !isToday);
+      $('page-dashboard').classList.add('morning-layout');
       const showComparison = false;
       $('page-dashboard').classList.toggle('review-only', !showComparison);
       $('departmentChartTitle').textContent = showComparison ? '部署別比較' : '部署別落下品数';
@@ -1403,16 +1421,16 @@
         const serials = groupSum(todayRows.filter(r=>r.department===dept),r=>r.serialNo);
         const chips = Object.entries(serials).sort((a,b)=>b[1]-a[1]).map(([name,count])=>{
           const product=productFor(name),url=safeUrl(product?.photo?.url);
-          const comments=!isToday?commentCounts(todayRows.filter(row=>row.department===dept && row.serialNo===name)):[];
-          const bubbles=!isToday?`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.length?comments.slice(0,1).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join(''):'<span class="product-card-no-comment">コメントなし</span>'}${comments.length>1?`<span class="product-comment-more">ほか${comments.length-1}種類</span>`:''}</span>`:'';
-          return `<button type="button" class="serial-chip serial-chip-item product-summary-card" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="product-card-title" title="${esc(name)}">${esc(name)}</span><span class="product-card-media">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:'<span class="product-card-no-photo">写真未登録</span>'}<span class="product-card-quantity">× ${count.toLocaleString('ja-JP')}個</span></span>${bubbles}</button>`;
+          const comments=commentCounts(todayRows.filter(row=>row.department===dept && row.serialNo===name));
+          const bubbles=`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.length?comments.slice(0,1).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join(''):'<span class="product-card-no-comment">コメントなし</span>'}${comments.length>1?`<span class="product-comment-more">ほか${comments.length-1}種類</span>`:''}</span>`;
+          return `<span class="product-card-wrap"><button type="button" class="serial-chip serial-chip-item product-summary-card" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="product-card-title" title="${esc(name)}">${esc(name)}</span><span class="product-card-media">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:'<span class="product-card-no-photo">写真未登録</span>'}<span class="product-card-quantity">× ${count.toLocaleString('ja-JP')}個</span></span>${bubbles}</button>${photoRegistrationLink(name, 'card-photo-register')}</span>`;
         }).join('');
         const departmentColor=departmentColors[state.departments.indexOf(dept)%departmentColors.length];
         return `<div class="dept-row" style="--department-bg:${departmentColor}"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個</span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
       document.querySelectorAll('#departmentList .dept-row').forEach(row => row.addEventListener('click', event => {
-        if(!event.target.closest('button')) row.querySelector('[data-dept]').click();
+        if(!event.target.closest('button, a')) row.querySelector('[data-dept]').click();
       }));
       document.querySelectorAll('[data-preview-serial]').forEach(btn => {
         const bubble=btn.querySelector('.product-comment-bubble');
@@ -1642,7 +1660,7 @@
     function openDetail(title,rows){
       closeSerialPreview();
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${photoRegistrationLink(item.serialNo)}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
       document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
       document.querySelectorAll('[data-delete-item]').forEach(btn => btn.addEventListener('click', () => openDelete(btn.dataset.deleteItem)));
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();
