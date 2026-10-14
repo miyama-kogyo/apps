@@ -2144,7 +2144,7 @@
 
     document.querySelectorAll('[data-back]').forEach(btn => {
       btn.textContent = '← 管理ボード';
-      btn.addEventListener('click', () => showScreen('menu'));
+      btn.addEventListener('click', () => returnToBoard());
     });
     document.getElementById('btnCardWorkflow').addEventListener('click', () => {
       document.getElementById('approvalWorkflow').scrollIntoView({ behavior:'smooth', block:'start' });
@@ -2155,12 +2155,56 @@
       const item = changepointData.find(p => p._id === lastRegisteredPlanned.docId) || { ...lastRegisteredPlanned, _id:lastRegisteredPlanned.docId };
       showDetail(item);
     });
+    let linkedEntryId='', linkedEntryUnsubscribe=null, linkedEntryRevision=0;
+    let mastersReady=false, mastersPromise=null;
+    function returnToBoard(){
+      if(linkedEntryId){location.assign(WORKFLOW_APP_URL);return;}
+      showScreen('menu');
+    }
+    function linkedEntryMessage(message, retry=false){
+      document.getElementById('detailModal').classList.remove('active');
+      showScreen('quickApproval');
+      screens.quickApproval.innerHTML=`<header><h1>変化点情報</h1><a href="${escapeAttr(WORKFLOW_APP_URL)}">管理ボード</a></header><p class="quick-status" role="status">${escapeHtml(message)}</p>${retry?'<button type="button" class="btn btn-primary" id="retryLinkedEntry">再読み込み</button>':''}`;
+      document.getElementById('retryLinkedEntry')?.addEventListener('click',()=>location.reload());
+    }
+    function setupLinkedEntry(){
+      linkedEntryMessage('読み込み中…');
+      linkedEntryUnsubscribe=onSnapshot(doc(db,'changepoints',linkedEntryId),async snapshot=>{
+        const revision=++linkedEntryRevision;
+        if(!snapshot.exists()){
+          currentDetailItem=null;linkedChangepointOpened=false;
+          linkedEntryMessage('対象の変化点が見つかりません。',true);return;
+        }
+        const item={...snapshot.data(),_id:snapshot.id,docType:'changepoint'};
+        changepointData=[item];window.changepointData=changepointData;
+        if(needsResponderChecks(item)){
+          if(!mastersReady && !linkedChangepointOpened)linkedEntryMessage('チェック項目を読み込み中…');
+          if(!await mastersPromise){
+            if(revision===linkedEntryRevision)linkedEntryMessage('チェック項目を読み込めませんでした。通信状態を確認して再読み込みしてください。',true);
+            return;
+          }
+          if(revision!==linkedEntryRevision)return;
+        }
+        // 同じ工程の更新では入力途中の日時・氏名・所見を描き直さない。
+        const stageChanged=currentDetailItem && (approvalStatusOf(currentDetailItem)!==approvalStatusOf(item) || boardCanceled(currentDetailItem)!==boardCanceled(item) || boardCompleted(currentDetailItem)!==boardCompleted(item));
+        if(!linkedChangepointOpened || stageChanged){linkedChangepointOpened=true;showDetail(item);}
+        else {refreshEvidenceFromSnapshot();refreshQuickApprovalFromSnapshot();}
+      },error=>{
+        console.error('リンク先読み込みエラー:',error);
+        ++linkedEntryRevision;linkedChangepointOpened=false;currentDetailItem=null;
+        linkedEntryMessage('変化点情報を読み込めませんでした。通信状態・閲覧権限を確認してください。',true);
+      });
+    }
     async function initApp(){
       const now = new Date();
       calendarYear = now.getFullYear();
       calendarMonth = now.getMonth();
-      await loadMasters();
-      setupListeners();
+      const entryId=new URLSearchParams(location.search).get('changepointId');
+      linkedEntryId=isQuickApprovalLink(entryId)?entryId:'';
+      mastersPromise=loadMasters(!!linkedEntryId).then(ok=>{mastersReady=ok;return ok;});
+      if(linkedEntryId)setupLinkedEntry();
+      await mastersPromise;
+      if(!linkedEntryId)setupListeners();
       setupPlannedForm();
       setupFileUpload();
       setupQRModal();
@@ -2178,12 +2222,13 @@
       if (aggSel){ aggSel.addEventListener('change', () => renderTimelineChart()); }
     }
 
-    async function loadMasters(){
+    async function loadMasters(linkedOnly=false){
       try{
-        const [deptSnap, lineSnap, checklistSnap] = await Promise.all([
+        const [deptSnap, lineSnap, checklistSnap, distributionSnap] = await Promise.all([
           getDocs(collection(db, 'masters', 'department', 'items')),
-          getDocs(collection(db, 'masters', 'line', 'items')),
-          getDocs(collection(db, 'masters', 'changeChecklist', 'items'))
+          linkedOnly?Promise.resolve({docs:[]}):getDocs(collection(db, 'masters', 'line', 'items')),
+          getDocs(collection(db, 'masters', 'changeChecklist', 'items')),
+          linkedOnly?Promise.resolve({docs:[]}):getDocs(collection(db,'masters','changeDistribution','items')).catch(error=>{console.error('展開先マスター読み込みエラー:',error);return {docs:[]};})
         ]);
         deptDocs = deptSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         lineDocs = lineSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -2194,10 +2239,7 @@
         refreshChangeCategories();
         checklistDocs.sort((a,b) => CHANGE_CATEGORIES.indexOf(a.category) - CHANGE_CATEGORIES.indexOf(b.category) || (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(String(b.name),'ja'));
         masterDepartments = deptDocs.map(d => d.name).filter(Boolean).sort();
-        try{
-          const snap=await getDocs(collection(db,'masters','changeDistribution','items'));
-          distributionDocs=snap.docs.map(d=>({id:d.id,...d.data()}));
-        }catch(error){distributionDocs=[];console.error('展開先マスター読み込みエラー:',error);}
+        distributionDocs=distributionSnap.docs.map(d=>({id:d.id,...d.data()}));
         masterLines = lineDocs.map(d => d.name).filter(Boolean).sort();
         document.getElementById('filterLine').innerHTML =
           '<option value="">選択...</option>' +
@@ -2214,7 +2256,8 @@
         document.getElementById('lineList2').innerHTML = masterLines.map(l => `<option value="${escapeAttr(l)}">`).join('');
         renderDistributionDepartments();
         renderPlanChecklistPreview();
-      }catch(err){ console.error('マスタ読み込みエラー:', err); }
+        return true;
+      }catch(err){ console.error('マスタ読み込みエラー:', err); return false; }
     }
 
     function categoryOptions(categories, selected=''){
@@ -4301,6 +4344,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     let quickApprovalId=null,quickApprovalReceipt=null,quickApprovalVersion='';
+    function needsResponderChecks(item){
+      if(!item || boardCompleted(item) || boardCanceled(item))return false;
+      return item.type==='sudden'?canEditUnplanned(item):(item.type==='planned' || item.workflowManaged===true) && approvalStatusOf(item)==='sender_approved';
+    }
     function isQuickApprovalLink(id){
       const params=new URLSearchParams(location.search);
       return !!id && params.get('changepointId')===id && params.get('view')!=='detail' && !params.has('qualityEvaluation') && !params.has('productionDateId');
@@ -4311,6 +4358,16 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       return url.href;
     }
     function renderQuickApproval(item){
+      if(needsResponderChecks(item)){
+        if(mastersReady){showDetail(item);return;}
+        linkedEntryMessage('チェック項目を読み込み中…');
+        mastersPromise?.then(ok=>{
+          if(currentDetailItem?._id!==item._id || !needsResponderChecks(currentDetailItem))return;
+          if(ok)showDetail(currentDetailItem);
+          else linkedEntryMessage('チェック項目を読み込めませんでした。再読み込みしてください。',true);
+        });
+        return;
+      }
       const host=screens.quickApproval;
       quickApprovalVersion=JSON.stringify(item || null);
       const header=`<header><h1>変化点の承認</h1><a href="${escapeAttr(WORKFLOW_APP_URL)}">管理ボード</a></header>`;
@@ -4340,13 +4397,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       renderQuickApproval(latest);
     }
     function showDetail(item){
-      if(isQuickApprovalLink(item?._id)){
+      if(isQuickApprovalLink(item?._id) && (!needsResponderChecks(item) || !mastersReady)){
         currentDetailItem=item;quickApprovalId=item._id;quickApprovalReceipt=null;
         screens.quickApproval.dataset.signature='';
         document.getElementById('detailModal').classList.remove('active');
         showScreen('quickApproval');renderQuickApproval(item);return;
       }
-      if(quickApprovalId && screens.quickApproval.style.display!=='none')showScreen('menu');
+      if(screens.quickApproval.style.display!=='none')showScreen(linkedEntryId?'linkedEntry':'menu');
       quickApprovalId=null;
       document.getElementById('approvalWorkflow').dataset.itemId='';
       const oldQuality=qualityDrafts.get(item._id);
@@ -4406,13 +4463,19 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         document.getElementById('detailTitle').textContent='チェック・承認';
         body = `<div class="qr-basic"><div><span>実施日</span><strong>${escapeHtml(item.occurrenceDate || '未定')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div class="qr-basic-content"><span>変化点内容</span><p>${escapeHtml(item.content || '-')}</p></div></div>`;
       }
-      if (isCP && item.type === 'sudden') body += '<section class="detail-section"><h3 class="detail-section-title">関連する異常内容</h3><div id="relatedAnomalyHost" aria-live="polite"></div></section>';
-      if (isCP) body += '<section id="evidenceHost" aria-label="評価エビデンス"></section>';
-      if (isCP) body += '<section id="qualityEvaluationHost" aria-label="品質評価"></section>';
+      const directChecks=qrMode && isQuickApprovalLink(item._id) && needsResponderChecks(item);
+      if(directChecks){
+        document.getElementById('detailTitle').textContent='対応者チェック';
+        body+=`<a class="quick-details" href="${escapeAttr(buildDetailUrl(item._id))}">詳細を見る</a>`;
+        if(item.qualityEvaluationRequired)body+=`<p>品質評価：${escapeHtml(QUALITY_VERDICTS[item.qualityEvaluationVerdict] || '未判定')}${item.qualityEvaluationVerdict==='conditional' && item.qualityEvaluationCondition?' / '+escapeHtml(item.qualityEvaluationCondition):''}</p>`;
+      }
+      if (isCP && item.type === 'sudden' && !directChecks) body += '<section class="detail-section"><h3 class="detail-section-title">関連する異常内容</h3><div id="relatedAnomalyHost" aria-live="polite"></div></section>';
+      if (isCP && !directChecks) body += '<section id="evidenceHost" aria-label="評価エビデンス"></section>';
+      if (isCP && !directChecks) body += '<section id="qualityEvaluationHost" aria-label="品質評価"></section>';
       document.getElementById('detailBody').innerHTML = body;
-      if (isCP && item.type === 'sudden') renderRelatedAnomaly(item);
-      if (isCP) renderEvidencePanel(item);
-      if (isCP) renderQualityEvaluation(item);
+      if (isCP && item.type === 'sudden' && !directChecks) renderRelatedAnomaly(item);
+      if (isCP && !directChecks) renderEvidencePanel(item);
+      if (isCP && !directChecks) renderQualityEvaluation(item);
       if(isCP && new URLSearchParams(location.search).get('qualityEvaluation')==='1'){
         document.getElementById('detailTitle').textContent='品質評価';
         document.getElementById('evidencePanel').open=true;
@@ -4510,8 +4573,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       document.getElementById('detailModal').classList.add('active');
     }
 
-    document.getElementById('detailClose').addEventListener('click', () => { document.getElementById('detailModal').classList.remove('active'); });
-    document.getElementById('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal') document.getElementById('detailModal').classList.remove('active'); });
+    function closeDetail(){
+      if(linkedEntryId){returnToBoard();return;}
+      document.getElementById('detailModal').classList.remove('active');
+    }
+    document.getElementById('detailClose').addEventListener('click', closeDetail);
+    document.getElementById('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal')closeDetail(); });
     document.getElementById('btnDetailEdit').addEventListener('click', () => { if (!currentDetailItem) return; document.getElementById('detailModal').classList.remove('active'); openEditModal(currentDetailItem._id); });
     document.getElementById('btnDetailDelete').addEventListener('click', async () => { if (!currentDetailItem) return; await deleteChangepoint(currentDetailItem._id); document.getElementById('detailModal').classList.remove('active'); });
 
