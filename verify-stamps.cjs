@@ -5,7 +5,7 @@ const assert=(ok,msg)=>{if(!ok)throw new Error(msg)};
 const slice=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 async function unit(){
  const ctx={window:{},workflowCommentDrafts:new Map(),workflowCommentSaves:new Set(),APPROVAL_STAGES:['draft','sender_approved','receiver_confirmed','approved'],currentDetailItem:null,
-  getRecordChecklist:i=>i.checklistItems,document:{querySelector:()=>null,getElementById:id=>({value:id==='actualSwitchDate'?'2026-10-08':id==='actualSwitchTime'?'09:15':ctx.actor,focus(){}})},
+  getRecordChecklist:i=>i.checklistItems,document:{querySelector:()=>null,getElementById:id=>({value:id==='actualSwitchDate'?'2026-10-08':id==='actualSwitchTime'?'09:15':ctx.actor,focus(){},showModal(){},close(){}})},
   localStorage:{setItem(){}},updateActorNameButton(){},alert:m=>ctx.messages.push(m),confirm:m=>{ctx.confirmed.push(m);return true},
   doc:(_,collection,id)=>({collection,id}),db:{},serverTimestamp:()=> 'SERVER_TIME',
   updateDoc:async(ref,payload)=>ctx.writes.push({ref,payload}),saveChecklist:async items=>ctx.writes.push({checklistItems:items}),renderApprovalWorkflow(){},console,
@@ -17,10 +17,15 @@ async function unit(){
   slice('function workflowStampEntries','    function renderApprovalWorkflow')+
   slice('    window.approveSender =','    function createQrDataUrl')+
   slice('    window.setApprovalResult =','    window.excludeApprovalItem'),ctx);
+ // Keep the existing business-rule assertions, using the new explicit approval steps.
+ vm.runInContext(`renderStampApproval=()=>{if(stampApprovalSession?.error)alert(stampApprovalSession.error)};`,ctx);
+ for(const method of ['approveSender','approveReceiver']){
+  const open=ctx.window[method];ctx.window[method]=async()=>{await open();await ctx.window.reviewStampApproval();await ctx.window.commitStampApproval();};
+ }
  const base=()=>({_id:'fixture-only',type:'planned',approvalStatus:'draft',occurrenceDate:'2020-01-01',
  checklistItems:[{key:'a',owner:'both',senderResult:'ok',receiverResult:'ok'}],
  specialHandlingStatus:'not_required',relatedReviewCompleted:true});
- const reset=(overrides={})=>{ctx.currentDetailItem={...base(),...overrides};ctx.messages=[];ctx.writes=[];ctx.confirmed=[];ctx.actor='試験 承認者';};
+ const reset=(overrides={})=>{ctx.window.closeStampApproval();ctx.currentDetailItem={...base(),...overrides};ctx.messages=[];ctx.writes=[];ctx.confirmed=[];ctx.actor='試験 承認者';};
  reset();await ctx.window.approveSender();assert(ctx.writes[0].payload.senderApprovedBy==='試験 承認者','sender name');
  assert(ctx.writes[0].payload.senderApprovedAt==='SERVER_TIME','sender timestamp');assert(ctx.currentDetailItem.approvalStatus==='sender_approved','sender stage');
  ctx.actor='試験 対応者';await ctx.window.confirmReceiver();assert(ctx.writes[1].payload.receiverConfirmedBy===ctx.actor,'receiver name');
@@ -59,7 +64,7 @@ async function unit(){
  ];
  for(const c of cases){reset({approvalStatus:'receiver_confirmed',...c});await ctx.window.approveReceiver();assert(ctx.writes.length===1&&ctx.writes[0].payload.switchStatus==='completed','unconditional final approval '+JSON.stringify(c));}
  reset({approvalStatus:'receiver_confirmed'});ctx.actor='';await ctx.window.approveReceiver();assert(ctx.writes.length===0,'final stamp requires name');
- reset({approvalStatus:'receiver_confirmed'});ctx.workflowCommentDrafts.set('fixture-only','保存失敗でも残す');const update=ctx.updateDoc;ctx.updateDoc=async()=>{throw new Error('expected save failure')};await ctx.window.approveReceiver();assert(ctx.currentDetailItem.approvalStatus==='receiver_confirmed'&&ctx.workflowCommentDrafts.get('fixture-only')==='保存失敗でも残す','failed approval preserves stage and comment');ctx.updateDoc=update;ctx.workflowCommentDrafts.clear();
+ reset({approvalStatus:'receiver_confirmed'});ctx.workflowCommentDrafts.set('fixture-only','保存失敗でも残す');const update=ctx.runTransaction;ctx.runTransaction=async()=>{throw new Error('expected save failure')};await ctx.window.approveReceiver();assert(ctx.currentDetailItem.approvalStatus==='receiver_confirmed'&&ctx.workflowCommentDrafts.get('fixture-only')==='保存失敗でも残す','failed approval preserves stage and comment');ctx.runTransaction=update;ctx.workflowCommentDrafts.clear();
  reset({approvalStatus:'sender_approved'});const transaction=ctx.runTransaction;
  ctx.runTransaction=async()=>{throw new Error('expected responder save failure')};await ctx.window.confirmReceiver();
  assert(ctx.currentDetailItem.approvalStatus==='sender_approved'&&ctx.writes.length===0,'failed responder stamp retains stage');
@@ -104,14 +109,14 @@ async function browserTest(){
   assert((await page.locator('[data-workflow-section="completion"] summary').innerText())==='追加記録（任意）','optional records label');
   assert(await page.locator('[data-workflow-section="completion"] .required').count()===0,'no approval required markers');
   assert(await page.locator('.workflow-stamp.is-stamped').count()===i+1,'stamped count '+status);
-  assert(await page.locator('.stamp-action button').count()===(status==='approved'?0:1),'one next action '+status);
+  assert(await page.locator('.stamp-action button').count()===(status==='sender_approved'?1:0),'responder action only '+status);
   assert(await page.locator('.workflow-fold[open]').count()===0,'folded initially '+status);
   assert(await page.locator('.workflow-checks .check-label').first().isVisible(),'checks always shown '+status);
   assert(await page.evaluate(()=>{
    const body=document.getElementById('detailBody'),checks=document.querySelector('.workflow-checks'),stamps=document.querySelector('.workflow-stamps');
    return !!(body.compareDocumentPosition(checks)&Node.DOCUMENT_POSITION_FOLLOWING) &&
     !!(checks.compareDocumentPosition(stamps)&Node.DOCUMENT_POSITION_FOLLOWING) &&
-    stamps===document.querySelector('.workflow-signoff').lastElementChild &&
+    stamps.parentElement===document.querySelector('.workflow-signoff') &&
     document.getElementById('approvalWorkflow')===document.querySelector('#detailModal .modal-content').lastElementChild;
   }),'content then checks then stamps at bottom '+status);
   assert(await page.locator('[data-check-role="sender"]').count()===0,'no sender check input');

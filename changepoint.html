@@ -832,6 +832,17 @@
     .is-next .stamp-role { color:#176349; }
     .is-next .stamp-seal { border-color:#63947b; color:#416d53; }
     .stamp-department { font-size:11px; color:#69786f; overflow-wrap:anywhere; }
+    .approval-entry { margin-top:16px; padding-top:12px; border-top:1px solid #d4ded7; }
+    .approval-entry p { margin-bottom:10px; }
+    #stampApprovalDialog { width:calc(100% - 24px); max-width:620px; max-height:90dvh; margin:auto; padding:24px; border:1px solid #bdcbc2; border-radius:8px; overflow:auto; }
+    #stampApprovalDialog::backdrop { background:rgba(0,0,0,.5); }
+    #stampApprovalDialog h2 { font-size:20px; margin-bottom:16px; }
+    #stampApprovalDialog dl { display:grid; grid-template-columns:90px minmax(0,1fr); gap:10px; margin:16px 0; }
+    #stampApprovalDialog dt { color:#52645a; }
+    #stampApprovalDialog dd { margin:0; overflow-wrap:anywhere; white-space:pre-wrap; }
+    #stampApprovalDialog input { width:100%; min-width:0; padding:10px; font:inherit; font-size:16px; margin:8px 0; }
+    #stampApprovalDialog .approval-confirm-name { font-size:22px; font-weight:700; overflow-wrap:anywhere; margin:12px 0; }
+    #stampApprovalDialog .confirm-modal-buttons { flex-wrap:wrap; }
     .stamp-action { padding:14px 0; margin-top:12px; border-top:1px solid #d4ded7; }
     .stamp-action label { display:block; font-size:13px; font-weight:600; margin-bottom:7px; color:#176349; }
     .stamp-action>div { display:flex; gap:8px; }
@@ -1641,6 +1652,7 @@
     </div>
   </div>
 
+  <dialog id="stampApprovalDialog" aria-labelledby="stampApprovalTitle" oncancel="if(!closeStampApproval())event.preventDefault()"></dialog>
   <dialog id="distributionEditDialog" aria-labelledby="distributionEditTitle" style="max-width:540px;width:calc(100% - 32px);margin:auto;border:0;border-radius:8px;padding:24px;">
     <form onsubmit="event.preventDefault();saveDistributionGroup()">
       <h2 id="distributionEditTitle" style="font-size:18px;margin-bottom:16px;">展開先</h2>
@@ -3582,13 +3594,14 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         return {...latest,_id:id,...fields,...(submit ? {postCheckedAt:new Date()} : {})};
       });
     }
-    async function approveUnplannedRecord(id,expectedRevision,who){
+    async function approveUnplannedRecord(id,expectedRevision,who,expectedRecord){
       if(!who?.trim() || who.trim().length>80) throw new Error('氏名を80文字以内で入力してください。');
       return runTransaction(db,async tx=>{
         const ref=doc(db,'changepoints',id),snapshot=await tx.get(ref);
         if(!snapshot.exists()) throw new Error('対象が見つかりません。');
         const latest=snapshot.data();
         if(!isResponsePostcheck(latest) || !latest.responseDepartment || latest.approvalStatus!=='draft' || !latest.postCheckedBy || !latest.postCheckedAt || boardCompleted(latest) || boardCanceled(latest) || (latest.postCheckRevision || 0)!==expectedRevision) throw new Error('状態が変更されています。開き直してください。');
+        if(expectedRecord && ['responseDepartment','content','lineName','serialNo','postCheckedBy'].some(key=>latest[key]!==expectedRecord[key]))throw new Error('内容が変更されています。画面を開き直して確認してください。');
         const fields={approvalStatus:'approved',switchStatus:'completed',responseApprovedBy:who.trim(),responseApprovedAt:serverTimestamp(),completedBy:who.trim(),completedAt:serverTimestamp(),updatedBy:who.trim(),updatedAt:serverTimestamp()};
         tx.update(ref,fields);
         return {...latest,_id:id,...fields,responseApprovedAt:new Date(),completedAt:new Date()};
@@ -3623,7 +3636,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
           <div class="form-group"><label for="postDepartment">対応部署</label><select id="postDepartment" ${disabled}><option value="">選択</option>${[...new Set([...masterDepartments,item.responseDepartment].filter(Boolean))].map(x=>`<option ${item.responseDepartment===x?'selected':''}>${escapeHtml(x)}</option>`).join('')}</select></div>
         </section>
         <section class="workflow-signoff"><div class="stamp-heading"><strong>${editable?'事後確認':'対応部署の上司承認'}</strong></div>
-        ${editable || approvable ? `<label for="postActor">氏名</label><input id="postActor" maxlength="80" value="${escapeAttr(localStorage.getItem('changepointActorName') || '')}"><div class="post-actions">${editable?'<button type="button" class="btn btn-secondary" onclick="saveUnplannedForm(false)">一時保存</button><button type="button" class="btn btn-primary" onclick="saveUnplannedForm(true)">確認完了・承認依頼</button>':'<button type="button" class="btn btn-primary" onclick="approveUnplanned()">承認して完了する</button>'}</div>`:''}
+        ${editable ? `<label for="postActor">氏名</label><input id="postActor" maxlength="80" value="${escapeAttr(localStorage.getItem('changepointActorName') || '')}"><div class="post-actions"><button type="button" class="btn btn-secondary" onclick="saveUnplannedForm(false)">一時保存</button><button type="button" class="btn btn-primary" onclick="saveUnplannedForm(true)">確認完了・承認依頼</button></div>`:''}
+        ${approvable ? '<div class="approval-entry"><p role="status">対応部署の上司承認待ちです。対応者の操作は完了しています。</p><button type="button" class="btn btn-secondary" onclick="approveUnplanned()">承認者用画面を開く</button></div>' : ''}
         ${item.postCheckedBy ? `<p>事後確認：${escapeHtml(item.postCheckedBy)} / ${escapeHtml(stampDate(item.postCheckedAt))}</p>` : ''}
         <div class="workflow-stamps">${workflowStampEntries(item).map(s=>`<div class="workflow-stamp ${s.name?'is-stamped':''}"><div class="stamp-role">${escapeHtml(s.department)} ${escapeHtml(s.role)}${item.responseDepartment ? '：'+escapeHtml(item.responseDepartment) : ''}</div><div class="stamp-seal"><span class="stamp-name">${escapeHtml(s.name || '未記録')}</span><time>${escapeHtml(stampDate(s.at))}</time></div></div>`).join('')}</div><p id="postSaveStatus" role="status"></p></section></form>`;
       box.querySelector('#unplannedCheckForm').onsubmit=e=>e.preventDefault();
@@ -3665,13 +3679,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       }
     };
     window.approveUnplanned=async function(){
-      const item=currentDetailItem,who=document.getElementById('postActor')?.value.trim();
-      if(!item || unplannedSaves.has(item._id))return;
-      if(!who){alert('氏名を入力してください。');return;}
-      if(!confirm(`対応部署「${item.responseDepartment}」の ${who} さんの承認スタンプを登録して完了しますか？`))return;
-      unplannedSaves.add(item._id);
-      try{const saved=await approveUnplannedRecord(item._id,item.postCheckRevision || 0,who);if(currentDetailItem?._id===item._id){currentDetailItem=saved;renderApprovalWorkflow(saved);}}
-      catch(e){alert('承認できませんでした：'+e.message);}finally{unplannedSaves.delete(item._id);}
+      openStampApproval('unplanned');
     };
 
     const APPROVAL_STAGES = ['draft', 'sender_approved', 'receiver_confirmed', 'approved', 'post_check'];
@@ -3846,7 +3854,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         </section>
         <section class="workflow-signoff">
         <div class="stamp-heading"><strong>承認スタンプ</strong><span class="approval-status-badge ${status === 'approved' ? 'approved' : ''}">${escapeHtml(approvalStatusLabel(status))}</span></div>
-        ${next ? `<div class="stamp-action">
+        ${status==='sender_approved' ? `<div class="stamp-action">
           <label for="workflowStampName">次：${next[0]}</label>
           ${status==='sender_approved' ? '<p id="receiverStampReadiness" class="stamp-readiness" role="status"></p>' : ''}
           <div><input type="text" id="workflowStampName" value="${escapeAttr(actor)}" placeholder="氏名" autocomplete="name" maxlength="80"><button type="button" class="btn btn-primary" ${status==='sender_approved' ? 'id="receiverStampButton"' : ''} ${stamping ? 'disabled' : ''} onclick="${next[2]}">${stamping ? '保存中...' : next[1]}</button></div>
@@ -3856,6 +3864,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
           <div class="stamp-seal"><span class="stamp-name">${escapeHtml(stamp.name || (index===0 ? '氏名未記録' : '未押印'))}</span><time>${stamp.name ? escapeHtml(stampDate(stamp.at)) : '―'}</time></div>
           <div class="stamp-department">${escapeHtml(index<2 ? item.planneddepartment || '-' : item.department || '-')}</div>
         </div>`).join('')}</div>
+        ${['draft','receiver_confirmed'].includes(status) ? `<div class="approval-entry"><p role="status">${status==='draft' ? '発信部署の承認待ちです。' : '対応完了・発生部署の承認待ちです。対応者の操作は完了しています。'}</p><button type="button" class="btn btn-secondary" onclick="${next[2]}">承認者用画面を開く</button></div>` : ''}
         </section>`;
       updateReceiverStampReadiness();
     }
@@ -3997,17 +4006,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
 
     window.approveSender = async function(){
-      if (currentDetailItem?.type === 'sudden') return;
-      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'draft') return;
-      const items = getRecordChecklist(currentDetailItem);
-      const who = readStampName(false);
-      if (!who || !confirm(`${who} さんの発信部署承認スタンプを登録しますか？`)) return;
-      const comment = stampCommentFields(who);
-      try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { ...comment, ...(comment.workflowCommentAt ? {workflowCommentAt:serverTimestamp()} : {}), checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, ...comment, checklistItems:items, approvalStatus:'sender_approved', senderApprovedBy:who, senderApprovedAt:new Date() };
-        renderApprovalWorkflow(currentDetailItem);
-      }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
+      openStampApproval('sender');
     };
 
     window.confirmReceiver = async function(){
@@ -4037,17 +4036,80 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     };
 
     window.approveReceiver = async function(){
-      if (currentDetailItem?.type === 'sudden') return;
-      if (!currentDetailItem || approvalStatusOf(currentDetailItem) !== 'receiver_confirmed') return;
-      const items = getRecordChecklist(currentDetailItem);
-      const who = readStampName(false);
-      if (!who || !confirm(`${who} さんの発生部署承認スタンプを登録し、変化点を完了にしますか？`)) return;
-      const comment = stampCommentFields(who);
+      openStampApproval('receiver');
+    };
+
+    let stampApprovalSession=null;
+    function approvalScreenTarget(item,kind){
+      if(!item?._id || boardCompleted(item) || boardCanceled(item))return null;
+      if(kind==='unplanned')return isResponsePostcheck(item) && item.approvalStatus==='draft' && item.responseDepartment && item.postCheckedBy && item.postCheckedAt
+        ? {role:'対応部署の上司承認',department:item.responseDepartment} : null;
+      if(item.type==='sudden' || !(item.type==='planned' || item.workflowManaged===true))return null;
+      if(kind==='sender' && approvalStatusOf(item)==='draft')return {role:'発信部署の承認',department:item.planneddepartment || '-'};
+      if(kind==='receiver' && approvalStatusOf(item)==='receiver_confirmed')return {role:'発生部署の最終承認',department:item.department || '-'};
+      return null;
+    }
+    function openStampApproval(kind){
+      if(stampApprovalSession?.busy)return;
+      const item=currentDetailItem,target=approvalScreenTarget(item,kind);
+      if(!target)return;
+      // Approval names are deliberately independent of the responder's saved name.
+      stampApprovalSession={item:{...item},kind,target,name:'',phase:'input',busy:false,error:''};
+      renderStampApproval();
+      const dialog=document.getElementById('stampApprovalDialog');
+      if(!dialog.open)dialog.showModal();
+      document.getElementById('stampApproverName').focus();
+    }
+    function renderStampApproval(){
+      const s=stampApprovalSession;if(!s)return;
+      const review=s.phase==='confirm',item=s.item;
+      document.getElementById('stampApprovalDialog').innerHTML=`<h2 id="stampApprovalTitle">${review?'承認内容の最終確認':'承認者用画面'}</h2>
+        <strong>${escapeHtml(s.target.role)}</strong>
+        <dl><dt>承認部署</dt><dd>${escapeHtml(s.target.department)}</dd><dt>ライン</dt><dd>${escapeHtml(item.lineName || '-')}</dd><dt>整理No.</dt><dd>${escapeHtml(item.serialNo || '-')}</dd><dt>変化点内容</dt><dd>${escapeHtml(item.content || '-')}</dd><dt>対応者</dt><dd>${escapeHtml(item.receiverConfirmedBy || item.postCheckedBy || '未対応')}</dd></dl>
+        ${review ? `<p>承認者</p><p class="approval-confirm-name">${escapeHtml(s.name)}</p><p>${s.kind==='sender'?'発信部署の承認スタンプを登録します。':'承認スタンプを登録し、この変化点を完了にします。'}</p>` : `<label for="stampApproverName">承認者氏名 *</label><input type="text" id="stampApproverName" value="${escapeAttr(s.name)}" maxlength="80" autocomplete="off">`}
+        <p id="stampApprovalError" role="alert" style="color:#a33832;margin:12px 0;">${escapeHtml(s.error)}</p>
+        <div class="confirm-modal-buttons"><button type="button" class="btn btn-secondary" ${s.busy?'disabled':''} onclick="closeStampApproval()">キャンセル</button>
+        ${review?`<button type="button" class="btn btn-secondary" ${s.busy?'disabled':''} onclick="editStampApproval()">戻る</button><button type="button" id="stampApprovalCommit" class="btn btn-primary" ${s.busy?'disabled':''} onclick="commitStampApproval()">${s.busy?'保存中...':'この内容で承認する'}</button>`:'<button type="button" id="stampApprovalReview" class="btn btn-primary" onclick="reviewStampApproval()">承認内容を確認する</button>'}</div>`;
+    }
+    window.closeStampApproval=function(){
+      if(stampApprovalSession?.busy)return false;
+      stampApprovalSession=null;
+      document.getElementById('stampApprovalDialog').close();
+      return true;
+    };
+    window.reviewStampApproval=function(){
+      const s=stampApprovalSession;if(!s || s.busy || s.phase!=='input')return;
+      s.name=document.getElementById('stampApproverName').value.trim();
+      if(!s.name || s.name.length>80){s.error='承認者の氏名を80文字以内で入力してください。';renderStampApproval();document.getElementById('stampApproverName').focus();return;}
+      s.phase='confirm';s.error='';renderStampApproval();
+      document.getElementById('stampApprovalDialog').scrollTop=0;
+    };
+    window.editStampApproval=function(){
+      const s=stampApprovalSession;if(!s || s.busy)return;
+      s.phase='input';s.error='';renderStampApproval();document.getElementById('stampApproverName').focus();
+    };
+    async function savePlannedApproval(item,kind,who,comment){
+      return runTransaction(db,async tx=>{
+        const ref=doc(db,'changepoints',item._id),snap=await tx.get(ref);
+        if(!snap.exists())throw new Error('対象が見つかりません。');
+        const latest={...snap.data(),_id:item._id},target=approvalScreenTarget(latest,kind);
+        if(!target || target.department!==approvalScreenTarget(item,kind)?.department || latest.content!==item.content || latest.lineName!==item.lineName || latest.serialNo!==item.serialNo || latest.receiverConfirmedBy!==item.receiverConfirmedBy)throw new Error('状態または内容が変更されています。画面を開き直して確認してください。');
+        const fields={...comment,...(comment.workflowCommentAt?{workflowCommentAt:serverTimestamp()}:{}),updatedBy:who,updatedAt:serverTimestamp(),
+          ...(kind==='sender'?{approvalStatus:'sender_approved',senderApprovedBy:who,senderApprovedAt:serverTimestamp()}:
+          {approvalStatus:'approved',switchStatus:'completed',receiverApprovedBy:who,receiverApprovedAt:serverTimestamp(),completedBy:who,completedAt:serverTimestamp()})};
+        tx.update(ref,fields);
+        return {...latest,...fields,...(kind==='sender'?{senderApprovedAt:new Date()}:{receiverApprovedAt:new Date(),completedAt:new Date()})};
+      });
+    }
+    window.commitStampApproval=async function(){
+      const s=stampApprovalSession;
+      if(!s || s.busy || s.phase!=='confirm' || !s.name || currentDetailItem?._id!==s.item._id)return;
+      s.busy=true;s.error='';renderStampApproval();
       try{
-        await updateDoc(doc(db, 'changepoints', currentDetailItem._id), { ...comment, ...(comment.workflowCommentAt ? {workflowCommentAt:serverTimestamp()} : {}), checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:serverTimestamp(), completedBy:who, completedAt:serverTimestamp() });
-        currentDetailItem = { ...currentDetailItem, ...comment, checklistItems:items, approvalStatus:'approved', switchStatus:'completed', receiverApprovedBy:who, receiverApprovedAt:new Date(), completedBy:who, completedAt:new Date() };
-        renderApprovalWorkflow(currentDetailItem);
-      }catch(e){ console.error(e); alert('承認の登録に失敗しました'); }
+        const saved=s.kind==='unplanned'?await approveUnplannedRecord(s.item._id,s.item.postCheckRevision || 0,s.name,s.item):await savePlannedApproval(s.item,s.kind,s.name,stampCommentFields(s.name));
+        if(currentDetailItem?._id===s.item._id){currentDetailItem=saved;renderApprovalWorkflow(saved);}
+        s.busy=false;window.closeStampApproval();
+      }catch(error){console.error(error);s.busy=false;s.error='承認できませんでした：'+error.message;renderStampApproval();}
     };
 
     function createQrDataUrl(text){
