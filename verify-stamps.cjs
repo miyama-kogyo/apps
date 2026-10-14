@@ -20,7 +20,7 @@ async function unit(){
  // Keep the existing business-rule assertions, using the new explicit approval steps.
  vm.runInContext(`renderStampApproval=()=>{if(stampApprovalSession?.error)alert(stampApprovalSession.error)};`,ctx);
  for(const method of ['approveSender','approveReceiver']){
-  const open=ctx.window[method];ctx.window[method]=async()=>{await open();await ctx.window.reviewStampApproval();await ctx.window.commitStampApproval();};
+  const open=ctx.window[method];ctx.window[method]=async()=>{await open();await ctx.window.commitStampApproval();};
  }
  const base=()=>({_id:'fixture-only',type:'planned',approvalStatus:'draft',occurrenceDate:'2020-01-01',
  checklistItems:[{key:'a',owner:'both',senderResult:'ok',receiverResult:'ok'}],
@@ -109,7 +109,7 @@ async function browserTest(){
   assert((await page.locator('[data-workflow-section="completion"] summary').innerText())==='追加記録（任意）','optional records label');
   assert(await page.locator('[data-workflow-section="completion"] .required').count()===0,'no approval required markers');
   assert(await page.locator('.workflow-stamp.is-stamped').count()===i+1,'stamped count '+status);
-  assert(await page.locator('.stamp-action button').count()===(status==='sender_approved'?1:0),'responder action only '+status);
+  assert(await page.locator('.stamp-action button').count()===(status==='approved'?0:1),'one next action '+status);
   assert(await page.locator('.workflow-fold[open]').count()===0,'folded initially '+status);
   assert(await page.locator('.workflow-checks .check-label').first().isVisible(),'checks always shown '+status);
   assert(await page.evaluate(()=>{
