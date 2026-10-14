@@ -6,7 +6,7 @@ const guards=slice('    function boardCompleted','    function buildTopicsDeptOp
 const validate=slice('    function validateActualSwitch','    async function saveReceiverStamp');
 const escaping=slice('    function escapeHtml','    function csvEscape')+slice('    function categoryOptions','    function refreshChangeCategories');
 const stamps=slice('    function workflowStampEntries','    function readStampName');
-const related=slice('    function relatedAnomalyHtml','    function showDetail');
+const related=slice('    function relatedAnomalyHtml','    let quickApprovalId');
 const categories=['人','設備','材料','方法','金型'];
 const record=()=>({_id:'fixture',type:'sudden',workflowManaged:true,workflowKind:'unplanned_response_v2',approvalStatus:'post_check',postCheckRevision:0,planneddepartment:'品質',department:'製造',category:'',createdBy:'作成者',createdAt:'2026-10-12T09:00:00+09:00',evidenceAttachments:[{id:'preserve'}]});
 const data=()=>({category:'設備',responseDepartment:'保全',temporaryChange:false,temporaryUntil:'',workflowComment:'確認結果',checklistItems:['safety','products','workability'].map(x=>({key:'post_'+x,receiverResult:'ok'}))});
@@ -52,7 +52,7 @@ async function browser(){
  const css=html.match(/<style>([\s\S]*?)<\/style>/)[1];
  const script=`const CHANGE_CATEGORIES=${JSON.stringify(categories)},masterDepartments=['品質','製造','保全'];let currentDetailItem=${JSON.stringify(record())};const db={},doc=(_,c,id)=>({c,id}),serverTimestamp=()=>new Date();let latest=currentDetailItem;
  const runTransaction=async(_,fn)=>fn({get:async()=>({exists:()=>true,data:()=>latest}),update:(_,p)=>{latest={...latest,...p}}});
- const getActorName=()=> '担当者';const isQrWorkflow=()=>true;const approvalStatusOf=i=>i.approvalStatus;
+ const getActorName=()=> '担当者';const isQrWorkflow=()=>true;const approvalStatusOf=i=>i.approvalStatus;let quickApprovalId=null,quickApprovalReceipt=null;const screens={quickApproval:{style:{display:'none'}}};
  const renderApprovalWorkflow=i=>renderUnplannedWorkflow(i,document.getElementById('approvalWorkflow'));const showDetail=renderApprovalWorkflow;
  ${escaping}${validate}${guards}${stamps}${core}${related}${slice('    let stampApprovalSession','    function createQrDataUrl')}
  let missing=false,fail=false;const getDoc=async()=>{if(fail)throw Error('fixture failure');return {exists:()=>!missing,data:()=>({anomalyContent:'異常内容のテスト',actionTaken:'部品交換',rootCauseAction:'再確認'})}};
@@ -168,7 +168,7 @@ async function fullApp(engine='chromium'){
   assert.equal(await p.evaluate(()=>window.__latest.workflowComment),'未保存の所見');
   await check('a').uncheck();assert(await p.locator('#receiverStampButton').isDisabled());await p.waitForFunction(()=>!window.setApprovalResult.pending.size);
   await check('a').check();await p.waitForFunction(()=>!window.setApprovalResult.pending.size);
-  await p.evaluate(()=>{history.replaceState(null,'','?changepointId=planned-checkbox');window.showDetail(window.__latest)});
+  await p.evaluate(()=>{history.replaceState(null,'','?changepointId=planned-checkbox&view=detail');window.showDetail(window.__latest)});
   for(const width of [320,390,768,1440]){
    await p.setViewportSize({width,height:900});
    const positions=await p.locator('#approvalWorkflow').evaluate(el=>Object.fromEntries(['workflow-checks','workflow-fold','workflow-comment','workflow-signoff'].map(c=>{const r=el.querySelector('.'+c).getBoundingClientRect();return [c,{top:r.top,bottom:r.bottom}]})));

@@ -9,7 +9,7 @@ const addDoc=async()=>{throw Error('unexpected create')},deleteDoc=async()=>{thr
 window.__records={};window.__writes=[];window.__fail=false;
 const runTransaction=async(_,fn)=>{if(window.__hold)await new Promise(r=>window.__release=r);if(window.__fail)throw Error('offline test failure');return fn({get:async ref=>{const data=window.__records[ref.split('/').pop()];return {exists:()=>!!data,data:()=>structuredClone(data)}},update:(ref,p)=>{Object.assign(window.__records[ref.split('/').pop()],p);window.__writes.push(p)}})};
 localStorage.setItem('changepointActorName','対応者テスト');`;
-const fixture=html.replace(/<script src="[^"]+"><\/script>/g,'').replace(/<script type="module">[\s\S]*?<\/script>/,`<script type="module">${mock}${source}\nawait initApp();document.getElementById('authGate').style.display='none';window.__show=item=>{window.__records[item._id]=structuredClone(item);showDetail(item)};window.__ready=true;</script>`);
+const fixture=html.replace(/<script src="[^"]+"><\/script>/g,'').replace(/<script type="module">[\s\S]*?<\/script>/,`<script type="module">${mock}${source}\nawait initApp();document.getElementById('authGate').style.display='none';window.__show=item=>{window.__records[item._id]=structuredClone(item);showDetail(item)};window.__snapshot=items=>{changepointData=items;refreshQuickApprovalFromSnapshot()};window.__linked=items=>{changepointData=items;linkedChangepointOpened=false;openLinkedChangepointIfReady()};window.__ready=true;</script>`);
 const planned=(status='sender_approved')=>({_id:'fixture',type:'planned',workflowManaged:true,approvalStatus:status,planneddepartment:'品質',department:'製造',lineName:'94-300',serialNo:'7106',content:'溶接条件変更後の確認',createdBy:'作成者',senderApprovedBy:'発信上司',checklistItems:[{key:'a',label:'安全面に問題はないか',receiverResult:'ok'}],actualSwitchDate:'2026-10-13',actualSwitchTime:'09:15',evidenceAttachments:[]});
 async function main(){
  fs.mkdirSync('outputs/approval-screen',{recursive:true});
@@ -55,7 +55,29 @@ async function main(){
    const unplanned={...planned('post_check'),type:'sudden',workflowKind:'unplanned_response_v2',category:'設備',responseDepartment:'保全',temporaryChange:false,checklistItems:['safety','products','workability'].map(x=>({key:'post_'+x,receiverResult:'ok'}))};
    await show(unplanned);await page.getByRole('button',{name:'確認完了・承認依頼',exact:true}).click();await page.waitForFunction(()=>window.__records.fixture.approvalStatus==='draft');assert.equal(await page.locator('#postActor').inputValue(),'');await open();await review('保全上司');await commit();assert.equal(await page.evaluate(()=>window.__records.fixture.responseApprovedBy),'保全上司');
    await show({...planned('receiver_confirmed'),receiverConfirmedBy:'対応者テスト'});await page.setViewportSize({width:390,height:850});await page.locator('.workflow-signoff').scrollIntoViewIfNeeded();await page.screenshot({path:path.resolve(`outputs/approval-screen/inline-${engine}.png`)});
-   assert.deepEqual(errors,[]);console.log(`PASS ${engine}: inline approval, blank name on transition/reopen, confirmation before write, cancellation, stale data, concurrent taps, retry, unconditional approval, unplanned, mobile. Offline only.`);
+   // Existing email and printed QR links both use the compact view, without rewriting URLs.
+   await page.evaluate(()=>history.replaceState(null,'','?changepointId=fixture'));
+   await show({...planned('receiver_confirmed'),receiverConfirmedBy:'対応者テスト',occurrenceDate:'2026-10-14'});
+   assert(await page.locator('#quickApprovalScreen').isVisible());assert(!(await page.locator('#detailModal').isVisible()));
+   assert.equal(await page.locator('#quickApproverName').inputValue(),'');
+   assert.equal(await page.locator('#quickApprovalScreen input[type="checkbox"],#quickApprovalScreen textarea,#quickApprovalScreen .workflow-stamps').count(),0);
+   assert((await page.locator('#quickDetailLink').getAttribute('href')).includes('view=detail'));
+   for(const width of [320,390,1280]){await page.setViewportSize({width,height:850});assert(await page.locator('#quickApprovalScreen').evaluate(e=>e.scrollWidth<=e.clientWidth));await page.screenshot({path:path.resolve(`outputs/approval-screen/quick-${engine}-${width}.png`)});}
+   const qcount=await count();await page.locator('#quickApprovalScreen button').click();assert.equal(await count(),qcount);assert.equal(await page.locator('#stampApprovalDialog').evaluate(e=>e.open),false);
+   await page.locator('#quickApproverName').fill('メール承認者');await page.locator('#quickApprovalScreen button').click();assert.equal(await count(),qcount);await commit();
+   assert.equal(await page.evaluate(()=>window.__records.fixture.receiverApprovedBy),'メール承認者');assert.equal(await page.locator('#quickApproverName').count(),0);assert((await page.locator('#quickApprovalScreen').textContent()).includes('登録しました'));
+   await show(planned('draft'));await page.locator('#quickApproverName').fill('発信上司');await page.locator('#quickApprovalScreen button').click();await commit();assert.equal(await page.locator('#quickApproverName').count(),0);assert((await page.locator('#quickDetailLink').textContent()).includes('対応者チェック'));
+   await show({...unplanned,approvalStatus:'draft',postCheckedBy:'担当者',postCheckedAt:'2026-10-14T09:00:00+09:00'});await page.locator('#quickApproverName').fill('対応部署上司');await page.locator('#quickApprovalScreen button').click();await commit();assert.equal(await page.evaluate(()=>window.__records.fixture.responseApprovedBy),'対応部署上司');
+   for(const state of [planned(),unplanned,{...planned('approved'),receiverApprovedBy:'上司'},{...planned(),switchStatus:'canceled'}]){await show(state);assert.equal(await page.locator('#quickApproverName').count(),0);assert(await page.locator('#quickDetailLink').isVisible());}
+   await show(planned('receiver_confirmed'));await page.locator('#quickApproverName').fill('入力中');
+   await page.evaluate(()=>window.__snapshot([structuredClone(window.__records.fixture)]));assert.equal(await page.locator('#quickApproverName').inputValue(),'入力中');assert(await page.locator('#quickApproverName').evaluate(e=>document.activeElement===e));
+   await page.evaluate(()=>window.__snapshot([{...window.__records.fixture,department:'変更後部署'}]));assert.equal(await page.locator('#quickApproverName').inputValue(),'');
+   await page.evaluate(()=>window.__snapshot([{...window.__records.fixture,approvalStatus:'approved'}]));assert.equal(await page.locator('#quickApproverName').count(),0);
+   await show(planned('receiver_confirmed'));await page.locator('#quickApproverName').fill('上司');await page.locator('#quickApprovalScreen button').click();await page.evaluate(()=>window.__snapshot([]));await page.locator('#stampApprovalCommit').click();assert((await page.locator('#stampApprovalError').textContent()).includes('変更'));await page.locator('#stampApprovalCancel').click();assert((await page.locator('#quickApprovalScreen').textContent()).includes('見つかりません'));
+   await page.evaluate(()=>window.__linked([]));assert((await page.locator('#quickApprovalScreen').textContent()).includes('見つかりません'));
+   await page.evaluate(()=>history.replaceState(null,'','?changepointId=fixture&view=detail'));await show(planned());assert(!(await page.locator('#quickApprovalScreen').isVisible()));assert(await page.locator('#receiverStampButton').isVisible());
+   await page.evaluate(()=>history.replaceState(null,'','?changepointId=fixture&qualityEvaluation=1'));await show({...planned(),qualityEvaluationRequired:true});assert.equal(await page.locator('#detailTitle').textContent(),'品質評価');assert(!(await page.locator('#quickApprovalScreen').isVisible()));
+   assert.deepEqual(errors,[]);console.log(`PASS ${engine}: inline and email/QR approval, existing URLs, detailed/quality routes, missing/completed/canceled/waiting states, live refresh and focus, name/confirmation, stale data, double taps, retry, unplanned, responsive. Offline only.`);
   }finally{await b.close()}
  }
 }

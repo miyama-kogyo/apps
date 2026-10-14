@@ -840,6 +840,21 @@
     #stampApprovalDialog dd { margin:0; overflow-wrap:anywhere; white-space:pre-wrap; }
     #stampApprovalDialog .approval-confirm-name { font-size:22px; font-weight:700; overflow-wrap:anywhere; margin:12px 0; }
     #stampApprovalDialog .confirm-modal-buttons { flex-wrap:wrap; }
+    #quickApprovalScreen { width:100%; max-width:620px; margin:0 auto; padding:20px 16px 32px; color:#243b30; }
+    #quickApprovalScreen header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:16px; border-bottom:1px solid #d4ded7; }
+    #quickApprovalScreen h1 { font-size:22px; margin:0; }
+    #quickApprovalScreen a { color:#176349; text-decoration:underline; text-underline-offset:3px; }
+    #quickApprovalScreen .quick-meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0; }
+    #quickApprovalScreen dt { font-size:12px; color:#596b61; margin-bottom:4px; }
+    #quickApprovalScreen dd { margin:0; font-weight:600; overflow-wrap:anywhere; }
+    #quickApprovalScreen .quick-content { white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 16px; line-height:1.65; }
+    #quickApprovalScreen .quick-status { font-weight:600; margin:18px 0 8px; }
+    #quickApprovalScreen .quick-result { padding:12px 0; color:#176349; }
+    #quickApprovalScreen .quick-signoff { margin-top:20px; padding-top:18px; border-top:1px solid #d4ded7; }
+    #quickApprovalScreen label { display:block; font-size:14px; margin-bottom:8px; }
+    #quickApprovalScreen input { display:block; width:100%; min-width:0; box-sizing:border-box; font:inherit; font-size:16px; padding:10px; border:1px solid #bdcbc2; border-radius:4px; margin-bottom:12px; }
+    #quickApprovalScreen .btn { width:100%; min-height:44px; margin:0; }
+    #quickApprovalScreen .quick-details { display:block; margin-top:18px; padding:8px 0; }
     .stamp-action { padding:14px 0; margin-top:12px; border-top:1px solid #d4ded7; }
     .stamp-action label { display:block; font-size:13px; font-weight:600; margin-bottom:7px; color:#176349; }
     .stamp-action>div { display:flex; gap:8px; }
@@ -1099,6 +1114,8 @@
   </div>
 
   <button id="signOutBtn">ログアウト</button>
+
+  <main id="quickApprovalScreen" class="screen" aria-label="変化点の承認"></main>
 
   <!-- 現場管理ボード -->
   <div id="mainMenu" data-board-view="today">
@@ -1756,6 +1773,7 @@
     const gate = document.getElementById('authGate');
     const mainMenu = document.getElementById('mainMenu');
     const screens = {
+      quickApproval: document.getElementById('quickApprovalScreen'),
       timeline: document.getElementById('timelineScreen'),
       planned: document.getElementById('plannedScreen'),
       calendar: document.getElementById('calendarScreen'),
@@ -2338,6 +2356,7 @@
         refreshChangeCategories();
         window.changepointData = changepointData; // ★ グローバル参照を更新
         refreshEvidenceFromSnapshot();
+        refreshQuickApprovalFromSnapshot();
         setupTopicsDeptFilter();
         buildTopicsDeptOptions();
         updateTopics();
@@ -2358,7 +2377,10 @@
       const id = new URLSearchParams(window.location.search).get('changepointId');
       if (!id) return;
       const item = changepointData.find(x => x._id === id);
-      if (!item) return;
+      if (!item){
+        if(isQuickApprovalLink(id)){linkedChangepointOpened=true;quickApprovalId=id;showScreen('quickApproval');renderQuickApproval(null);}
+        return;
+      }
       linkedChangepointOpened = true;
       showDetail(item);
     }
@@ -3542,7 +3564,8 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
 
     function isQrWorkflow(item){
-      return !!item?._id && new URLSearchParams(location.search).get('changepointId') === item._id;
+      const params=new URLSearchParams(location.search);
+      return !!item?._id && params.get('changepointId')===item._id && params.get('view')!=='detail';
     }
 
     function isUnplannedPostcheck(item){ return item?.type === 'sudden' && ['unplanned_postcheck_v1','unplanned_response_v2'].includes(item.workflowKind); }
@@ -3782,6 +3805,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       if(status)status.textContent=messages.length ? messages.join('・') : 'チェック完了';
     }
     function renderApprovalWorkflow(item){
+      if(quickApprovalId===item?._id && screens.quickApproval.style.display!=='none'){renderQuickApproval(item);return;}
       const box = document.getElementById('approvalWorkflow');
       if (!box) return;
       if (item?.type === 'sudden'){ renderUnplannedWorkflow(item,box); return; }
@@ -4049,7 +4073,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const item=currentDetailItem,target=approvalScreenTarget(item,kind);
       if(!target)return;
       // Approval names are deliberately independent of the responder's saved name.
-      const input=document.getElementById(kind==='unplanned'?'postActor':'workflowStampName');
+      const input=document.getElementById(quickApprovalId===item._id && screens.quickApproval.style.display!=='none'?'quickApproverName':kind==='unplanned'?'postActor':'workflowStampName');
       const name=input?.value.trim() || '';
       if(!name || name.length>80){alert('承認者の氏名を80文字以内で入力してください。');input?.focus();return;}
       stampApprovalSession={item:{...item},kind,target,name,phase:'confirm',busy:false,error:''};
@@ -4089,10 +4113,12 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     }
     window.commitStampApproval=async function(){
       const s=stampApprovalSession;
-      if(!s || s.busy || s.phase!=='confirm' || !s.name || currentDetailItem?._id!==s.item._id)return;
+      if(!s || s.busy || s.phase!=='confirm' || !s.name)return;
+      if(currentDetailItem?._id!==s.item._id){s.error='対象の状態が変更されています。画面を開き直して確認してください。';renderStampApproval();return;}
       s.busy=true;s.error='';renderStampApproval();
       try{
         const saved=s.kind==='unplanned'?await approveUnplannedRecord(s.item._id,s.item.postCheckRevision || 0,s.name,s.item):await savePlannedApproval(s.item,s.kind,s.name,stampCommentFields(s.name));
+        if(quickApprovalId===s.item._id)quickApprovalReceipt={id:s.item._id,name:s.name,role:s.target.role};
         if(currentDetailItem?._id===s.item._id){currentDetailItem=saved;renderApprovalWorkflow(saved);}
         s.busy=false;window.closeStampApproval();
       }catch(error){console.error(error);s.busy=false;s.error='承認できませんでした：'+error.message;renderStampApproval();}
@@ -4274,7 +4300,54 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       }
     }
 
+    let quickApprovalId=null,quickApprovalReceipt=null,quickApprovalVersion='';
+    function isQuickApprovalLink(id){
+      const params=new URLSearchParams(location.search);
+      return !!id && params.get('changepointId')===id && params.get('view')!=='detail' && !params.has('qualityEvaluation') && !params.has('productionDateId');
+    }
+    function buildDetailUrl(id){
+      const url=new URL(buildWorkflowUrl(id));
+      url.searchParams.set('view','detail');
+      return url.href;
+    }
+    function renderQuickApproval(item){
+      const host=screens.quickApproval;
+      quickApprovalVersion=JSON.stringify(item || null);
+      const header=`<header><h1>変化点の承認</h1><a href="${escapeAttr(WORKFLOW_APP_URL)}">管理ボード</a></header>`;
+      if(!item){host.innerHTML=header+'<p class="quick-status" role="status">対象の変化点が見つかりません。</p>';host.dataset.signature='';return;}
+      const kind=item.type==='sudden'?'unplanned':approvalStatusOf(item)==='draft'?'sender':'receiver';
+      const target=approvalScreenTarget(item,kind);
+      const signature=JSON.stringify([item._id,approvalStatusOf(item),boardCompleted(item),boardCanceled(item),target?.department,item.content,item.lineName,item.serialNo,item.receiverConfirmedBy,item.postCheckedBy]);
+      const name=host.dataset.signature===signature?host.querySelector('#quickApproverName')?.value || '':'';
+      host.dataset.signature=signature;
+      const receipt=quickApprovalReceipt?.id===item._id?quickApprovalReceipt:null;
+      const waiting=!boardCompleted(item) && !boardCanceled(item) && !target;
+      const label=boardCanceled(item)?'中止':boardCompleted(item)?'承認完了':target?target.role+'待ち':item.type==='sudden'?'事後チェック待ち':'対応者チェック待ち';
+      const approvedBy=item.responseApprovedBy || item.receiverApprovedBy || (boardCompleted(item)?item.senderApprovedBy:'');
+      host.innerHTML=header+`<p class="quick-status" role="status">${escapeHtml(label)}</p>
+        ${receipt?`<p class="quick-result" role="status">${escapeHtml(receipt.role)}を登録しました（${escapeHtml(receipt.name)}）。</p>`:''}
+        <dl class="quick-meta"><div><dt>実施予定日</dt><dd>${escapeHtml(item.occurrenceDate || '未定')}</dd></div><div><dt>ライン</dt><dd>${escapeHtml(item.lineName || '-')}</dd></div><div><dt>整理No.</dt><dd>${escapeHtml(item.serialNo || '-')}</dd></div></dl>
+        <p class="quick-content">${escapeHtml(item.content || '-')}</p>
+        ${item.qualityEvaluationRequired?`<p>品質評価：${escapeHtml(QUALITY_VERDICTS[item.qualityEvaluationVerdict] || '未判定')}${item.qualityEvaluationVerdict==='conditional' && item.qualityEvaluationCondition?' / '+escapeHtml(item.qualityEvaluationCondition):''}</p>`:''}
+        ${target?`<section class="quick-signoff"><p style="margin-bottom:12px;">承認部署：<strong>${escapeHtml(target.department)}</strong></p><label for="quickApproverName">承認者氏名</label><input id="quickApproverName" type="text" maxlength="80" autocomplete="off" value="${escapeAttr(name)}" placeholder="承認者の氏名を入力"><button type="button" class="btn btn-primary" onclick="${kind==='unplanned'?'approveUnplanned':kind==='sender'?'approveSender':'approveReceiver'}()">承認スタンプを押す</button></section>`:approvedBy?`<p class="quick-result">承認者：${escapeHtml(approvedBy)}</p>`:''}
+        <a class="quick-details" id="quickDetailLink" href="${escapeAttr(buildDetailUrl(item._id))}">${waiting?'対応者チェック・詳細を開く':'詳細を見る'}</a>`;
+    }
+    function refreshQuickApprovalFromSnapshot(){
+      if(!quickApprovalId || screens.quickApproval.style.display==='none')return;
+      const latest=changepointData.find(x=>x._id===quickApprovalId);
+      currentDetailItem=latest || null;
+      if(quickApprovalVersion===JSON.stringify(latest || null))return;
+      renderQuickApproval(latest);
+    }
     function showDetail(item){
+      if(isQuickApprovalLink(item?._id)){
+        currentDetailItem=item;quickApprovalId=item._id;quickApprovalReceipt=null;
+        screens.quickApproval.dataset.signature='';
+        document.getElementById('detailModal').classList.remove('active');
+        showScreen('quickApproval');renderQuickApproval(item);return;
+      }
+      if(quickApprovalId && screens.quickApproval.style.display!=='none')showScreen('menu');
+      quickApprovalId=null;
       document.getElementById('approvalWorkflow').dataset.itemId='';
       const oldQuality=qualityDrafts.get(item._id);
       if(oldQuality && !oldQuality.busy)qualityDrafts.delete(item._id);

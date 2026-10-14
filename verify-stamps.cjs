@@ -4,7 +4,7 @@ const file=path.resolve(fs.existsSync('変化点管理システム.html')?'変�
 const assert=(ok,msg)=>{if(!ok)throw new Error(msg)};
 const slice=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 async function unit(){
- const ctx={window:{},workflowCommentDrafts:new Map(),workflowCommentSaves:new Set(),APPROVAL_STAGES:['draft','sender_approved','receiver_confirmed','approved'],currentDetailItem:null,
+ const ctx={window:{},quickApprovalId:null,quickApprovalReceipt:null,screens:{quickApproval:{style:{display:'none'}}},workflowCommentDrafts:new Map(),workflowCommentSaves:new Set(),APPROVAL_STAGES:['draft','sender_approved','receiver_confirmed','approved'],currentDetailItem:null,
   getRecordChecklist:i=>i.checklistItems,document:{querySelector:()=>null,getElementById:id=>({value:id==='actualSwitchDate'?'2026-10-08':id==='actualSwitchTime'?'09:15':ctx.actor,focus(){},showModal(){},close(){}})},
   localStorage:{setItem(){}},updateActorNameButton(){},alert:m=>ctx.messages.push(m),confirm:m=>{ctx.confirmed.push(m);return true},
   doc:(_,collection,id)=>({collection,id}),db:{},serverTimestamp:()=> 'SERVER_TIME',
