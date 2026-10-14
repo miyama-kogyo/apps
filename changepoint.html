@@ -2642,7 +2642,7 @@
         window.changepointData = changepointData; // ★ グローバル参照を更新
         refreshEvidenceFromSnapshot();
         refreshQuickApprovalFromSnapshot();
-        if(screens.bulkUnplanned.style.display==='block' && !bulkUnplanned.drafts.size && !bulkUnplanned.busy)renderBulkUnplanned();
+        if(screens.bulkUnplanned.style.display==='block' && !bulkUnplanned.drafts.size && !bulkUnplanned.busy)openBulkUnplanned();
         setupTopicsDeptFilter();
         buildTopicsDeptOptions();
         updateTopics();
