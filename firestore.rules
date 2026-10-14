@@ -107,13 +107,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn()
         && request.resource.data.keys().hasOnly([
-          'department', 'serialNo', 'quantity', 'cause', 'comment',
+          'department', 'lineName', 'serialNo', 'quantity', 'cause', 'comment',
           'media', 'occurredAt', 'dateKey', 'createdAt', 'createdBy',
           'schemaVersion'
         ])
         && request.resource.data.department is string
         && request.resource.data.department.size() > 0
         && request.resource.data.department.size() <= 100
+        && request.resource.data.get('lineName', '') is string
+        && request.resource.data.get('lineName', '').size() <= 200
         && request.resource.data.serialNo is string
         && request.resource.data.serialNo.size() > 0
         && request.resource.data.serialNo.size() <= 60
@@ -133,13 +135,15 @@ service cloud.firestore {
         && request.resource.data.schemaVersion == 1;
       allow update: if isSignedIn()
         && request.resource.data.keys().hasOnly([
-          'department', 'serialNo', 'quantity', 'cause', 'comment',
+          'department', 'lineName', 'serialNo', 'quantity', 'cause', 'comment',
           'media', 'occurredAt', 'dateKey', 'createdAt', 'createdBy',
           'schemaVersion', 'updatedAt', 'updatedBy'
         ])
         && request.resource.data.department is string
         && request.resource.data.department.size() > 0
         && request.resource.data.department.size() <= 100
+        && request.resource.data.get('lineName', '') is string
+        && request.resource.data.get('lineName', '').size() <= 200
         && request.resource.data.serialNo is string
         && request.resource.data.serialNo.size() > 0
         && request.resource.data.serialNo.size() <= 60

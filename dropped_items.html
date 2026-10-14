@@ -440,6 +440,10 @@
               <select id="department" required><option value="">読み込み中...</option></select>
             </div>
             <div class="field">
+              <label for="lineName">発生ライン</label>
+              <select id="lineName" disabled><option value="">部署を選択してください</option></select>
+            </div>
+            <div class="field">
               <label for="serialNo">整理Noまたは部品名 <span class="required">*</span></label>
               <input id="serialNo" list="serialSuggestions" maxlength="60" autocomplete="off" placeholder="例：A-1234 / ブラケット" required>
               <datalist id="serialSuggestions"></datalist>
@@ -620,6 +624,10 @@
             <select id="editDepartment" required></select>
           </div>
           <div class="field">
+            <label for="editLineName">発生ライン</label>
+            <select id="editLineName"></select>
+          </div>
+          <div class="field">
             <label for="editSerialNo">整理Noまたは部品名 <span class="required">*</span></label>
             <input id="editSerialNo" list="editSerialSuggestions" maxlength="60" autocomplete="off" required>
             <datalist id="editSerialSuggestions"></datalist>
@@ -701,7 +709,7 @@
     const storage = getStorage(app);
     const state = {
       departments: [], items: [], files: [], editFiles: [], editMedia: [], editItemId: '', deleteItemId: '', charts: {}, activePage: 'entry',
-      dashboardDepartments: new Set(), productMasters: new Map(), productMastersReady:false,
+      dashboardDepartments: new Set(), lines: [], productMasters: new Map(), productMastersReady:false,
       productEdit:null, productFile:null, productPreviewUrl:'', productBusy:false, productPhotoLoading:false
     };
 
@@ -782,6 +790,21 @@
       const options = state.departments.map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join('');
       $('department').innerHTML = `<option value="">部署を選択</option>${options}`;
       $('analysisDepartment').innerHTML = `<option value="">すべての部署</option>${options}`;
+      const lines = await getDocs(collection(db, 'masters', 'line', 'items'));
+      state.lines = lines.docs.map(doc => doc.data()).filter(line => typeof line.name === 'string' && line.name);
+    }
+
+    function updateLineOptions(edit=false, savedLine=''){
+      const department = $(edit ? 'editDepartment' : 'department').value;
+      const select = $(edit ? 'editLineName' : 'lineName');
+      const names = [...new Set(state.lines.filter(line => line.department === department).map(line => line.name))]
+        .sort((a,b) => a.localeCompare(b,'ja',{numeric:true}));
+      const historical = savedLine && !names.includes(savedLine);
+      if(historical) names.unshift(savedLine);
+      const placeholder = !department ? '部署を選択してください' : names.length ? '未選択' : '登録されたラインがありません';
+      select.innerHTML = `<option value="">${placeholder}</option>` + names.map(name => `<option value="${esc(name)}">${esc(name)}${historical && name === savedLine ? '（マスター未登録）' : ''}</option>`).join('');
+      select.value = savedLine;
+      select.disabled = !department || !names.length;
     }
 
     function subscribeItems(){
@@ -818,7 +841,7 @@
       $('qtyPlus').addEventListener('click', () => changeQty(1));
       $('mediaCapture').addEventListener('change', e => addFiles(e.target.files));
       $('mediaSelect').addEventListener('change', e => addFiles(e.target.files));
-      $('department').addEventListener('change', updateEntrySerialSuggestions);
+      $('department').addEventListener('change', () => { updateEntrySerialSuggestions(); updateLineOptions(); });
       const zone = $('mediaZone');
       ['dragenter','dragover'].forEach(type => zone.addEventListener(type, e => { e.preventDefault(); zone.classList.add('dragover'); }));
       ['dragleave','drop'].forEach(type => zone.addEventListener(type, e => { e.preventDefault(); zone.classList.remove('dragover'); }));
@@ -832,7 +855,7 @@
       $('closeEditModal').addEventListener('click', closeEdit);
       $('cancelEdit').addEventListener('click', closeEdit);
       $('editModal').addEventListener('click', e => { if(e.target === $('editModal')) closeEdit(); });
-      $('editDepartment').addEventListener('change', updateEditSerialSuggestions);
+      $('editDepartment').addEventListener('change', () => { updateEditSerialSuggestions(); updateLineOptions(true); });
       $('editMediaCapture').addEventListener('change', e => addEditFiles(e.target.files));
       $('editMediaSelect').addEventListener('change', e => addEditFiles(e.target.files));
       $('editForm').addEventListener('submit', saveEdit);
@@ -1157,6 +1180,7 @@
         for(let i=0;i<state.files.length;i++) uploaded.push(await uploadMedia(state.files[i].file,i,state.files.length));
         await addDoc(collection(db,'droppedItems'), {
           department:$('department').value,
+          lineName:$('lineName').value,
           serialNo:$('serialNo').value.trim(),
           quantity:qty,
           cause,
@@ -1170,7 +1194,7 @@
         });
         state.files.forEach(entry => URL.revokeObjectURL(entry.preview)); state.files = [];
         $('entryForm').reset(); $('quantity').value = 1; $('occurredAt').value = localDateTimeValue(new Date());
-        updateEntrySerialSuggestions(); renderPreviews(); showToast('落下品を登録しました');
+        updateEntrySerialSuggestions(); updateLineOptions(); renderPreviews(); showToast('落下品を登録しました');
       }catch(error){
         console.error(error);
         await Promise.allSettled(uploaded.map(file => deleteObject(storageRef(storage,file.path))));
@@ -1229,6 +1253,7 @@
       const departments = state.departments.includes(item.department) ? state.departments : [item.department, ...state.departments].filter(Boolean);
       $('editDepartment').innerHTML = departments.map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join('');
       $('editDepartment').value = item.department || '';
+      updateLineOptions(true, item.lineName || '');
       $('editOccurredAt').value = localDateTimeValue(parseDate(item));
       $('editSerialNo').value = item.serialNo || '';
       $('editQuantity').value = quantity(item) || 1;
@@ -1257,6 +1282,7 @@
       const original = state.items.find(row => row.id === state.editItemId);
       const occurred = new Date($('editOccurredAt').value);
       const department = $('editDepartment').value;
+      const lineName = $('editLineName').value;
       const serialNo = $('editSerialNo').value.trim();
       const quantityValue = Number($('editQuantity').value);
       const cause = $('editCause').value;
@@ -1276,7 +1302,7 @@
         for(let i=0;i<state.editFiles.length;i++) uploaded.push(await uploadMedia(state.editFiles[i].file, i, state.editFiles.length, 'editUploadProgress'));
         const media = [...state.editMedia, ...uploaded];
         await updateDoc(doc(db, 'droppedItems', original.id), {
-          department, serialNo, quantity:quantityValue, cause, comment, media,
+          department, lineName, serialNo, quantity:quantityValue, cause, comment, media,
           occurredAt:Timestamp.fromDate(occurred), dateKey:localDateKey(occurred),
           updatedAt:serverTimestamp(), updatedBy:auth.currentUser.uid
         });
@@ -1401,7 +1427,7 @@
         btn.addEventListener('click', () => { show(); $('closeSerialPreview').focus({preventScroll:true}); });
       });
       const recent = todayRows;
-      $('recentList').innerHTML = recent.length ? recent.map(item=>`<button class="recent-item" data-item="${item.id}"><div class="recent-top"><span class="recent-serial">${esc(item.serialNo)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div><div class="recent-meta">${esc(item.department)} / ${quantity(item)}個<br>${fmtDateTime(item)}</div></button>`).join('') : '<div class="empty">登録データがありません</div>';
+      $('recentList').innerHTML = recent.length ? recent.map(item=>`<button class="recent-item" data-item="${item.id}"><div class="recent-top"><span class="recent-serial">${esc(item.serialNo)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div><div class="recent-meta">${esc(item.department)} / ${quantity(item)}個<br>ライン：${esc(item.lineName || '未記録')}<br>${fmtDateTime(item)}</div></button>`).join('') : '<div class="empty">登録データがありません</div>';
       document.querySelectorAll('[data-item]').forEach(btn=>btn.addEventListener('click',()=>openDetail('登録内容',[state.items.find(item=>item.id===btn.dataset.item)].filter(Boolean))));
     }
 
@@ -1616,7 +1642,7 @@
     function openDetail(title,rows){
       closeSerialPreview();
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
       document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
       document.querySelectorAll('[data-delete-item]').forEach(btn => btn.addEventListener('click', () => openDelete(btn.dataset.deleteItem)));
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();
