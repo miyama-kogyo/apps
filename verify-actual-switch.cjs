@@ -11,6 +11,18 @@ async function unit(){
   doc:(_,collection,id)=>({collection,id}),serverTimestamp:()=> 'SERVER',latest:base()};
  ctx.runTransaction=async(_,fn)=>fn({get:async()=>({exists:()=>!!ctx.latest,data:()=>ctx.latest}),update:(ref,data)=>writes.push({ref,data})});
  vm.createContext(ctx);vm.runInContext(core,ctx);
+ const at=new Date('2026-10-15T15:05:59Z');
+ assert.equal(ctx.actualSwitchValues(base(),at).actualSwitchDate,'2026-10-16');
+ assert.equal(ctx.actualSwitchValues(base(),at).actualSwitchTime,'00:05');
+ assert.equal(ctx.actualSwitchValues(base(),new Date('2026-10-17T12:00:00Z')).actualSwitchTime,'00:05');
+ assert.equal(ctx.actualSwitchValues({...base(),actualSwitchDate:'2026-10-01'},at).actualSwitchDate,'2026-10-01');
+ assert.equal(ctx.actualSwitchValues({...base(),actualSwitchTime:'13:24'},at).actualSwitchTime,'13:24');
+ assert.equal(ctx.actualSwitchValues({...base(),...valid},at).actualSwitchTime,'09:15');
+ for(const patch of [{type:'sudden'},{approvalStatus:'draft'},{approvalStatus:'approved'},{switchStatus:'completed'},{switchStatus:'canceled'}])assert.equal(ctx.actualSwitchValues({...base(),...patch},at).actualSwitchDate,undefined);
+ vm.runInContext("actualSwitchDrafts.set('fixture',{actualSwitchDate:'',actualSwitchTime:'10:20'})",ctx);
+ assert.equal(ctx.actualSwitchValues(base(),at).actualSwitchDate,'');
+ assert.equal(ctx.actualSwitchValues(base(),at).actualSwitchTime,'10:20');
+ vm.runInContext('actualSwitchDrafts.clear();actualSwitchDefaults.clear()',ctx);
  for(const [date,time] of [['',''],['2026-10-08',''],['2026-02-30','12:00'],['2026-10-08','24:00'],['2026-10-08','09:60'],['2026-10-08','9:15']]){
   await assert.rejects(ctx.saveReceiverStamp('fixture','対応者',{actualSwitchDate:date,actualSwitchTime:time}));
  }

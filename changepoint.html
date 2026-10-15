@@ -3623,7 +3623,20 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     const workflowCommentDrafts = new Map();
     const workflowCommentSaves = new Set();
     const actualSwitchDrafts = new Map();
+    const actualSwitchDefaults = new Map();
     const receiverStampSaves = new Set();
+
+    function actualSwitchValues(item, now = new Date()){
+      if (!item?._id || item.type === 'sudden' || approvalStatusOf(item) !== 'sender_approved' || boardCompleted(item) || boardCanceled(item)) return item || {};
+      if (actualSwitchDrafts.has(item._id)) return actualSwitchDrafts.get(item._id);
+      if (item.actualSwitchDate && item.actualSwitchTime) return item;
+      if (!actualSwitchDefaults.has(item._id)){
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(part => [part.type, part.value]));
+        actualSwitchDefaults.set(item._id, {actualSwitchDate:`${parts.year}-${parts.month}-${parts.day}`,actualSwitchTime:`${parts.hour}:${parts.minute}`});
+      }
+      const defaults = actualSwitchDefaults.get(item._id);
+      return {actualSwitchDate:item.actualSwitchDate || defaults.actualSwitchDate,actualSwitchTime:item.actualSwitchTime || defaults.actualSwitchTime};
+    }
 
     function actualSwitchLabel(item){
       return item.actualSwitchDate && item.actualSwitchTime ? `${item.actualSwitchDate} ${item.actualSwitchTime}` : '未記録';
@@ -3632,7 +3645,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     window.setActualSwitchDraft = function(field, value){
       if (!currentDetailItem?._id || !['actualSwitchDate','actualSwitchTime'].includes(field) || approvalStatusOf(currentDetailItem) !== 'sender_approved') return;
       const item = currentDetailItem;
-      const draft = actualSwitchDrafts.get(item._id) || {actualSwitchDate:item.actualSwitchDate || '',actualSwitchTime:item.actualSwitchTime || ''};
+      const draft = actualSwitchValues(item);
       actualSwitchDrafts.set(item._id,{...draft,[field]:value});
       updateReceiverStampReadiness();
     };
@@ -3819,7 +3832,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const messages=[];
       if(!allRoleChecksDone(getRecordChecklist(item),'receiver'))messages.push('チェック未完了');
       if(window.setApprovalResult?.pending?.has(item._id))messages.push('チェック保存中');
-      const actual=actualSwitchDrafts.get(item._id) || item;
+      const actual=actualSwitchValues(item);
       try{validateActualSwitch(actual.actualSwitchDate || '',actual.actualSwitchTime || '');}catch(_){messages.push('切替日時未入力');}
       if(workflowCommentSaves.has(item._id))messages.push('コメント保存中');
       else if(workflowCommentDrafts.has(item._id) && workflowCommentDrafts.get(item._id).trim()!==(item.workflowComment || '').trim())messages.push('コメント未保存');
@@ -3850,7 +3863,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const receiverLocked = stage >= 3;
       const commentValue = workflowCommentDrafts.has(item._id) ? workflowCommentDrafts.get(item._id) : (item.workflowComment || '');
       const commentSaving = workflowCommentSaves.has(item._id);
-      const actual = actualSwitchDrafts.get(item._id) || item;
+      const actual = actualSwitchValues(item);
       const stamping = receiverStampSaves.has(item._id);
       const actions = {
         draft: ['発信部署の承認者', '承認スタンプを押す', 'approveSender()'],
@@ -4380,6 +4393,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       renderQuickApproval(latest);
     }
     function showDetail(item){
+      actualSwitchDefaults.delete(item?._id);
       if(isQuickApprovalLink(item?._id) && (!needsResponderChecks(item) || !mastersReady)){
         currentDetailItem=item;quickApprovalId=item._id;quickApprovalReceipt=null;
         screens.quickApproval.dataset.signature='';
