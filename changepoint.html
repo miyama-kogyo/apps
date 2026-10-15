@@ -491,6 +491,9 @@
 
     .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:3000; align-items:center; justify-content:center; padding:20px; }
     .modal.active{ display:flex; }
+    .modal, .confirm-modal { overscroll-behavior:none; }
+    .modal-content, .confirm-modal-content, dialog { overscroll-behavior:contain; }
+    dialog { max-height:90dvh; overflow-y:auto; }
     .modal-content{ background:#fff; border-radius:16px; max-width:700px; width:100%; max-height:85vh; overflow-y:auto; }
     .modal-header{ padding:20px 24px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:flex-start; }
     .modal-header h3{ font-size:1.2rem; color:#333; }
@@ -1692,6 +1695,48 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
+  <script id="modalScrollLock">
+    (() => {
+      const root = document.documentElement, body = document.body;
+      const overlays = [...document.querySelectorAll('.modal, .confirm-modal, dialog')];
+      const properties = ['position', 'top', 'left', 'width', 'overflow', 'padding-right'];
+      let saved = null;
+      const read = (element, name) => [element.style.getPropertyValue(name), element.style.getPropertyPriority(name)];
+      const restore = (element, name, value) => value[0] ? element.style.setProperty(name, ...value) : element.style.removeProperty(name);
+      const sync = () => {
+        const open = overlays.some(element => {
+          if (!element.isConnected || element.hidden || (element.tagName === 'DIALOG' && !element.open)) return false;
+          const style = getComputedStyle(element);
+          return style.display !== 'none' && style.visibility !== 'hidden';
+        });
+        if (open && !saved) {
+          const gap = Math.max(0, innerWidth - root.clientWidth);
+          saved = { x:scrollX, y:scrollY, body:properties.map(name => read(body, name)), overflow:read(root, 'overflow') };
+          const padding = parseFloat(getComputedStyle(body).paddingRight) || 0;
+          // Fixed positioning also prevents background touch scrolling on mobile Safari.
+          body.style.setProperty('position', 'fixed');
+          body.style.setProperty('top', -saved.y + 'px');
+          body.style.setProperty('left', -saved.x + 'px');
+          body.style.setProperty('width', '100%');
+          body.style.setProperty('overflow', 'hidden');
+          if (gap) body.style.setProperty('padding-right', padding + gap + 'px');
+          root.style.setProperty('overflow', 'hidden');
+        } else if (!open && saved) {
+          const previous = saved;
+          saved = null;
+          properties.forEach((name, i) => restore(body, name, previous.body[i]));
+          restore(root, 'overflow', previous.overflow);
+          const behavior = read(root, 'scroll-behavior');
+          root.style.setProperty('scroll-behavior', 'auto');
+          window.scrollTo(previous.x, previous.y);
+          restore(root, 'scroll-behavior', behavior);
+        }
+      };
+      const observer = new MutationObserver(sync);
+      overlays.forEach(element => observer.observe(element, { attributes:true, attributeFilter:['class', 'style', 'hidden', 'open'] }));
+      sync();
+    })();
+  </script>
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
     import {
