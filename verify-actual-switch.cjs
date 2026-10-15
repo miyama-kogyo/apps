@@ -46,7 +46,7 @@ async function fixture(){
  const record={...base(),occurrenceDate:null,planneddepartment:'品質',department:'1G',createdBy:'作成者',createdAtLocal:'2026-10-08T08:00:00+09:00',senderApprovedBy:'承認者',senderApprovedAt:'2026-10-08T08:30:00+09:00',processName:'プレス',serialNo:'7089',lineName:'プレスA',category:'設備',content:'センサー交換後の初品確認'};
  const workflow=slice('    function isQrWorkflow','    window.setWorkflowCommentDraft');
  const stamps=slice('    window.approveSender =','    function createQrDataUrl');
- const ticket=slice('    function renderChangeTicket','    const todayCardQrCache');
+ const ticket=slice('    function hasActualDisplayDate','    function escapeHtml')+slice('    function renderChangeTicket','    const todayCardQrCache');
  const escape=slice('    function escapeHtml','    function csvEscape');
  const buildUrl=slice('    function buildProductionDateUrl','    function updatePlanDateMode');
  let printHtml='';
@@ -59,7 +59,7 @@ async function fixture(){
  await printContext.window.printChangeCard({...record,...valid});
  printHtml=printHtml.replace('window.print();','');
  assert.equal((printHtml.match(/実際の切替日時：/g)||[]).length,2);
- assert.equal((printHtml.match(/2026-10-08 09:15/g)||[]).length,2);
+ assert.equal((printHtml.match(/2026-10-08 09:15/g)||[]).length,4);
  const script=`let currentDetailItem=${JSON.stringify(record)},quickApprovalId=null,quickApprovalReceipt=null;const screens={quickApproval:{style:{display:'none'}}};const workflowCommentDrafts=new Map(),workflowCommentSaves=new Set();
  const WORKFLOW_APP_URL='https://miyama-kogyo.github.io/apps/changepoint.html';
  const getRecordChecklist=i=>i.checklistItems;const updateActorNameButton=()=>{};const getProposalDate=()=> '2026-10-08';

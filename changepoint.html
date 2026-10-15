@@ -1855,6 +1855,16 @@
     function getProposalDate(item){
       return toLocalDateString(item.proposalDate || item.draftDate || item.createdAtLocal || item.createdAt || item.createdDate || item.registeredAt);
     }
+    function hasActualDisplayDate(item){
+      if (!item || item.type === 'sudden' || item.type === 'anomaly' || item._kind === 'anomaly') return false;
+      const date = item.actualSwitchDate || '';
+      const parsed = new Date(date + 'T00:00:00Z');
+      return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0,10) === date;
+    }
+    // Display saved response dates only; input defaults and drafts never move a card.
+    function changeDisplayDate(item){ return hasActualDisplayDate(item) ? item.actualSwitchDate : item.occurrenceDate || ''; }
+    function changeDisplayTime(item){ return hasActualDisplayDate(item) ? item.actualSwitchTime || '' : item.occurrenceTime || ''; }
+    function changeDisplayDateLabel(item){ return hasActualDisplayDate(item) ? '対応日' : item.type === 'planned' ? '実施予定日' : '実施日'; }
     function escapeHtml(text){
       if (text === null || text === undefined) return '';
       return String(text)
@@ -1908,7 +1918,7 @@
       } else {
         hay = [item.type, item.category, item.planneddepartment, item.department,
                item.lineName, item.serialNo, item.occurrenceDate, item.occurrenceTime,
-               item.lot, item.document, item.content, item.relatedAnomalyId].join(' ');
+               item.actualSwitchDate, item.actualSwitchTime, item.lot, item.document, item.content, item.relatedAnomalyId].join(' ');
       }
       return normText(hay).includes(kw);
     }
@@ -2557,11 +2567,11 @@
     function renderBoardCard(p){
       const color=Object.hasOwn(boardColors,p.category)?boardColors[p.category]:'#d6ded8';
       return `<button type="button" class="board-change" data-change-id="${escapeAttr(p._id)}" style="--category-color:${color}">
-        <span class="board-change-top"><span><span class="board-category">${escapeHtml(p.category||'未分類')}</span> ${p.type==='planned'?'計画':'計画外'}</span><span>${escapeHtml(p.occurrenceTime||'')}</span></span>
+        <span class="board-change-top"><span><span class="board-category">${escapeHtml(p.category||'未分類')}</span> ${p.type==='planned'?'計画':'計画外'}</span><span>${escapeHtml(changeDisplayTime(p))}</span></span>
         <span class="board-change-line">${escapeHtml(p.lineName||'ライン未設定')}</span>
         <span class="board-change-serial">整理No. ${escapeHtml(p.serialNo||'未設定')}</span>
         <span class="board-change-content">${escapeHtml(p.content||'内容未登録')}</span>
-        <span class="board-change-meta"><span class="board-change-context"><span>${escapeHtml(p.department||'部署未設定')}</span><span class="board-change-date">${escapeHtml(p.occurrenceDate||'日程未確定')}</span></span><span class="board-status ${boardCompleted(p)?'done':''}">${boardStatus(p)}</span></span>
+        <span class="board-change-meta"><span class="board-change-context"><span>${escapeHtml(p.department||'部署未設定')}</span><span class="board-change-date">${escapeHtml(changeDisplayDate(p)||'日程未確定')}</span></span><span class="board-status ${boardCompleted(p)?'done':''}">${boardStatus(p)}</span></span>
       </button>`;
     }
     function updateTopics(){
@@ -2576,12 +2586,12 @@
       const items=changepointData.filter(p=>!boardCanceled(p) && (!dept||p.department===dept) && (!line||p.lineName===line) &&
         (!category||p.category===category) && (!type||p.type===type) && (!openOnly||(boardTracked(p)&&!boardCompleted(p))) &&
         (!keyword||[p.serialNo,p.content,p.lineName,p.department].join(' ').normalize('NFKC').toLowerCase().includes(keyword)))
-        .sort((a,b)=>String(a.occurrenceDate||'').localeCompare(String(b.occurrenceDate||''))||String(a.occurrenceTime||'').localeCompare(String(b.occurrenceTime||'')));
-      const todayItems=items.filter(p=>p.occurrenceDate===today);
-      const weekItems=items.filter(p=>p.occurrenceDate>=weekStart&&p.occurrenceDate<=weekEnd);
-      const carry=items.filter(p=>boardTracked(p)&&p.occurrenceDate&&p.occurrenceDate<today&&!boardCompleted(p));
-      const future=items.filter(p=>p.occurrenceDate>weekEnd&&!boardCompleted(p));
-      const undecided=items.filter(p=>!p.occurrenceDate&&!boardCompleted(p));
+        .sort((a,b)=>changeDisplayDate(a).localeCompare(changeDisplayDate(b))||changeDisplayTime(a).localeCompare(changeDisplayTime(b)));
+      const todayItems=items.filter(p=>changeDisplayDate(p)===today);
+      const weekItems=items.filter(p=>changeDisplayDate(p)>=weekStart&&changeDisplayDate(p)<=weekEnd);
+      const carry=items.filter(p=>boardTracked(p)&&changeDisplayDate(p)&&changeDisplayDate(p)<today&&!boardCompleted(p));
+      const future=items.filter(p=>changeDisplayDate(p)>weekEnd&&!boardCompleted(p));
+      const undecided=items.filter(p=>!changeDisplayDate(p)&&!boardCompleted(p));
       const set=(id,text)=>document.getElementById(id).textContent=text;
       const format=d=>d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
       const filterCount=[dept,line,category,type,keyword,openOnly].filter(Boolean).length;
@@ -2602,7 +2612,7 @@
       ).join(''):'<div class="board-empty">該当する今日の変化点はありません</div>';
       fillTodayCardQrs();
       document.getElementById('topicsWeek').innerHTML=days.map(d=>{
-        const date=ymdLocal(d), list=weekItems.filter(p=>p.occurrenceDate===date);
+        const date=ymdLocal(d), list=weekItems.filter(p=>changeDisplayDate(p)===date);
         return '<div class="board-day '+(date===today?'is-today ':'')+(list.length?'':'is-empty')+'"><h3>'+format(d)+'<span class="board-count">'+list.length+'</span></h3>'+
           (list.map(renderBoardCard).join('')||'<div class="board-empty">予定なし</div>')+'</div>';
       }).join('');
@@ -2669,7 +2679,7 @@
 
       let allItems = [];
       anomalyData.forEach(item => { allItems.push({ ...item, _kind: 'anomaly', sortDate: item.occurrenceDate || '', sortTime: item.occurrenceTime || '' }); });
-      changepointData.forEach(item => { allItems.push({ ...item, _kind: 'changepoint', sortDate: item.occurrenceDate || '', sortTime: item.occurrenceTime || '' }); });
+      changepointData.forEach(item => { allItems.push({ ...item, _kind: 'changepoint', sortDate: changeDisplayDate(item), sortTime: changeDisplayTime(item) }); });
 
       filteredData = allItems.filter(item => {
         if (mode === 'serial' && serial){ if (!String(item.serialNo || '').includes(serial)) return false; }
@@ -2781,7 +2791,7 @@
         const dayOfWeek = new Date(calendarYear, calendarMonth, day).getDay();
         const isToday = (dateStr === today);
         const dayClass = isToday ? 'today' : (dayOfWeek === 0 ? 'sunday' : (dayOfWeek === 6 ? 'saturday' : ''));
-        const dayEvents = plannedOnly.filter(p => p.occurrenceDate === dateStr);
+        const dayEvents = plannedOnly.filter(p => changeDisplayDate(p) === dateStr);
         let eventsHtml = dayEvents.slice(0,3).map(e => {
           const info = [e.department, e.lineName, e.serialNo].filter(Boolean).join(' / ');
           const contentPreview = (e.content || '').slice(0, 30) + ((e.content || '').length > 30 ? '...' : '');
@@ -3136,7 +3146,7 @@
     function renderPlannedHistory(){
       const container = document.getElementById('plannedHistory');
       const plannedOnly = changepointData.filter(p => p.type === 'planned' || p.workflowManaged === true)
-        .sort((a,b) => (String(b.occurrenceDate||'').localeCompare(String(a.occurrenceDate||''))));
+        .sort((a,b) => changeDisplayDate(b).localeCompare(changeDisplayDate(a)));
       if (!plannedOnly.length){ container.innerHTML = '<div class="empty-state"><p>まだ登録がありません</p></div>'; return; }
       container.innerHTML = `
         <table class="history-table">
@@ -3144,7 +3154,7 @@
           <tbody>
             ${plannedOnly.slice(0, 20).map(item => `
               <tr>
-                <td>${escapeHtml(item.occurrenceDate || '')}</td>
+                <td>${escapeHtml(changeDisplayDate(item))}</td>
                 <td>${item.type === 'planned' ? '計画' : '計画外'}</td>
                 <td><span class="badge badge-changepoint">${escapeHtml(item.category || '-')}</span></td>
                 <td>${escapeHtml(item.planneddepartment || '')}</td>
@@ -4195,7 +4205,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const [cardColor, cardColorName] = Object.hasOwn(cardColors,item.category)?cardColors[item.category]:['#e2e8f0',item.category?'追加分類':'指定なし'];
       const qr = (kind, src, alt, label) => `<div class="qr" data-card-qr="${escapeAttr(item._id || '')}" data-qr-kind="${kind}"><img ${src ? `src="${src}"` : 'hidden'} alt="${alt}">${src ? '' : '<span class="qr-pending">QR準備中</span>'}<b>${label}</b></div>`;
       const cardQrs = unplanned ? '' : `<div class="card-qrs">${qr('workflow',qrDataUrl,'ワークフローQR','チェック・承認')}${qr('production',productionQrDataUrl,'生産日入力QR','生産日入力・変更')}</div>`;
-      return `<section class="ticket${unplanned ? ' unplanned-ticket' : ''}" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '計画外'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>実施日</b>${escapeHtml(item.occurrenceDate || '未定')} ${escapeHtml(item.occurrenceTime || '')}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div>${unplanned ? '' : `<table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table>`}${unplanned ? '' : `<div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div>`}${unplanned ? `<div class="sign"><div><b>${escapeHtml(qualityCheckLabel(item))}</b>${item.qualityCheckedAt?'<br>'+escapeHtml(stampDate(item.qualityCheckedAt)):''}</div></div>` : `<div class="sign" style="grid-template-columns:repeat(${workflowStampEntries(item).length},minmax(0,1fr))">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}${unplanned ? '：'+escapeHtml(item.responseDepartment || '未選択') : ''}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div>`}<footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
+      return `<section class="ticket${unplanned ? ' unplanned-ticket' : ''}" style="--card-color:${cardColor}"><header><div><strong>変化点カード</strong><span>${copyLabel}</span><small>${escapeHtml(cardStatus)} / カード色：${cardColorName}</small></div>${cardQrs}</header><div class="meta"><div><b>計画区分</b>${item.type === 'planned' ? '計画' : '計画外'}</div><div><b>分類</b>${escapeHtml(item.category || '-')}</div><div><b>起票日</b>${escapeHtml(item.issuedDate || getProposalDate(item) || '-')}</div><div><b>${changeDisplayDateLabel(item)}</b>${escapeHtml(changeDisplayDate(item) || '未定')} ${escapeHtml(changeDisplayTime(item))}</div><div><b>発信部署</b>${escapeHtml(item.planneddepartment || '-')}</div><div><b>発生部署</b>${escapeHtml(item.department || '-')}</div><div><b>ライン</b>${escapeHtml(item.lineName || '-')}</div><div><b>工程</b>${escapeHtml(item.processName || '-')}</div><div><b>整理No</b>${escapeHtml(item.serialNo || '-')}</div></div><div class="content"><b>変化点内容</b><p>${escapeHtml(item.content || '-')}</p></div>${unplanned ? '' : `<table><thead><tr><th>確認項目</th><th>合格判定基準</th><th>対応者判定</th></tr></thead><tbody>${checks}</tbody></table>`}${unplanned ? '' : `<div class="review"><b>関係部署確認：</b>${item.relatedReviewCompleted ? '完了' : '未完了'}</div>`}${unplanned ? `<div class="sign"><div><b>${escapeHtml(qualityCheckLabel(item))}</b>${item.qualityCheckedAt?'<br>'+escapeHtml(stampDate(item.qualityCheckedAt)):''}</div></div>` : `<div class="sign" style="grid-template-columns:repeat(${workflowStampEntries(item).length},minmax(0,1fr))">${workflowStampEntries(item).map(stamp => `<div><b>${escapeHtml(stamp.department)} ${escapeHtml(stamp.role)}${unplanned ? '：'+escapeHtml(item.responseDepartment || '未選択') : ''}</b><br><strong>${escapeHtml(stamp.name || '未記録')}</strong><br>${escapeHtml(stampDate(stamp.at))}</div>`).join('')}</div>`}<footer>${escapeHtml(keeper)}保管 / ID: ${escapeHtml(item._id || '')}</footer></section>`;
 
     }
 
@@ -4379,7 +4389,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const approvedBy=item.responseApprovedBy || item.receiverApprovedBy || (boardCompleted(item)?item.senderApprovedBy:'');
       host.innerHTML=header+`<p class="quick-status" role="status">${escapeHtml(label)}</p>
         ${receipt?`<p class="quick-result" role="status">${escapeHtml(receipt.role)}を登録しました（${escapeHtml(receipt.name)}）。</p>`:''}
-        <dl class="quick-meta"><div><dt>実施予定日</dt><dd>${escapeHtml(item.occurrenceDate || '未定')}</dd></div><div><dt>ライン</dt><dd>${escapeHtml(item.lineName || '-')}</dd></div><div><dt>整理No.</dt><dd>${escapeHtml(item.serialNo || '-')}</dd></div></dl>
+        <dl class="quick-meta"><div><dt>${changeDisplayDateLabel(item)}</dt><dd>${escapeHtml(changeDisplayDate(item) || '未定')}</dd></div><div><dt>ライン</dt><dd>${escapeHtml(item.lineName || '-')}</dd></div><div><dt>整理No.</dt><dd>${escapeHtml(item.serialNo || '-')}</dd></div></dl>
         <p class="quick-content">${escapeHtml(item.content || '-')}</p>
         ${item.qualityEvaluationRequired?`<p>品質評価：${escapeHtml(QUALITY_VERDICTS[item.qualityEvaluationVerdict] || '未判定')}${item.qualityEvaluationVerdict==='conditional' && item.qualityEvaluationCondition?' / '+escapeHtml(item.qualityEvaluationCondition):''}</p>`:''}
         ${target?`<section class="quick-signoff"><p style="margin-bottom:12px;">承認部署：<strong>${escapeHtml(target.department)}</strong></p><label for="quickApproverName">承認者氏名</label><input id="quickApproverName" type="text" maxlength="80" autocomplete="off" value="${escapeAttr(name)}" placeholder="承認者の氏名を入力"><button type="button" class="btn btn-primary" onclick="${kind==='unplanned'?'approveUnplanned':kind==='sender'?'approveSender':'approveReceiver'}()">承認スタンプを押す</button></section>`:approvedBy?`<p class="quick-result">承認者：${escapeHtml(approvedBy)}</p>`:''}
@@ -4419,7 +4429,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         document.getElementById('detailDate').textContent = `${item.occurrenceDate || ''} ${item.occurrenceTime || ''}`;
       } else {
         document.getElementById('detailTitle').textContent = '変化点カード';
-        document.getElementById('detailDate').textContent = `${item.lineName || '-'} / 整理No. ${item.serialNo || '-'} / ${item.occurrenceDate || '日程未確定'}`;
+        document.getElementById('detailDate').textContent = `${item.lineName || '-'} / 整理No. ${item.serialNo || '-'} / ${changeDisplayDate(item) || '日程未確定'}`;
       }
 
       let badges = '';
@@ -4456,9 +4466,10 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         body += `<div class="detail-section"><div class="detail-section-title">📝 変化点内容</div><div class="detail-section-content">${escapeHtml(item.content || '-')}</div></div>`;
         if (item.document) body += `<div class="detail-section"><div class="detail-section-title">📎 関連資料</div><div class="detail-section-content">${escapeHtml(item.document)}</div></div>`;
       }
+      if (isCP && hasActualDisplayDate(item)) body += `<div class="detail-section"><div class="detail-section-title">実施予定日</div><div class="detail-section-content">${escapeHtml(item.occurrenceDate || '未定')}</div></div>`;
       if (qrMode){
         document.getElementById('detailTitle').textContent='チェック・承認';
-        body = `<div class="qr-basic"><div><span>実施日</span><strong>${escapeHtml(item.occurrenceDate || '未定')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div class="qr-basic-content"><span>変化点内容</span><p>${escapeHtml(item.content || '-')}</p></div></div>`;
+        body = `<div class="qr-basic"><div><span>${changeDisplayDateLabel(item)}</span><strong>${escapeHtml(changeDisplayDate(item) || '未定')}</strong></div><div><span>工程</span><strong>${escapeHtml(item.processName || '-')}</strong></div><div><span>整理No</span><strong>${escapeHtml(item.serialNo || '-')}</strong></div><div class="qr-basic-content"><span>変化点内容</span><p>${escapeHtml(item.content || '-')}</p></div></div>`;
       }
       const directChecks=qrMode && isQuickApprovalLink(item._id) && needsResponderChecks(item);
       if(directChecks){

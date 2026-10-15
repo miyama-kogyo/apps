@@ -20,6 +20,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(slice('    function escapeHtml', '    function csvEscape') +
+  slice('    function hasActualDisplayDate', '    function escapeHtml') +
   slice('    function checklistResult', '    function allRoleChecksDone') +
   slice('    function workflowStampEntries', '    function readStampName') +
   slice('    function qualityCheckLabel', '    function qualityCheckControls') +
