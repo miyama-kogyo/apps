@@ -353,6 +353,10 @@ t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'stale reset requ
 t=passwordResetSetup();t.env.identityError='EMAIL_NOT_FOUND';t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);assert.equal(t.deleted.length,1);
 t=passwordResetSetup();t.env.sendError=true;t.ctx.pollApprovalNotifications();
 assert.equal(JSON.parse(t.state[Object.keys(t.state).find(k=>k.startsWith('reset_job_'))]).state,'uncertain');t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1,'uncertain reset is never automatically resent');
+t=passwordResetSetup();t.env.identityError='PERMISSION_DENIED';t.ctx.pollApprovalNotifications();
+const retryKey=Object.keys(t.state).find(k=>k.startsWith('reset_job_'));
+t.state['reset_rate_'+t.ctx.passwordResetDigest('user@miyama-unitec.co.jp')]=JSON.stringify([t.env.now]);
+t.env.identityError='';t.ctx.processPasswordResetJobs();assert.equal(JSON.parse(t.state[retryKey]).state,'skipped','a delayed retry never duplicates a recent successful send');
 t=setup();delete t.state.PASSWORD_RESET_START_AT;t.ctx.enablePasswordResetNotifications();const resetStart=t.state.PASSWORD_RESET_START_AT;
 t.ctx.enablePasswordResetNotifications();assert.equal(t.state.PASSWORD_RESET_START_AT,resetStart);assert.equal(t.triggers.length,0,'reuse existing trigger');
 const appHtml=fs.readFileSync(`${__dirname}/../../abnreport.html`,'utf8');

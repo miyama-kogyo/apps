@@ -181,7 +181,7 @@ function processPasswordResetJobs() {
     .sort((a,b) => a.job.createdAt.localeCompare(b.job.createdAt));
   for (const entry of jobs) {
     const key = entry.key, job = entry.job;
-    if (job.state !== 'pending' || (job.nextAttempt && Date.parse(job.nextAttempt) > Date.now())) continue;
+    if (job.state !== 'pending') continue;
     const email = validPasswordResetEmail(job.email);
     const age = Date.now() - Date.parse(job.requestedAt || '');
     const invalid = !email || job.source !== 'abnreport' || !Number.isFinite(age) || age < -60000 || age > NOTIFIER.passwordResetMaxAgeMinutes * 60000;
@@ -190,6 +190,7 @@ function processPasswordResetJobs() {
       finishPasswordResetJob(props,key,job,'skipped',invalid ? '不正または期限切れの依頼です。' : rateReason);
       continue;
     }
+    if (job.nextAttempt && Date.parse(job.nextAttempt) > Date.now()) continue;
     if (remaining < 1 || sent >= NOTIFIER.passwordResetMaxSendsPerRun) break;
     try {
       const link = createPasswordResetLink(email);
