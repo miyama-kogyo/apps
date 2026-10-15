@@ -226,6 +226,13 @@ for(const selected of [[],['工程変更'],['初期管理'],['工程変更','初
   const expected=['sender@example.com','receiver@example.com','extra@example.com',...(selected.length?['process@example.com']:[]),...(selected.includes('初期管理')?['initial@example.com']:[])];
   assert.deepEqual(t.sent[0].to.split(',').sort(),expected.sort());
 }
+for(const selected of [[],['検査G']]){
+  t=distributionSetup({distributionGroups:selected});
+  t.env.distributionGroups=[{_name:prefix+'/masters/changeDistribution/items/検査G',name:'検査G',distributionEmail:'kensa@miyama-unitec.co.jp'}];
+  t.state.AUTO_ALLOW_MASTER_RECIPIENTS='true';
+  t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1);
+  assert.equal(t.sent[0].to.split(',').includes('kensa@miyama-unitec.co.jp'),selected.length>0);
+}
 for(const bad of ['missing','invalid','unallowed','unknown','notArray']){
   t=distributionSetup({distributionGroups:bad==='unknown'?['未登録']:bad==='notArray'?'工程変更':['工程変更']});
   t.env.distributionGroups=bad==='missing'?[]:[{_name:prefix+'/masters/changeDistribution/items/工程変更',name:'工程変更',distributionEmail:bad==='invalid'?'invalid':'external@example.com'}];

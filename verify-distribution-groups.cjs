@@ -19,12 +19,13 @@ async function main(){
    const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];let answer='';
    page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.type()==='prompt'?d.accept(answer):d.dismiss());
    await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:fixture}));await page.goto('http://127.0.0.1/distribution-test');await page.waitForFunction(()=>window.__ready);
-   await page.evaluate(()=>window.__render());await page.locator('[data-tab="distribution"]').click();assert.equal(await page.locator('#distributionTableBody tr').count(),3);
+   await page.evaluate(()=>window.__render());await page.locator('[data-tab="distribution"]').click();assert.equal(await page.locator('#distributionTableBody tr').count(),4);
    const row=name=>page.locator('#distributionTableBody tr').filter({hasText:name});
    answer='PROCESS@example.com; second@example.com, process@example.com';await row('工程変更').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill(answer);await page.locator('#saveDistributionButton').click();
    await page.waitForFunction(()=>window.__groups['工程変更']?.distributionEmail==='process@example.com,second@example.com');
    answer='initial@example.com';await row('初期管理').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill(answer);await page.locator('#saveDistributionButton').click();await page.waitForFunction(()=>!!window.__groups['初期管理']);
    answer='invalid';await row('工程変更').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill(answer);await page.locator('#saveDistributionButton').click();assert.equal(await page.evaluate(()=>window.__masterWrites.length),2);assert((await page.locator('#distributionEditStatus').textContent()).includes('誤り'));await page.getByRole('button',{name:'キャンセル',exact:true}).filter({visible:true}).click();
+   await row('検査G').getByRole('button',{name:'変更'}).click();await page.locator('#distributionEmailInput').fill('kensa@miyama-unitec.co.jp');await page.locator('#saveDistributionButton').click();await page.waitForFunction(()=>window.__groups['検査G']?.distributionEmail==='kensa@miyama-unitec.co.jp');
    for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.resolve(`outputs/distribution-groups/master-${engine}-${width}.png`),fullPage:true});}
    await page.locator('#masterScreen [data-back]').click();await page.locator('.menu-card[data-screen="planned"]').click();await page.locator('#planType').selectOption('sudden');
    assert.equal(await page.locator('#planDepartment option').allTextContents().then(xs=>xs.includes('工程変更')),false);
@@ -33,13 +34,13 @@ async function main(){
    await page.locator('#planQualityEvaluation').selectOption('yes');assert(await group('品技G').isChecked());assert(await group('品技G').isDisabled());
    await page.locator('#planQualityEvaluation').selectOption('no');assert(!(await group('品技G').isChecked()));assert(!(await group('品技G').isDisabled()));
    await page.locator('#planQualityEvaluation').selectOption('yes');
-   await group('工程変更').check();await group('初期管理').check();await group('初期管理').uncheck();
+   await group('工程変更').check();await group('初期管理').check();await group('初期管理').uncheck();await group('検査G').check();
    assert(await page.locator('#planDistributionDepartments input[value="品質"]').isDisabled());
    await page.locator('#planDepartmentOccur').selectOption('品質');assert(await group('工程変更').isChecked());await page.locator('#planDepartmentOccur').selectOption('製造');
    await page.locator('#planLineName').fill('94-300');await page.locator('#planProcessName').fill('溶接');await page.locator('#planContent').fill('テスト変化点');await page.locator('#planDate').fill('2026-10-14');
    await page.locator('#planDistributionDepartments').screenshot({path:path.resolve(`outputs/distribution-groups/options-${engine}.png`)});
    await page.locator('#btnRegisterPlanned').click();assert((await page.locator('#confirmModal').textContent()).includes('工程変更'));await page.locator('#btnConfirmOk').click();await page.locator('#registrationPrintDialog').waitFor();
-   assert.deepEqual(await page.evaluate(()=>window.__writes[0].distributionGroups),['工程変更','品技G']);assert.equal(await page.evaluate(()=>window.__writes[0].qualityEvaluationRequired),true);assert.deepEqual(await page.evaluate(()=>window.__writes[0].distributionDepartments),['品質','製造']);
+   assert.deepEqual((await page.evaluate(()=>window.__writes[0].distributionGroups)).sort(),['工程変更','品技G','検査G'].sort());assert.equal(await page.evaluate(()=>window.__writes[0].qualityEvaluationRequired),true);assert.deepEqual(await page.evaluate(()=>window.__writes[0].distributionDepartments),['品質','製造']);
    await page.evaluate(()=>document.getElementById('registrationPrintDialog').close());assert(!(await group('工程変更').isChecked()));
    await page.evaluate(async()=>{window.__masterReadFail=true;await window.__load()});assert((await page.locator('#planDistributionDepartments').textContent()).includes('展開先アドレス未設定'));
    await page.evaluate(()=>{

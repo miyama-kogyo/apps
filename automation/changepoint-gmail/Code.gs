@@ -516,7 +516,7 @@ function resolveDistributionRecipient(item, departments, groups = []) {
     addresses.push(...emails);
   });
   const selected = item.distributionGroups === undefined ? [] : item.distributionGroups;
-  if (!Array.isArray(selected) || selected.some(name => !['工程変更','初期管理','品技G'].includes(name))) throw new Error('展開先区分が不正です。');
+  if (!Array.isArray(selected) || selected.some(name => !['工程変更','初期管理','品技G','検査G'].includes(name))) throw new Error('展開先区分が不正です。');
   [...new Set(selected.concat(item.qualityEvaluationRequired === true ? ['品技G'] : []))].forEach(name => {
     const matches = groups.filter(group => group._name.split('/').pop() === name && group.name === name);
     if (matches.length !== 1) throw new Error('展開先マスターが未登録、または重複しています: ' + name);
