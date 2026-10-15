@@ -724,7 +724,8 @@ async function loadUsers(){
 function renderUsers(){
   const list = document.getElementById('userList');
   const search = (document.getElementById('userSearch')?.value||'').toLowerCase();
-  let items = allUsers;
+  // 匿名認証ユーザーはメールアドレスを持たないため、管理対象の一覧から除外する。
+  let items = allUsers.filter(u=>typeof u.email==='string' && u.email.trim()!=='');
   if(search) items=items.filter(u=>(u.email||'').toLowerCase().includes(search));
   document.getElementById('userCount').textContent=`${items.length} 件`;
 
