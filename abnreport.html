@@ -1562,7 +1562,7 @@ document.getElementById('shareOpenRepair')?.addEventListener('click', ()=>{
 
  
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserLocalPersistence, signOut, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
   import {
     getFirestore,
     collection, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, updateDoc,
@@ -2045,9 +2045,9 @@ document.getElementById('authLoginBtn').addEventListener('click', async ()=>{
   }
 });
 
-// 登録済みメールアドレスへパスワード再設定リンクを送信
+// Apps Scriptから再設定リンクを送るため、未ログインでも依頼だけを登録する。
 document.getElementById('passwordResetBtn')?.addEventListener('click', async ()=>{
-  const email = (document.getElementById('authEmail').value || '').trim();
+  const email = (document.getElementById('authEmail').value || '').trim().toLowerCase();
   const msg = document.getElementById('authMsg');
   const btn = document.getElementById('passwordResetBtn');
   msg.style.color = '#c62828';
@@ -2058,25 +2058,26 @@ document.getElementById('passwordResetBtn')?.addEventListener('click', async ()=
     document.getElementById('authEmail').focus();
     return;
   }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    msg.textContent = 'メールアドレスの形式を確認してください。';
+    return;
+  }
 
   btn.disabled = true;
   btn.textContent = '送信中...';
   try{
-    await sendPasswordResetEmail(auth, email);
+    await addDoc(collection(db, 'passwordResetRequests'), {
+      email,
+      source: 'abnreport',
+      requestedAt: serverTimestamp()
+    });
     msg.style.color = '#059669';
-    msg.textContent = 'パスワード再設定メールを送信しました。メールが届かない場合は、迷惑メールフォルダーも確認してください。';
+    msg.textContent = '再設定依頼を受け付けました。登録済みの場合、通常5分以内にメールが届きます。迷惑メールフォルダーも確認してください。';
   }catch(e){
-    console.error('パスワード再設定メール送信失敗:', e);
-    if(e.code === 'auth/user-not-found'){
-      msg.style.color = '#059669';
-      msg.textContent = '登録済みの場合は、パスワード再設定メールが送信されます。迷惑メールフォルダーも確認してください。';
-    }else if(e.code === 'auth/invalid-email'){
-      msg.textContent = 'メールアドレスの形式を確認してください。';
-    }else if(e.code === 'auth/too-many-requests'){
-      msg.textContent = '送信回数が多すぎます。しばらく待ってから再試行してください。';
-    }else{
-      msg.textContent = '再設定メールを送信できませんでした。通信状態を確認して再試行してください。';
-    }
+    console.error('パスワード再設定依頼の登録失敗:', e);
+    msg.textContent = e.code === 'permission-denied'
+      ? 'このメールアドレスでは再設定を受け付けできません。社内メールアドレスを確認してください。'
+      : '再設定依頼を登録できませんでした。通信状態を確認して再試行してください。';
   }finally{
     btn.disabled = false;
     btn.textContent = 'パスワードを忘れた方';

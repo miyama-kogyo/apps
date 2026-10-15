@@ -85,6 +85,16 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if canUseApp();
     }
+    // 未ログイン画面から受け付け、Apps Scriptだけが処理する再設定依頼。
+    match /passwordResetRequests/{requestId} {
+      allow create: if request.resource.data.keys().hasOnly(['email', 'source', 'requestedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.email.matches('^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@miyama-unitec[.]co[.]jp$')
+        && request.resource.data.source == 'abnreport'
+        && request.resource.data.requestedAt == request.time;
+      allow read, update, delete: if false;
+    }
     match /pastTroubles/{docId} {
       allow read: if isSignedIn();
       allow create, update, delete: if canUseApp();

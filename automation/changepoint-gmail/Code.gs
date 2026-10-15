@@ -6,7 +6,13 @@ const NOTIFIER = Object.freeze({
   autoAllowedDomain: 'miyama-unitec.co.jp',
   batchSize: 40,
   maxJobs: 200,
-  maxSendsPerRun: 10
+  maxSendsPerRun: 10,
+  passwordResetBatchSize: 20,
+  passwordResetMaxJobs: 100,
+  passwordResetMaxSendsPerRun: 3,
+  passwordResetCooldownMinutes: 15,
+  passwordResetMaxPerDay: 3,
+  passwordResetMaxAgeMinutes: 30
 });
 
 function notifierProperties() { return PropertiesService.getScriptProperties(); }
@@ -46,6 +52,178 @@ function decodeDocument(doc) {
   const item = {_name: doc.name};
   Object.keys(doc.fields || {}).forEach(key => { item[key] = firestoreValue(doc.fields[key]); });
   return item;
+}
+
+function firestoreDelete(documentName) {
+  const prefix = 'projects/' + NOTIFIER.project + '/databases/(default)/documents';
+  if (!documentName.startsWith(prefix + '/passwordResetRequests/')) throw new Error('不正な削除対象です。');
+  const response = UrlFetchApp.fetch('https://firestore.googleapis.com/v1/' + documentName, {
+    method:'delete', headers:{Authorization:'Bearer ' + ScriptApp.getOAuthToken()}, muteHttpExceptions:true
+  });
+  const code = response.getResponseCode();
+  if (code !== 404 && (code < 200 || code >= 300)) throw new Error('Firestore削除エラー HTTP ' + code);
+}
+
+function passwordResetDigest(value) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value, Utilities.Charset.UTF_8);
+  return digest.map(n => ('0' + ((n + 256) % 256).toString(16)).slice(-2)).join('');
+}
+
+function validPasswordResetEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  return email.length <= 254 && /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@miyama-unitec\.co\.jp$/.test(email) ? email : '';
+}
+
+function enablePasswordResetNotifications() {
+  verifyNotifierOwner();
+  const props = notifierProperties();
+  if (props.getProperty('ENABLED') !== 'true') throw new Error('既存の5分間隔通知を先に開始してください。');
+  if (!props.getProperty('PASSWORD_RESET_START_AT')) props.setProperty('PASSWORD_RESET_START_AT', new Date().toISOString());
+  props.setProperty('PASSWORD_RESET_ENABLED', 'true');
+  console.log('パスワード再設定メールを有効にしました。既存の5分間隔トリガーを使用します。');
+}
+
+function disablePasswordResetNotifications() {
+  verifyNotifierOwner();
+  notifierProperties().setProperty('PASSWORD_RESET_ENABLED', 'false');
+}
+
+function passwordResetJobKey(documentName) {
+  return 'reset_job_' + passwordResetDigest(documentName);
+}
+
+function collectPasswordResetRequests() {
+  const props = notifierProperties();
+  if (props.getProperty('PASSWORD_RESET_ENABLED') !== 'true') return;
+  const start = props.getProperty('PASSWORD_RESET_START_AT');
+  if (!start) throw new Error('パスワード再設定の開始日時が未設定です。');
+  const state = props.getProperties();
+  let count = Object.keys(state).filter(k => k.startsWith('reset_job_')).length;
+  if (count >= NOTIFIER.passwordResetMaxJobs) return;
+  const query = {
+    from:[{collectionId:'passwordResetRequests'}],
+    where:{fieldFilter:{field:{fieldPath:'requestedAt'},op:'GREATER_THAN_OR_EQUAL',value:{timestampValue:start}}},
+    orderBy:[{field:{fieldPath:'requestedAt'},direction:'ASCENDING'},{field:{fieldPath:'__name__'},direction:'ASCENDING'}],
+    limit:NOTIFIER.passwordResetBatchSize
+  };
+  const cursor = JSON.parse(props.getProperty('PASSWORD_RESET_CURSOR') || 'null');
+  if (cursor) query.startAt = {before:false,values:[{timestampValue:cursor.at},{referenceValue:cursor.name}]};
+  const rows = firestoreRead(':runQuery',{structuredQuery:query});
+  for (const row of rows) {
+    if (!row.document) continue;
+    const item = decodeDocument(row.document);
+    const key = passwordResetJobKey(item._name);
+    if (!props.getProperty(key) && count < NOTIFIER.passwordResetMaxJobs) {
+      props.setProperty(key,JSON.stringify({document:item._name,email:String(item.email || '').toLowerCase(),requestedAt:item.requestedAt,
+        source:item.source,state:'pending',createdAt:new Date().toISOString()}));
+      count++;
+    }
+    props.setProperty('PASSWORD_RESET_CURSOR',JSON.stringify({at:item.requestedAt,name:item._name}));
+  }
+}
+
+function passwordResetRate(email) {
+  const props = notifierProperties(), key = 'reset_rate_' + passwordResetDigest(email);
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const timestamps = JSON.parse(props.getProperty(key) || '[]').filter(value => Date.parse(value) >= cutoff);
+  return {key:key,timestamps:timestamps};
+}
+
+function passwordResetRateReason(email) {
+  const rate = passwordResetRate(email), now = Date.now();
+  if (rate.timestamps.length >= NOTIFIER.passwordResetMaxPerDay) return '同一アドレスへの1日あたりの上限に達しました。';
+  if (rate.timestamps.length && Date.parse(rate.timestamps[rate.timestamps.length - 1]) > now - NOTIFIER.passwordResetCooldownMinutes * 60000) {
+    return '同一アドレスから短時間に複数回依頼されました。';
+  }
+  return '';
+}
+
+function recordPasswordResetSend(email) {
+  const props = notifierProperties(), rate = passwordResetRate(email);
+  rate.timestamps.push(new Date().toISOString());
+  props.setProperty(rate.key,JSON.stringify(rate.timestamps));
+}
+
+function createPasswordResetLink(email) {
+  const response = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode',{
+    method:'post', headers:{Authorization:'Bearer ' + ScriptApp.getOAuthToken()}, contentType:'application/json',
+    payload:JSON.stringify({requestType:'PASSWORD_RESET',email:email,targetProjectId:NOTIFIER.project,returnOobLink:true}),
+    muteHttpExceptions:true
+  });
+  const code = response.getResponseCode(), data = JSON.parse(response.getContentText() || '{}');
+  if (code < 200 || code >= 300 || !data.oobLink) {
+    const error = new Error('Firebase再設定リンク生成エラー HTTP ' + code);
+    error.identityCode = data.error && data.error.message || '';
+    throw error;
+  }
+  return data.oobLink;
+}
+
+function passwordResetMessage(email, link) {
+  return {to:email,name:'異常履歴入力ツール',subject:'【異常履歴入力ツール】パスワード再設定',
+    body:['異常履歴入力ツールのパスワード再設定依頼を受け付けました。','','次のリンクを開いて、新しいパスワードを設定してください。',link,'',
+      'このメールに心当たりがない場合は、そのまま削除してください。','このメールは ' + NOTIFIER.sender + ' から自動送信しています。'].join('\n')};
+}
+
+function finishPasswordResetJob(props, key, job, state, note) {
+  job.state = state; job.finishedAt = new Date().toISOString();
+  if (note) job.note = note;
+  delete job.error; delete job.nextAttempt;
+  props.setProperty(key,JSON.stringify(job));
+  try { firestoreDelete(job.document); } catch (error) { console.error(key + ': 処理済み依頼の削除に失敗しました。'); }
+}
+
+function processPasswordResetJobs() {
+  const props = notifierProperties(), state = props.getProperties();
+  let remaining = MailApp.getRemainingDailyQuota(), sent = 0;
+  const jobs = Object.keys(state).filter(k => k.startsWith('reset_job_')).map(key => ({key:key,job:JSON.parse(state[key])}))
+    .sort((a,b) => a.job.createdAt.localeCompare(b.job.createdAt));
+  for (const entry of jobs) {
+    const key = entry.key, job = entry.job;
+    if (job.state !== 'pending' || (job.nextAttempt && Date.parse(job.nextAttempt) > Date.now())) continue;
+    const email = validPasswordResetEmail(job.email);
+    const age = Date.now() - Date.parse(job.requestedAt || '');
+    const invalid = !email || job.source !== 'abnreport' || !Number.isFinite(age) || age < -60000 || age > NOTIFIER.passwordResetMaxAgeMinutes * 60000;
+    const rateReason = email ? passwordResetRateReason(email) : '';
+    if (invalid || rateReason) {
+      finishPasswordResetJob(props,key,job,'skipped',invalid ? '不正または期限切れの依頼です。' : rateReason);
+      continue;
+    }
+    if (remaining < 1 || sent >= NOTIFIER.passwordResetMaxSendsPerRun) break;
+    try {
+      const link = createPasswordResetLink(email);
+      job.state = 'sending'; job.attemptedAt = new Date().toISOString();
+      props.setProperty(key,JSON.stringify(job));
+      MailApp.sendEmail(passwordResetMessage(email,link));
+      recordPasswordResetSend(email);
+      finishPasswordResetJob(props,key,job,'sent');
+      remaining--; sent++;
+    } catch (error) {
+      if (['EMAIL_NOT_FOUND','INVALID_EMAIL','USER_DISABLED'].includes(error.identityCode)) {
+        finishPasswordResetJob(props,key,job,'skipped','再設定対象外のアカウントです。');
+      } else if (job.state === 'sending') {
+        job.state = 'uncertain'; job.error = '送信結果不明。Gmailの送信済みを確認するまで自動再送しません。';
+        props.setProperty(key,JSON.stringify(job));
+      } else {
+        job.error = String(error.message || error).slice(0,300);
+        job.nextAttempt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        props.setProperty(key,JSON.stringify(job));
+      }
+      console.error(key + ': ' + (job.error || '再設定対象外のため送信しませんでした。'));
+    }
+  }
+}
+
+function prunePasswordResetJobs() {
+  const props = notifierProperties(), state = props.getProperties(), cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  Object.keys(state).filter(k => k.startsWith('reset_job_')).forEach(key => {
+    const job = JSON.parse(state[key]);
+    if (['sent','skipped'].includes(job.state) && Date.parse(job.finishedAt) < cutoff) props.deleteProperty(key);
+  });
+  Object.keys(state).filter(k => k.startsWith('reset_rate_')).forEach(key => {
+    const kept = JSON.parse(state[key]).filter(value => Date.parse(value) >= cutoff);
+    if (kept.length) props.setProperty(key,JSON.stringify(kept)); else props.deleteProperty(key);
+  });
 }
 
 function readDepartments() {
@@ -535,6 +713,16 @@ function pollApprovalNotifications() {
       console.error('状況確認の取得を保留しました: '+error.message);
     }
     processApprovalJobs();
+    try {
+      prunePasswordResetJobs();
+      collectPasswordResetRequests();
+      processPasswordResetJobs();
+      props.setProperty('PASSWORD_RESET_LAST_SUCCESS_AT',new Date().toISOString());
+      props.deleteProperty('PASSWORD_RESET_LAST_ERROR');
+    } catch (error) {
+      props.setProperty('PASSWORD_RESET_LAST_ERROR',String(error.message || error).slice(0,500));
+      console.error('パスワード再設定メール処理を保留しました: ' + error.message);
+    }
     props.setProperty('LAST_SUCCESS_AT', new Date().toISOString());
     props.deleteProperty('LAST_ERROR');
   } catch (error) {
@@ -547,6 +735,8 @@ function showNotificationStatus() {
   verifyNotifierOwner();
   const state = notifierProperties().getProperties();
   console.log(JSON.stringify({enabled:state.ENABLED,automaticMasterRecipients:automaticMasterRecipientsEnabled(),autoAllowedDomain:NOTIFIER.autoAllowedDomain,start:state.START_AT,lastRun:state.LAST_SUCCESS_AT,error:state.LAST_ERROR,
+    passwordReset:{enabled:state.PASSWORD_RESET_ENABLED,start:state.PASSWORD_RESET_START_AT,lastRun:state.PASSWORD_RESET_LAST_SUCCESS_AT,error:state.PASSWORD_RESET_LAST_ERROR,
+      jobs:Object.keys(state).filter(k => k.startsWith('reset_job_')).map(key => ({key:key,details:JSON.parse(state[key])}))},
     reminders:{enabled:state.REMINDERS_ENABLED,startDay:state.REMINDERS_START_DAY,hour:'09:00 Asia/Tokyo',weekdaysOnly:state.REMINDER_WEEKDAYS_ONLY,scan:state.REMINDER_SCAN,error:state.REMINDER_LAST_ERROR},
     jobs:Object.keys(state).filter(k => k.startsWith('job_')).map(key => ({key:key,details:JSON.parse(state[key])}))},null,2));
 }

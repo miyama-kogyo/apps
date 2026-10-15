@@ -12,9 +12,9 @@ function encoded(item) {
 }
 function setup() {
   const state = {ALLOWED_RECIPIENTS:'sender@example.com,receiver@example.com',START_AT:'2026-10-08T00:00:00Z',ENABLED:'true'};
-  const writes = [], sent = [], requests = [], triggers = [];
+  const writes = [], sent = [], requests = [], triggers = [], deleted = [];
   const props = {getProperty:k=>state[k]??null,getProperties:()=>({...state}),setProperty(k,v){writes.push(k);state[k]=v;return this;},deleteProperty(k){delete state[k];return this;}};
-  const env = {owner:'miyama.firebase@gmail.com',quota:100,records:[record()],lock:true,
+  const env = {owner:'miyama.firebase@gmail.com',quota:100,records:[record()],resetRecords:[],lock:true,
     departments:[{_name:'sender',name:'Sender',approverName:'Sender Boss',approverEmail:'sender@example.com',notificationEmail:'origin-notify@example.com'},{_name:'receiver',name:'Receiver',approverName:'Receiver Boss',approverEmail:'receiver@example.com',notificationEmail:'receiver-notify@example.com'}]};
   const ctx = {console:{log(){},warn(){},error(){}},PropertiesService:{getScriptProperties:()=>props},Session:{getEffectiveUser:()=>({getEmail:()=>env.owner})},
     Date:class extends Date { constructor(...args){super(...(args.length?args:[env.now||Date.now()]));} static now(){return env.now?Date.parse(env.now):Date.now();} },
@@ -31,12 +31,24 @@ function setup() {
     UrlFetchApp:{fetch(url,options){
       requests.push({url,options});
       assert.equal(options.headers.Authorization,'Bearer test-token');
-      assert.ok(['get','post'].includes(options.method));
+      assert.ok(['get','post','delete'].includes(options.method));
       let data;
-      if(url.includes('/masters/department/items'))data={documents:env.departments.map(encoded)};
+      if(url.includes('identitytoolkit.googleapis.com')){
+        if(env.identityError)data={error:{message:env.identityError}};
+        else data={oobLink:'https://example.test/reset?oobCode=secret'};
+      }
+      else if(options.method==='delete'){
+        deleted.push(url);data={};
+      }
+      else if(url.includes('/masters/department/items'))data={documents:env.departments.map(encoded)};
       else if(url.includes('/masters/changeDistribution/items'))data={documents:(env.distributionGroups || []).map(encoded)};
       else if(url.endsWith(':runQuery')){
         const query=JSON.parse(options.payload).structuredQuery;
+        if(query.from[0].collectionId==='passwordResetRequests'){
+          data=env.resetRecords.filter(r=>r.requestedAt>=query.where.fieldFilter.value.timestampValue)
+            .map(r=>({document:encoded(r)}));
+          return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(data)};
+        }
         const field=query.where.fieldFilter.field.fieldPath;
         if(query.where.fieldFilter.op==='IN'){
           if(env.reminderQueryError)throw Error('expected reminder query failure');
@@ -46,11 +58,12 @@ function setup() {
         }else data=env.records.filter(r=>r[field]&&r[field]>=query.where.fieldFilter.value.timestampValue).map(r=>({document:encoded(r)}));
       }
       else {assert.equal(options.method,'get');const item=env.records.find(r=>url.endsWith(r._name.slice(prefix.length)));data=item?encoded(item):null;}
-      return {getResponseCode:()=>data?200:404,getContentText:()=>JSON.stringify(data)};
+      const responseCode = env.identityError && url.includes('identitytoolkit.googleapis.com') ? 400 : data ? 200 : 404;
+      return {getResponseCode:()=>responseCode,getContentText:()=>JSON.stringify(data)};
     }}};
   vm.createContext(ctx);vm.runInContext(source,ctx);
   const jobs=()=>Object.entries(state).filter(([k])=>k.startsWith('job_')).map(([key,v])=>({key,...JSON.parse(v)}));
-  return {ctx,state,sent,requests,triggers,writes,env,jobs};
+  return {ctx,state,sent,requests,triggers,writes,deleted,env,jobs};
 }
 {
  const u=setup();
@@ -317,4 +330,34 @@ t=setup();t.state.ALLOWED_RECIPIENTS='';t.ctx.enableAutomaticMasterRecipients();
 t.ctx.startApprovalNotifications();assert.equal(t.triggers.length,1);assert.equal(t.state.START_AT,preservedStart);
 t=setup();t.env.owner='other@example.com';assert.throws(()=>t.ctx.enableAutomaticMasterRecipients());assert.equal(t.state.AUTO_ALLOW_MASTER_RECIPIENTS,undefined);
 console.log('PASS: automatic master recipients across all five notification kinds; exact company domain; invalid/external group hold; live additions/removals; dedup; owner guard; existing manual mode.');
+
+function passwordResetSetup(requests) {
+  const t=setup(), requestedAt='2026-10-15T01:00:00.000Z';
+  t.env.now='2026-10-15T01:05:00.000Z';
+  t.env.records=[];
+  t.state.PASSWORD_RESET_ENABLED='true';
+  t.state.PASSWORD_RESET_START_AT='2026-10-15T00:00:00.000Z';
+  t.env.resetRecords=(requests || ['user@miyama-unitec.co.jp']).map((email,index)=>({_name:`${prefix}/passwordResetRequests/request-${index}`,email,source:'abnreport',requestedAt}));
+  return t;
+}
+t=passwordResetSetup();t.ctx.pollApprovalNotifications();
+assert.equal(t.sent.length,1);assert.equal(t.sent[0].to,'user@miyama-unitec.co.jp');assert.ok(t.sent[0].body.includes('oobCode=secret'));
+assert.equal(t.deleted.length,1);assert.equal(JSON.parse(t.state[Object.keys(t.state).find(k=>k.startsWith('reset_job_'))]).state,'sent');
+assert.ok(t.requests.some(r=>r.url.includes('identitytoolkit.googleapis.com')&&JSON.parse(r.options.payload).returnOobLink===true));
+t=passwordResetSetup(['user@miyama-unitec.co.jp','user@miyama-unitec.co.jp']);t.ctx.pollApprovalNotifications();
+assert.equal(t.sent.length,1,'cooldown prevents repeated reset email');
+assert.equal(Object.keys(t.state).filter(k=>k.startsWith('reset_job_')).map(k=>JSON.parse(t.state[k]).state).filter(x=>x==='skipped').length,1);
+t=passwordResetSetup(['user@outside.example']);t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);assert.equal(t.deleted.length,1);
+t=passwordResetSetup();t.env.resetRecords[0].requestedAt='2026-10-15T00:00:00.000Z';t.state.PASSWORD_RESET_START_AT='2026-10-14T00:00:00.000Z';
+t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0,'stale reset requests are discarded');
+t=passwordResetSetup();t.env.identityError='EMAIL_NOT_FOUND';t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,0);assert.equal(t.deleted.length,1);
+t=passwordResetSetup();t.env.sendError=true;t.ctx.pollApprovalNotifications();
+assert.equal(JSON.parse(t.state[Object.keys(t.state).find(k=>k.startsWith('reset_job_'))]).state,'uncertain');t.ctx.pollApprovalNotifications();assert.equal(t.sent.length,1,'uncertain reset is never automatically resent');
+t=setup();delete t.state.PASSWORD_RESET_START_AT;t.ctx.enablePasswordResetNotifications();const resetStart=t.state.PASSWORD_RESET_START_AT;
+t.ctx.enablePasswordResetNotifications();assert.equal(t.state.PASSWORD_RESET_START_AT,resetStart);assert.equal(t.triggers.length,0,'reuse existing trigger');
+const appHtml=fs.readFileSync(`${__dirname}/../../abnreport.html`,'utf8');
+assert.ok(appHtml.includes("collection(db, 'passwordResetRequests')"));assert.ok(!appHtml.includes('sendPasswordResetEmail'));
+const manifest=JSON.parse(fs.readFileSync(`${__dirname}/appsscript.json`,'utf8'));
+assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/cloud-platform'));
+console.log('PASS password reset: Gmail sender flow, Firebase link generation, exact-domain validation, stale/unknown skip, cooldown, deletion and uncertain-send hold.');
 console.log('PASS: mocked Gmail/Firestore tests; routing, allowlist, stages, cursor, duplicate prevention, stale requests, quotas, uncertain send, owner, trigger lifecycle and queue capacity. No real email or database writes.');
