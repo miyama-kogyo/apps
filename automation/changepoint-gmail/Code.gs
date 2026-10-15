@@ -146,13 +146,14 @@ function recordPasswordResetSend(email) {
 
 function createPasswordResetLink(email) {
   const response = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode',{
-    method:'post', headers:{Authorization:'Bearer ' + ScriptApp.getOAuthToken()}, contentType:'application/json',
+    method:'post', headers:{Authorization:'Bearer ' + ScriptApp.getOAuthToken(),'x-goog-user-project':NOTIFIER.project}, contentType:'application/json',
     payload:JSON.stringify({requestType:'PASSWORD_RESET',email:email,targetProjectId:NOTIFIER.project,returnOobLink:true}),
     muteHttpExceptions:true
   });
   const code = response.getResponseCode(), data = JSON.parse(response.getContentText() || '{}');
   if (code < 200 || code >= 300 || !data.oobLink) {
-    const error = new Error('Firebase再設定リンク生成エラー HTTP ' + code);
+    const detail = String(data.error && (data.error.status || data.error.message) || '').slice(0,200);
+    const error = new Error('Firebase再設定リンク生成エラー HTTP ' + code + (detail ? ' / ' + detail : ''));
     error.identityCode = data.error && data.error.message || '';
     throw error;
   }
