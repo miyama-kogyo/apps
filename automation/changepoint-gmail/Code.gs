@@ -300,6 +300,7 @@ function collectNotificationStream(stream) {
 function resolveRecipient(item, departments, kind) {
   if (kind === 'distribution' || kind === 'quality_result') return resolveDistributionRecipient(item,departments,item.qualityEvaluationRequired === true || item.distributionGroups && item.distributionGroups.length ? readDistributionGroups() : []);
   if (kind === 'overdue_reminder') {
+    if (item.type === 'sudden') return resolveRecipient(item,departments,'approval_request');
     if (item.approvalStatus !== 'sender_approved' && item.approvalStatus !== 'post_check') return resolveRecipient(item,departments,'approval_request');
     const targetDepartment = item.workflowKind === 'unplanned_response_v2' ? item.responseDepartment || item.department : item.department;
     const matches = departments.filter(d=>d.name===targetDepartment);
@@ -310,7 +311,7 @@ function resolveRecipient(item, departments, kind) {
     return {email:emails.join(','),emails:emails,name:targetDepartment+' 対応者',department:targetDepartment};
   }
   const resultNotification = kind && kind !== 'approval_request';
-  const department = !resultNotification && item.workflowKind === 'unplanned_response_v2' ? item.responseDepartment : resultNotification || item.approvalStatus === 'draft' ? item.planneddepartment : item.department;
+  const department = !resultNotification && item.type === 'sudden' ? '品質' : resultNotification || item.approvalStatus === 'draft' ? item.planneddepartment : item.department;
   const matches = departments.filter(d => d.name === department);
   if (matches.length !== 1) throw new Error('承認先の部署が未登録、または重複しています: ' + (department || '未設定'));
   const master = matches[0];
@@ -392,7 +393,7 @@ function qualityResultMessage(item, recipient) {
 
 function overdueReminderMessage(item, recipient) {
   const labels = {draft:'発信部署の承認待ち',sender_approved:'発生部署の対応・チェック待ち',receiver_confirmed:'発生部署の最終承認待ち',post_check:'計画外変化点の事後チェック待ち'};
-  if (item.workflowKind === 'unplanned_response_v2') labels.draft='対応部署の承認待ち';
+  if (item.type === 'sudden') Object.keys(labels).forEach(key => labels[key]='品管チェック待ち');
   return {
     to:recipient.email,name:'変化点管理',
     subject:('【変化点 状況確認】予定日超過 / '+(item.lineName || '-')+' / 整理No '+(item.serialNo || '-')).replace(/[\r\n]/g,' ').slice(0,180),
@@ -408,6 +409,7 @@ function overdueReminderMessage(item, recipient) {
 
 function resultMessage(item, recipient, kind) {
   const labels = {production_date:'生産予定日の入力・変更',receiver_approved:'発生部署の承認完了',unplanned_approved:'計画外変化点の発信部署承認完了',response_approved:'計画外変化点の対応部署承認完了'};
+  if (item.qualityCheckOnly) labels.response_approved='計画外変化点の品管チェック完了';
   const actors = {production_date:item.productionDateUpdatedBy,receiver_approved:item.receiverApprovedBy,unplanned_approved:item.senderApprovedBy,response_approved:item.responseApprovedBy};
   const fields = {production_date:'productionDateUpdatedAt',receiver_approved:'receiverApprovedAt',unplanned_approved:'senderApprovedAt',response_approved:'responseApprovedAt'};
   const label = labels[kind], timestamp = item[fields[kind]];
@@ -426,9 +428,9 @@ function resultMessage(item, recipient, kind) {
 }
 
 function approvalMessage(item, recipient) {
-  const stage = item.workflowKind === 'unplanned_response_v2' ? '対応部署承認' : item.approvalStatus === 'draft' ? '発信部署承認' : '発生部署承認';
+  const stage = item.type === 'sudden' ? '品管チェック' : item.approvalStatus === 'draft' ? '発信部署承認' : '発生部署承認';
   const id = item._name.split('/').pop();
-  const who = ['unplanned_postcheck_v1','unplanned_response_v2'].includes(item.workflowKind) ? item.postCheckedBy : item.approvalStatus === 'draft' ? item.createdBy : item.receiverConfirmedBy;
+  const who = item.type === 'sudden' ? item.createdBy || item.postCheckedBy : item.approvalStatus === 'draft' ? item.createdBy : item.receiverConfirmedBy;
   return {
     to:recipient.email,
     name:'変化点管理',
@@ -437,7 +439,7 @@ function approvalMessage(item, recipient) {
       'ライン: ' + (item.lineName || '-'),'工程: ' + (item.processName || '-'),
       '整理No: ' + (item.serialNo || '-'),'実施予定日: ' + (item.occurrenceDate || '未確定'),
       '発信部署: ' + (item.planneddepartment || '-'),'発生部署: ' + (item.department || '-'),
-      ...(item.workflowKind === 'unplanned_response_v2' ? ['対応部署: '+(item.responseDepartment || '-')] : []),
+      ...(item.type === 'sudden' ? ['確認部署: 品質'] : []),
       '作成・対応者: ' + (who || '-'),'','変化点内容:',String(item.content || '').slice(0,4000),
       '','承認画面:',NOTIFIER.appUrl + '?changepointId=' + encodeURIComponent(id),
       ...productionDateMessageLines(item),

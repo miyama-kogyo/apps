@@ -22,6 +22,7 @@ vm.createContext(ctx);
 vm.runInContext(slice('    function escapeHtml', '    function csvEscape') +
   slice('    function checklistResult', '    function allRoleChecksDone') +
   slice('    function workflowStampEntries', '    function readStampName') +
+  slice('    function qualityCheckLabel', '    function qualityCheckControls') +
   slice('    function renderChangeTicket', '    const todayCardQrCache') +
   slice('    window.printChangeCard =', '    function relatedAnomalyHtml'), ctx);
 const checks = [
