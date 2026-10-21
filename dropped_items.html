@@ -400,6 +400,20 @@
     .product-card-wrap{position:relative;display:block;width:260px;max-width:100%;flex:0 0 auto}
     .card-photo-register{position:absolute;top:38px;left:9px;width:80px;height:72px;display:flex;align-items:center;justify-content:center;background:#f2f3f4;color:#265f82;font-size:13px;font-weight:600;text-decoration:underline;border:1px dashed #aab5bc;border-radius:4px}
     .card-photo-register:focus-visible{outline:3px solid #265f82;outline-offset:2px}
+    .cost-summary{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:baseline;padding:20px 0;border-block:1px solid var(--line);margin:16px 0}
+    .cost-summary strong{font-size:32px;overflow-wrap:anywhere}
+    .cost-note{font-size:13px;color:var(--muted)}
+    .product-loss{display:block;font-size:14px;font-weight:600;color:#a3333d;line-height:20px;white-space:normal}
+    .dept-loss{flex-basis:100%;font-size:15px;color:#a3333d;overflow-wrap:anywhere}
+    .cost-master-section{margin-top:28px;border-top:1px solid var(--line);padding-top:20px}
+    .cost-form{display:flex;align-items:end;flex-wrap:wrap;gap:16px;margin:16px 0}
+    .cost-form label{display:grid;gap:8px;flex:1 1 200px;min-width:0}
+    .cost-form input,#costSearch{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #cbd2d8;border-radius:6px;background:#fff;font:inherit;color:inherit;box-sizing:border-box}
+    #costSearch{margin:8px 0;max-width:480px}
+    .cost-form .btn{min-height:44px}
+    .cost-table{width:100%;border-collapse:collapse;font-size:15px}
+    .cost-table td,.cost-table th{text-align:left;padding:12px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+    .cost-table td:last-child{width:54px}
   </style>
 </head>
 <body>
@@ -417,7 +431,7 @@
         <button class="nav-btn active" data-page="entry"><i data-lucide="square-pen"></i>入力</button>
         <button class="nav-btn" data-page="dashboard"><i data-lucide="layout-dashboard"></i>ダッシュボード</button>
         <button class="nav-btn" data-page="analysis"><i data-lucide="chart-no-axes-combined"></i>分析</button>
-        <button class="nav-btn" data-page="products"><i data-lucide="image"></i>製品写真</button>
+        <button class="nav-btn" data-page="products"><i data-lucide="image"></i>製品マスター</button>
       </nav>
       <div class="header-actions">
         <span class="connection" id="connectionState"><span class="connection-dot"></span><span>接続中</span></span>
@@ -540,6 +554,11 @@
         <div class="panel metric danger"><div class="metric-label">比較日との差</div><div class="metric-value" id="dayDifference">0</div><div class="metric-sub" id="differenceNote">個</div></div>
         <div class="panel metric"><div class="metric-label">対象日の発生部署</div><div class="metric-value" id="activeDepartments">0</div><div class="metric-sub">部署</div></div>
       </div>
+      <section class="cost-summary" aria-label="対象日のロスコスト">
+        <span>対象日のロスコスト</span><strong id="dailyLossCost">読込中</strong>
+        <span class="cost-note" id="dailyLossCoverage"></span>
+        <span class="cost-note">現在原価による概算（税込・税抜は登録原価に準拠）</span>
+      </section>
       <div class="dashboard-grid">
         <section class="panel" id="departmentChartPanel">
           <div class="section-header"><h3 id="departmentChartTitle">部署別落下品数</h3><span class="full-screen-note">落下品数（個）</span></div>
@@ -551,6 +570,10 @@
           <div class="dept-list" id="departmentList"></div>
         </section>
       </div>
+      <section class="panel recent-panel">
+        <div class="section-header"><h3>日別ロスコスト（対象日までの14日間）</h3><span class="cost-note">現在原価・登録済み分（* 原価未登録を含む）</span></div>
+        <div class="chart-wrap"><canvas id="lossCostChart" aria-label="日別ロスコスト" role="img"></canvas></div>
+      </section>
       <section class="panel recent-panel">
         <div class="section-header"><h3>対象日の登録内容</h3></div>
         <div class="recent-list" id="recentList"></div>
@@ -581,7 +604,18 @@
       </section>
     </section>
     <section class="page" id="page-products">
-      <div class="page-heading"><div><h2>製品写真マスター</h2><p>全部署共通</p></div></div>
+      <div class="page-heading"><div><h2>製品マスター（写真・原価）</h2><p>全部署共通</p></div></div>
+      <section class="cost-master-section" id="costMasterSection">
+        <h3>製品原価</h3>
+        <p id="costMasterStatus" class="cost-note" role="status">原価を読み込み中...</p>
+        <form id="costMasterForm" class="cost-form">
+          <label>整理Noまたは部品名<input id="costSerial" list="costSuggestions" maxlength="60" required autocomplete="off"><datalist id="costSuggestions"></datalist></label>
+          <label>1個あたり原価（円）<input id="costAmount" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required></label>
+          <button id="saveCost" type="submit" class="btn btn-primary" disabled><i data-lucide="save"></i>原価を保存</button>
+        </form>
+        <input id="costSearch" type="search" placeholder="原価一覧を検索" aria-label="原価一覧を検索">
+        <table class="cost-table"><thead><tr><th>整理No・部品名</th><th>原価／個</th><th></th></tr></thead><tbody id="costList"></tbody></table>
+      </section>
       <p id="productMasterStatus" class="product-master-status" role="status">読み込み中...</p>
       <div class="product-master-layout">
         <form id="productMasterForm" class="product-master-form">
@@ -716,6 +750,7 @@
     const state = {
       departments: [], items: [], files: [], editFiles: [], editMedia: [], editItemId: '', deleteItemId: '', charts: {}, activePage: 'entry',
       dashboardDepartments: new Set(), lines: [], productMasters: new Map(), productMastersReady:false,
+      costs: new Map(), costsReady:false, costBusy:false,
       productEdit:null, productFile:null, productPreviewUrl:'', productBusy:false, productPhotoLoading:false
     };
 
@@ -780,6 +815,7 @@
         $('comparisonDate').value = localDateKey(previousWeekday(new Date()));
         subscribeItems();
         subscribeProductMasters();
+        subscribeCosts();
         $('occurredAt').value = localDateTimeValue(new Date());
         const to = new Date(); const from = new Date(); from.setDate(from.getDate()-29);
         $('dateFrom').value = localDateKey(from); $('dateTo').value = localDateKey(to);
@@ -821,6 +857,10 @@
     }
 
     function bindEvents(){
+      $('costMasterForm').addEventListener('submit', saveCost);
+      $('costSearch').addEventListener('input', renderCosts);
+      $('costSerial').addEventListener('change',()=>{const serial=productKey($('costSerial').value),cost=state.costs.get(serial);state.costDraft={serial,revision:cost?.revision || 0};$('costAmount').value=cost ? cost.unitCostSen/100 : '';});
+      document.addEventListener('click',event=>{const link=event.target.closest('[data-cost-product]');if(!link)return;event.preventDefault();closeDetail();showPage('products');$('costSerial').value=link.dataset.costProduct;$('costSerial').dispatchEvent(new Event('change'));$('costAmount').focus();});
       $('serialNo').addEventListener('input', updatePhotoRegistrationLinks);
       $('editSerialNo').addEventListener('input', updatePhotoRegistrationLinks);
       $('commentTooltip').addEventListener('pointerenter',()=>clearTimeout(commentTooltipTimer));
@@ -960,6 +1000,55 @@
     }
 
     const productKey = value => String(value || '').trim().normalize('NFC');
+    const money = cents => new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',minimumFractionDigits:0,maximumFractionDigits:2}).format(cents/100);
+    function lossSummary(rows){
+      let cents=0, missing=0;const products=new Set();
+      rows.forEach(row=>{const cost=state.costs.get(productKey(row.serialNo));if(cost){cents+=cost.unitCostSen*quantity(row);}else{missing+=quantity(row);products.add(productKey(row.serialNo));}});
+      return {cents,missing,products:products.size};
+    }
+    function lossLabel(rows){
+      if(!state.costsReady)return '原価未取得';
+      const total=lossSummary(rows);
+      if(total.missing>0 && total.missing===sumQty(rows))return '原価未登録';
+      return `${money(total.cents)}${total.missing?'（登録済み分）':''}`;
+    }
+    function subscribeCosts(){
+      onSnapshot(collection(db,'droppedProductCosts'),snap=>{
+        state.costs=new Map(snap.docs.map(doc=>{const data=doc.data();return [productKey(data.serialNo),data];}));
+        state.costsReady=true;$('saveCost').disabled=state.costBusy;
+        $('costMasterStatus').textContent='現在原価で全期間を再計算・原価0円と未登録は区別';
+        renderCosts();renderDashboard();
+      },error=>{console.error(error);state.costsReady=false;$('saveCost').disabled=true;$('costMasterStatus').textContent='原価を取得できません。再読み込みしてください。';renderDashboard();});
+    }
+    function renderCosts(){
+      const serials=[...new Set([...state.items.map(row=>productKey(row.serialNo)),...state.productMasters.keys(),...state.costs.keys()])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ja',{numeric:true}));
+      $('costSuggestions').innerHTML=serials.map(serial=>`<option value="${esc(serial)}"></option>`).join('');
+      const search=$('costSearch').value.trim().toLocaleLowerCase('ja');
+      $('costList').innerHTML=serials.filter(serial=>serial.toLocaleLowerCase('ja').includes(search)).map(serial=>`<tr><td>${esc(serial)}</td><td>${state.costsReady?(state.costs.has(serial)?money(state.costs.get(serial).unitCostSen):'未登録'):'未取得'}</td><td><button type="button" class="icon-btn" data-cost-product="${esc(serial)}" aria-label="${esc(serial)}の原価を編集" title="原価を編集"><i data-lucide="pencil"></i></button></td></tr>`).join('');refreshIcons();
+    }
+    async function saveCost(event){
+      event.preventDefault();if(state.costBusy || !state.costsReady)return;
+      const serial=productKey($('costSerial').value),raw=$('costAmount').value,amount=Number(raw),cents=Math.round(amount*100);
+      if(!serial || serial.length>60 || raw==='' || !Number.isFinite(amount) || amount<0 || amount>1000000 || Math.abs(amount*100-cents)>0.000001){showToast('原価は0～100万円、小数第2位まで入力してください',true);return;}
+      const revision=state.costDraft?.serial===serial?state.costDraft.revision:0;
+      state.costBusy=true;$('saveCost').disabled=true;
+      try{
+        const ref=doc(db,'droppedProductCosts',await productDocumentId(serial));
+        await runTransaction(db,async transaction=>{
+          const current=await transaction.get(ref),data=current.exists()?current.data():null;
+          if((data?.revision || 0)!==revision)throw new Error('別の端末で原価が更新されました。最新の原価を確認して再度保存してください');
+          transaction.set(ref,{serialNo:serial,unitCostSen:cents,revision:revision+1,createdAt:data?.createdAt || serverTimestamp(),createdBy:data?.createdBy || auth.currentUser.uid,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+        });
+        state.costDraft={serial,revision:revision+1};showToast('原価を保存しました');
+      }catch(error){console.error(error);showToast(`原価を保存できませんでした: ${error.message}`,true);}
+      finally{state.costBusy=false;$('saveCost').disabled=!state.costsReady;}
+    }
+    function renderLossTrend(rows,dateKey){
+      const keys=[];const end=new Date(`${dateKey}T12:00:00`);
+      for(let i=13;i>=0;i--){const day=new Date(end);day.setDate(day.getDate()-i);keys.push(localDateKey(day));}
+      const summaries=keys.map(key=>lossSummary(byDate(rows,key)));
+      makeChart('lossCost',$('lossCostChart'),{type:'bar',data:{labels:keys.map((key,i)=>shortDateLabel(key)+(summaries[i].missing?' *':'')),datasets:[{label:'ロスコスト（円）',data:summaries.map(s=>!state.costsReady || (s.missing && s.cents===0)?null:s.cents/100),backgroundColor:'#a85c65'}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:ctx=>summaries[ctx.dataIndex].missing?`原価未登録 ${summaries[ctx.dataIndex].missing}個`:'原価登録済み'}}},scales:{y:{beginAtZero:true,title:{display:true,text:'円'}}},onClick:(_,elements)=>{if(elements.length){$('comparisonDate').value=keys[elements[0].index];renderDashboard();}}}});
+    }
     function productFor(serial){ return state.productMasters.get(productKey(serial)); }
     function photoRegistrationLink(serial, className='photo-register-link'){
       if(!productKey(serial) || safeUrl(productFor(serial)?.photo?.url)) return '';
@@ -992,6 +1081,7 @@
       });
     }
     function renderProductMasters(){
+      renderCosts();
       const query=$('productMasterSearch').value.trim().toLocaleLowerCase('ja');
       const products=[...state.productMasters.values()].sort((a,b)=>a.serialNo.localeCompare(b.serialNo,'ja',{numeric:true}));
       const matched=products.filter(p=>`${p.serialNo} ${p.productName||''}`.toLocaleLowerCase('ja').includes(query));
@@ -1016,6 +1106,7 @@
       if(productFor(serial)) editProductMaster(serial);
       else {resetProductMasterForm();$('productMasterSerial').value=productKey(serial).slice(0,60);}
       $('productMasterFile').focus({preventScroll:true});
+      $('productMasterForm').scrollIntoView({block:'start'});
     }
     function editProductMaster(serial){
       if(state.productBusy)return;
@@ -1403,6 +1494,10 @@
       const todayRows = byDate(dashboardItems,todayKey), comparisonRows = byDate(dashboardItems,comparisonKey);
       const todayTotal = sumQty(todayRows), comparisonTotal = sumQty(comparisonRows), diff = todayTotal-comparisonTotal;
       $('todayTotal').textContent = todayTotal.toLocaleString('ja-JP');
+      const loss=lossSummary(todayRows);
+      $('dailyLossCost').textContent=lossLabel(todayRows);
+      $('dailyLossCoverage').textContent=!state.costsReady?'原価を取得できるまで集計できません':loss.missing?`未集計：原価未登録 ${loss.products}製品・${loss.missing}個`:'対象日の全製品を集計済み';
+      renderLossTrend(dashboardItems,todayKey);
       $('yesterdayTotal').textContent = comparisonTotal.toLocaleString('ja-JP');
       $('comparisonDateSub').textContent = `個（${shortDateLabel(comparisonKey)}）`;
       $('dayDifference').textContent = `${diff>0?'+':''}${diff.toLocaleString('ja-JP')}`;
@@ -1423,10 +1518,10 @@
           const product=productFor(name),url=safeUrl(product?.photo?.url);
           const comments=commentCounts(todayRows.filter(row=>row.department===dept && row.serialNo===name));
           const bubbles=`<span class="product-comment-summary"><span class="product-comment-heading">コメント（登録件数）</span>${comments.length?comments.slice(0,1).map(([comment,total,cause])=>`<span class="product-comment-bubble ${causeClass(cause)}" title="${esc(cause)}：${esc(comment)}"><span class="product-comment-text">${esc(comment)}</span><strong>${esc(cause)}・${total}件</strong></span>`).join(''):'<span class="product-card-no-comment">コメントなし</span>'}${comments.length>1?`<span class="product-comment-more">ほか${comments.length-1}種類</span>`:''}</span>`;
-          return `<span class="product-card-wrap"><button type="button" class="serial-chip serial-chip-item product-summary-card" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="product-card-title" title="${esc(name)}">${esc(name)}</span><span class="product-card-media">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:'<span class="product-card-no-photo">写真未登録</span>'}<span class="product-card-quantity">× ${count.toLocaleString('ja-JP')}個</span></span>${bubbles}</button>${photoRegistrationLink(name, 'card-photo-register')}</span>`;
+          return `<span class="product-card-wrap"><button type="button" class="serial-chip serial-chip-item product-summary-card" data-preview-serial="${esc(name)}" data-preview-dept="${esc(dept)}" aria-label="${esc(name)}${product?.productName?` ${esc(product.productName)}`:''} ${count.toLocaleString('ja-JP')}個" aria-haspopup="dialog" aria-expanded="false" aria-controls="serialPreview"><span class="product-card-title" title="${esc(name)}">${esc(name)}</span><span class="product-card-media">${url?`<img class="product-thumb" src="${esc(url)}" alt="${esc(product.productName||name)}の製品写真" loading="lazy">`:'<span class="product-card-no-photo">写真未登録</span>'}<span class="product-card-quantity">× ${count.toLocaleString('ja-JP')}個<span class="product-loss">${!state.costsReady?'原価未取得':state.costs.has(productKey(name)) ? money(state.costs.get(productKey(name)).unitCostSen*count) : '原価未登録'}</span></span></span>${bubbles}</button>${photoRegistrationLink(name, 'card-photo-register')}<a class="photo-register-link" href="?screen=products" data-cost-product="${esc(name)}">原価${state.costs.has(productKey(name))?'を編集':'を登録'}</a></span>`;
         }).join('');
         const departmentColor=departmentColors[state.departments.indexOf(dept)%departmentColors.length];
-        return `<div class="dept-row" style="--department-bg:${departmentColor}"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個</span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
+        return `<div class="dept-row" style="--department-bg:${departmentColor}"><span class="dept-name"><button type="button" class="dept-detail-trigger" data-dept="${esc(dept)}">${esc(dept)}</button></span><span class="dept-number dept-total">合計 <span class="dept-total-value">${(todayByDept[dept]||0).toLocaleString('ja-JP')}</span>個<span class="dept-loss">${lossLabel(todayRows.filter(row=>row.department===dept))}</span></span><span class="dept-number">${comparisonByDept[dept]||0}<small>${shortDateLabel(comparisonKey)}</small></span><span class="serial-breakdown">${chips || '<span class="serial-chip">対象日0件</span>'}</span></div>`;
       }).join('') : '<div class="empty">表示する部署を選択してください</div>';
       document.querySelectorAll('[data-dept]').forEach(btn => btn.addEventListener('click',()=>openDetail(`${btn.dataset.dept}：${todayKey.replaceAll('-','/')}`,todayRows.filter(r=>r.department===btn.dataset.dept))));
       document.querySelectorAll('#departmentList .dept-row').forEach(row => row.addEventListener('click', event => {
@@ -1660,7 +1755,7 @@
     function openDetail(title,rows){
       closeSerialPreview();
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}${photoRegistrationLink(item.serialNo)}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}<div class="product-loss">ロスコスト：${lossLabel([item])}</div>${photoRegistrationLink(item.serialNo)}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
       document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
       document.querySelectorAll('[data-delete-item]').forEach(btn => btn.addEventListener('click', () => openDelete(btn.dataset.deleteItem)));
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();

@@ -175,6 +175,25 @@ service cloud.firestore {
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if isSignedIn();
     }
+    // Shared current unit costs, stored as integer hundredths of a yen.
+    match /droppedProductCosts/{productId} {
+      function validCost() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['serialNo', 'unitCostSen', 'revision', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && data.serialNo is string && data.serialNo.size() > 0 && data.serialNo.size() <= 60
+          && data.unitCostSen is int && data.unitCostSen >= 0 && data.unitCostSen <= 100000000
+          && data.revision is int
+          && data.updatedAt == request.time && data.updatedBy == request.auth.uid;
+      }
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && validCost()
+        && request.resource.data.revision == 1
+        && request.resource.data.createdAt == request.time && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSignedIn() && validCost()
+        && request.resource.data.serialNo == resource.data.serialNo
+        && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.revision == resource.data.revision + 1;
+    }
     // Shared product-photo masters for the anonymous dropped-items app.
     match /droppedProductPhotos/{productId} {
       function validProductPhoto() {
