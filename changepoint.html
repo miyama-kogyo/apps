@@ -4569,7 +4569,7 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       const delBtn  = document.getElementById('btnDetailDelete');
       const isUndecidedOnly = isPlannedCP && (switchStatus === 'undecided') && !switchDate;
       if (editBtn) editBtn.style.display = isUndecidedOnly ? 'none' : '';
-      if (delBtn)  delBtn.style.display  = isUndecidedOnly ? 'none' : '';
+      if (delBtn) delBtn.style.display = '';
 
       const bodyEl   = document.getElementById('detailBody');
       const badgesEl = document.getElementById('detailBadges');
@@ -4588,7 +4588,15 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
     document.getElementById('detailClose').addEventListener('click', closeDetail);
     document.getElementById('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal')closeDetail(); });
     document.getElementById('btnDetailEdit').addEventListener('click', () => { if (!currentDetailItem) return; document.getElementById('detailModal').classList.remove('active'); openEditModal(currentDetailItem._id); });
-    document.getElementById('btnDetailDelete').addEventListener('click', async () => { if (!currentDetailItem) return; await deleteChangepoint(currentDetailItem._id); document.getElementById('detailModal').classList.remove('active'); });
+    document.getElementById('btnDetailDelete').addEventListener('click', async (event) => {
+      if (!currentDetailItem || event.currentTarget.disabled) return;
+      const id = currentDetailItem._id, button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const deleted = await deleteChangepoint(id);
+        if (deleted && currentDetailItem?._id === id) document.getElementById('detailModal').classList.remove('active');
+      } finally { button.disabled = false; }
+    });
 
     const btnSwitchToday = document.getElementById('btnSwitchToday');
     const btnSwitchDecide = document.getElementById('btnSwitchDecide');
@@ -4640,9 +4648,9 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
 
     window.openEditFromHistory = function(id) { openEditModal(id); };
     window.deleteChangepoint = async function(id) {
-      if (!confirm('この変化点を削除しますか？')) return;
-      try { await deleteDoc(doc(db, 'changepoints', id)); alert('削除しました'); }
-      catch (err) { alert('削除に失敗しました: ' + (err.message || err)); }
+      if (!confirm('この変化点を削除しますか？')) return false;
+      try { await deleteDoc(doc(db, 'changepoints', id)); alert('削除しました'); return true; }
+      catch (err) { alert('削除に失敗しました: ' + (err.message || err)); return false; }
     };
 
     function openEditModal(id) {
