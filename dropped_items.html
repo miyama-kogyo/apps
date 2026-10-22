@@ -582,6 +582,12 @@
 
     <section class="page" id="page-analysis">
       <div class="page-heading"><div><h2>傾向分析</h2><p>期間・部署・整理Noまたは部品名を切り替えて発生傾向を確認します。</p></div></div>
+      <fieldset class="analysis-measure" style="border:0;padding:0;margin:0 0 16px;display:flex;gap:16px;align-items:center">
+        <legend style="margin-bottom:8px">集計指標</legend>
+        <label><input type="radio" name="analysisMeasure" value="quantity" checked> 個数</label>
+        <label><input type="radio" name="analysisMeasure" value="cost"> ロスコスト</label>
+      </fieldset>
+      <p id="analysisCostNote" class="cost-note" role="status" hidden></p>
       <div class="panel filters">
         <div class="field"><label for="dateFrom">開始日</label><input type="date" id="dateFrom"></div>
         <div class="field"><label for="dateTo">終了日</label><input type="date" id="dateTo"></div>
@@ -599,7 +605,7 @@
         </section>
       </div>
       <section class="panel recent-panel">
-        <div class="section-header"><h3>整理No・部品名別ランキング</h3><span class="full-screen-note">集計期間内の落下品合計</span></div>
+        <div class="section-header"><h3>整理No・部品名別ランキング</h3><span class="full-screen-note" id="analysisRankingUnit">集計期間内の落下品合計</span></div>
         <div class="ranking-list" id="serialRanking"></div>
       </section>
     </section>
@@ -857,6 +863,7 @@
     }
 
     function bindEvents(){
+      document.querySelectorAll('input[name="analysisMeasure"]').forEach(input=>input.addEventListener('change',renderAnalysis));
       $('costMasterForm').addEventListener('submit', saveCost);
       $('costSearch').addEventListener('input', renderCosts);
       $('costSerial').addEventListener('change',()=>{const serial=productKey($('costSerial').value),cost=state.costs.get(serial);state.costDraft={serial,revision:cost?.revision || 0};$('costAmount').value=cost ? cost.unitCostSen/100 : '';});
@@ -895,8 +902,8 @@
       ['dragleave','drop'].forEach(type => zone.addEventListener(type, e => { e.preventDefault(); zone.classList.remove('dragover'); }));
       zone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
       $('entryForm').addEventListener('submit', submitEntry);
-      ['dateFrom','dateTo','analysisDepartment','analysisSerial'].forEach(id => $(id).addEventListener('change', renderAnalysis));
-      $('analysisDepartment').addEventListener('change', updateSerialOptions);
+      ['dateFrom','dateTo','analysisSerial'].forEach(id => $(id).addEventListener('change', renderAnalysis));
+      $('analysisDepartment').addEventListener('change',()=>{updateSerialOptions();renderAnalysis();});
       $('fullscreenBtn').addEventListener('click', toggleFullscreen);
       $('closeModal').addEventListener('click', closeDetail);
       $('detailModal').addEventListener('click', e => { if(e.target === $('detailModal')) closeDetail(); });
@@ -1017,8 +1024,8 @@
         state.costs=new Map(snap.docs.map(doc=>{const data=doc.data();return [productKey(data.serialNo),data];}));
         state.costsReady=true;$('saveCost').disabled=state.costBusy;
         $('costMasterStatus').textContent='現在原価で全期間を再計算・原価0円と未登録は区別';
-        renderCosts();renderDashboard();
-      },error=>{console.error(error);state.costsReady=false;$('saveCost').disabled=true;$('costMasterStatus').textContent='原価を取得できません。再読み込みしてください。';renderDashboard();});
+        renderCosts();renderDashboard();renderAnalysis();
+      },error=>{console.error(error);state.costsReady=false;$('saveCost').disabled=true;$('costMasterStatus').textContent='原価を取得できません。再読み込みしてください。';renderDashboard();renderAnalysis();});
     }
     function renderCosts(){
       const serials=[...new Set([...state.items.map(row=>productKey(row.serialNo)),...state.productMasters.keys(),...state.costs.keys()])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ja',{numeric:true}));
@@ -1727,18 +1734,34 @@
 
     function renderAnalysis(){
       if(!$('dateFrom').value || !$('dateTo').value) return;
-      const rows=filteredAnalysisRows(), labels=dateKeys($('dateFrom').value,$('dateTo').value), byDay=groupSum(rows,r=>r.dateKey);
+      const rows=filteredAnalysisRows(), labels=dateKeys($('dateFrom').value,$('dateTo').value);
+      const costMode=document.querySelector('input[name="analysisMeasure"]:checked').value==='cost';
+      const metric=costMode?'ロスコスト':'落下品数',unit=costMode?'円':'個';
+      const eligible=costMode?rows.filter(row=>state.costsReady && state.costs.has(productKey(row.serialNo))):rows;
+      const aggregate=keyFn=>eligible.reduce((map,row)=>{
+        const key=keyFn(row)||'未設定';
+        map.set(key,(map.get(key)||0)+(costMode?state.costs.get(productKey(row.serialNo)).unitCostSen*quantity(row):quantity(row)));return map;
+      },new Map());
+      const byDay=aggregate(r=>r.dateKey);
+      const chartValue=value=>costMode?value/100:value;
+      const format=value=>costMode?money(value):value.toLocaleString('ja-JP')+'個';
+      const loss=lossSummary(rows);
+      $('analysisCostNote').hidden=!costMode;
+      $('analysisCostNote').textContent=!state.costsReady?'原価を取得できないため、ロスコストを集計できません。':
+        `現在原価による概算・登録済み分のみ。合計 ${money(loss.cents)}。${loss.missing?`原価未登録：${loss.products}製品・${loss.missing}個（集計対象外）`:'対象製品の原価は登録済み'}`;
+      $('analysisRankingUnit').textContent=`集計期間内の${metric}合計（${unit}）`;
       const selectedSerial=$('analysisSerial').value;
-      $('trendTitle').textContent=selectedSerial ? `${selectedSerial} の落下品数推移` : '落下品数の推移';
-      makeChart('trend',$('trendChart'),{type:'line',data:{labels:labels.map(x=>x.slice(5).replace('-','/')),datasets:[{label:'落下品数',data:labels.map(x=>byDay[x]||0),borderColor:'#4b5359',backgroundColor:'rgba(75,83,89,.12)',fill:true,tension:.25,pointRadius:3,pointHoverRadius:6}]},options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const key=labels[els[0].index];openDetail(`${key.replaceAll('-','/')} の詳細`,rows.filter(r=>r.dateKey===key));},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
-      const deptMap=groupSum(rows,r=>r.department),deptRanking=Object.entries(deptMap).sort((a,b)=>b[1]-a[1]);
-      makeChart('ranking',$('rankingChart'),{type:'bar',data:{labels:deptRanking.map(x=>x[0]),datasets:[{label:'落下品数',data:deptRanking.map(x=>x[1]),backgroundColor:deptRanking.map((_,i)=>i===0?'#3f464b':'#9ba2a7'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(!els.length)return;const dept=deptRanking[els[0].index][0];openDetail(`${dept} の詳細`,rows.filter(r=>r.department===dept));},plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'落下品数（個）'}}}}});
-      const serialRanking=Object.entries(groupSum(rows,r=>r.serialNo)).sort((a,b)=>b[1]-a[1]);
+      $('trendTitle').textContent=selectedSerial ? `${selectedSerial} の${metric}推移` : `${metric}の推移`;
+      const tooltip={callbacks:{label:ctx=>`${metric}：${costMode?money(ctx.parsed.y*100):ctx.parsed.y+'個'}`}};
+      makeChart('trend',$('trendChart'),{type:'line',data:{labels:labels.map(x=>x.slice(5).replace('-','/')),datasets:[{label:metric,data:labels.map(key=>costMode && (!state.costsReady || (!byDay.has(key) && rows.some(row=>row.dateKey===key)))?null:chartValue(byDay.get(key)||0)),borderColor:costMode?'#a85c65':'#4b5359',backgroundColor:'rgba(75,83,89,.12)',fill:true,tension:.25,pointRadius:3,pointHoverRadius:6}]},options:{responsive:true,maintainAspectRatio:false,animation:false,onClick:(_,els)=>{if(!els.length)return;const key=labels[els[0].index];openDetail(`${key.replaceAll('-','/')} の詳細`,rows.filter(r=>r.dateKey===key));},plugins:{legend:{display:false},tooltip},scales:{y:{beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:`${metric}（${unit}）`}}}}});
+      const deptRanking=[...aggregate(r=>r.department)].sort((a,b)=>b[1]-a[1]);
+      makeChart('ranking',$('rankingChart'),{type:'bar',data:{labels:deptRanking.map(x=>x[0]),datasets:[{label:metric,data:deptRanking.map(x=>chartValue(x[1])),backgroundColor:deptRanking.map((_,i)=>i===0?(costMode?'#a85c65':'#3f464b'):'#9ba2a7'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,animation:false,onClick:(_,els)=>{if(!els.length)return;const dept=deptRanking[els[0].index][0];openDetail(`${dept} の詳細`,rows.filter(r=>r.department===dept));},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${metric}：${costMode?money(ctx.parsed.x*100):ctx.parsed.x+'個'}`}}},scales:{x:{beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:`${metric}（${unit}）`}}}}});
+      const serialRanking=[...aggregate(r=>r.serialNo)].sort((a,b)=>b[1]-a[1]);
       $('serialRanking').innerHTML=serialRanking.length?serialRanking.slice(0,20).map(([serial,count],i)=>{
         const product=productFor(serial),url=safeUrl(product?.photo?.url);
         const photo=url?`<button type="button" class="rank-product-photo" data-rank-serial="${esc(serial)}" aria-label="${esc(serial)}の詳細"><img src="${esc(url)}" alt="${esc(product.productName||serial)}の製品写真" loading="lazy"></button>`:`<a class="rank-photo-register" href="?screen=products&amp;product=${encodeURIComponent(serial)}" data-register-product="${esc(serial)}" aria-label="${esc(serial)}の製品写真を登録">写真を登録</a>`;
-        return `<div class="rank-row product-rank-row"><span class="rank-no">${i+1}</span>${photo}<button type="button" class="rank-product-detail" data-rank-serial="${esc(serial)}"><span class="rank-label">${esc(serial)}${product?.productName?`<small>${esc(product.productName)}</small>`:''}</span><span class="rank-value">${count.toLocaleString('ja-JP')}個</span></button></div>`;
-      }).join(''):'<div class="empty">対象期間のデータがありません</div>';
+        return `<div class="rank-row product-rank-row"><span class="rank-no">${i+1}</span>${photo}<button type="button" class="rank-product-detail" data-rank-serial="${esc(serial)}"><span class="rank-label">${esc(serial)}${product?.productName?`<small>${esc(product.productName)}</small>`:''}</span><span class="rank-value">${format(count)}</span></button></div>`;
+      }).join(''):`<div class="empty">${costMode && rows.length?'原価登録済みの集計対象がありません':'対象期間のデータがありません'}</div>`;
       document.querySelectorAll('[data-rank-serial]').forEach(btn=>btn.addEventListener('click',()=>openDetail(`${btn.dataset.rankSerial} の詳細`,rows.filter(r=>r.serialNo===btn.dataset.rankSerial))));
       document.querySelectorAll('[data-register-product]').forEach(link=>link.addEventListener('click',event=>{
         if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
