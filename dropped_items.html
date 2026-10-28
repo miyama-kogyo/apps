@@ -462,8 +462,8 @@
               <select id="lineName" disabled><option value="">部署を選択してください</option></select>
             </div>
             <div class="field">
-              <label for="serialNo">整理Noまたは部品名 <span class="required">*</span></label>
-              <input id="serialNo" list="serialSuggestions" maxlength="60" autocomplete="off" placeholder="例：A-1234 / ブラケット" required>
+              <label for="serialNo">整理No（背番号入力可） <span class="required">*</span></label>
+              <input id="serialNo" list="serialSuggestions" maxlength="60" autocomplete="off" placeholder="例：6338（背番号630でも可）" required>
               <datalist id="serialSuggestions"></datalist>
               <span id="entryProductRegistration"></span>
               <small class="field-hint" id="serialSuggestionHint">部署を選択すると過去の入力候補を表示します</small>
@@ -509,7 +509,7 @@
         </form>
         <aside class="panel entry-guide">
           <h3>入力のポイント</h3>
-          <div class="guide-step"><span class="step-no">1</span><div><strong>部署・整理Noまたは部品名を確認</strong><span>部署は異常履歴アプリと共通です。</span></div></div>
+          <div class="guide-step"><span class="step-no">1</span><div><strong>部署・整理No（背番号入力可）を確認</strong><span>部署は異常履歴アプリと共通です。</span></div></div>
           <div class="guide-step"><span class="step-no">2</span><div><strong>落下した実数を入力</strong><span>まとめて発見した場合は、その合計個数を登録します。</span></div></div>
           <div class="guide-step"><span class="step-no">3</span><div><strong>状況を撮影</strong><span>発生場所や落下状態が分かる写真・動画を残します。</span></div></div>
           <div class="guide-step"><span class="step-no">4</span><div><strong>原因を一次分類</strong><span>詳細が不明な場合は「その他」を選び、コメントへ記録します。</span></div></div>
@@ -566,7 +566,7 @@
         </section>
         <section class="panel">
           <div class="section-header"><h3>対象日の部署別内訳</h3><span class="full-screen-note" id="breakdownDateLabel"></span></div>
-          <div class="dept-column-head"><span>部署</span><span id="deptTodayHeading">対象日</span><span id="deptComparisonHeading">比較日</span><span>対象日の整理No・部品名と個数</span></div>
+          <div class="dept-column-head"><span>部署</span><span id="deptTodayHeading">対象日</span><span id="deptComparisonHeading">比較日</span><span>対象日の整理Noと個数</span></div>
           <div class="dept-list" id="departmentList"></div>
         </section>
       </div>
@@ -581,7 +581,7 @@
     </section>
 
     <section class="page" id="page-analysis">
-      <div class="page-heading"><div><h2>傾向分析</h2><p>期間・部署・整理Noまたは部品名を切り替えて発生傾向を確認します。</p></div></div>
+      <div class="page-heading"><div><h2>傾向分析</h2><p>期間・部署・整理No（背番号入力可）を切り替えて発生傾向を確認します。</p></div></div>
       <fieldset class="analysis-measure" style="border:0;padding:0;margin:0 0 16px;display:flex;gap:16px;align-items:center">
         <legend style="margin-bottom:8px">集計指標</legend>
         <label><input type="radio" name="analysisMeasure" value="quantity" checked> 個数</label>
@@ -592,7 +592,7 @@
         <div class="field"><label for="dateFrom">開始日</label><input type="date" id="dateFrom"></div>
         <div class="field"><label for="dateTo">終了日</label><input type="date" id="dateTo"></div>
         <div class="field"><label for="analysisDepartment">部署</label><select id="analysisDepartment"><option value="">すべての部署</option></select></div>
-        <div class="field"><label for="analysisSerial">整理Noまたは部品名</label><select id="analysisSerial"><option value="">すべての整理No・部品名</option></select></div>
+        <div class="field"><label for="analysisSerial">整理No（背番号入力可）</label><select id="analysisSerial"><option value="">すべての整理No</option></select></div>
       </div>
       <div class="analysis-grid">
         <section class="panel">
@@ -605,7 +605,7 @@
         </section>
       </div>
       <section class="panel recent-panel">
-        <div class="section-header"><h3>整理No・部品名別ランキング</h3><span class="full-screen-note" id="analysisRankingUnit">集計期間内の落下品合計</span></div>
+        <div class="section-header"><h3>整理No別ランキング</h3><span class="full-screen-note" id="analysisRankingUnit">集計期間内の落下品合計</span></div>
         <div class="ranking-list" id="serialRanking"></div>
       </section>
     </section>
@@ -615,19 +615,19 @@
         <h3>製品原価</h3>
         <p id="costMasterStatus" class="cost-note" role="status">原価を読み込み中...</p>
         <form id="costMasterForm" class="cost-form">
-          <label>整理Noまたは部品名<input id="costSerial" list="costSuggestions" maxlength="60" required autocomplete="off"><datalist id="costSuggestions"></datalist></label>
+          <label>整理No（背番号入力可）<input id="costSerial" list="costSuggestions" maxlength="60" required autocomplete="off"><datalist id="costSuggestions"></datalist></label>
           <label>1個あたり原価（円）<input id="costAmount" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required></label>
           <button id="saveCost" type="submit" class="btn btn-primary" disabled><i data-lucide="save"></i>原価を保存</button>
         </form>
         <input id="costSearch" type="search" placeholder="原価一覧を検索" aria-label="原価一覧を検索">
-        <table class="cost-table"><thead><tr><th>整理No・部品名</th><th>原価／個</th><th></th></tr></thead><tbody id="costList"></tbody></table>
+        <table class="cost-table"><thead><tr><th>整理No</th><th>原価／個</th><th></th></tr></thead><tbody id="costList"></tbody></table>
       </section>
       <p id="productMasterStatus" class="product-master-status" role="status">読み込み中...</p>
       <div class="product-master-layout">
         <form id="productMasterForm" class="product-master-form">
           <h3 id="productMasterFormTitle">製品写真の登録</h3>
           <fieldset id="productMasterFields" style="border:0;padding:0;margin:0;display:grid;gap:16px" disabled>
-            <label>整理Noまたは部品名<input id="productMasterSerial" maxlength="60" list="productMasterSuggestions" required autocomplete="off"></label>
+            <label>整理No（背番号入力可）<input id="productMasterSerial" maxlength="60" list="productMasterSuggestions" required autocomplete="off"></label>
             <datalist id="productMasterSuggestions"></datalist>
             <label>製品名（任意）<input id="productMasterName" maxlength="100"></label>
             <label>製品写真<input id="productMasterFile" type="file" accept="image/jpeg,image/png,image/webp"></label>
@@ -636,7 +636,7 @@
             <div class="product-master-actions"><button type="submit" class="btn btn-primary" id="saveProductMaster"><i data-lucide="save"></i>保存</button><button type="button" class="btn btn-secondary" id="cancelProductMaster">新規登録に戻る</button></div>
           </fieldset>
         </form>
-        <section><label for="productMasterSearch">登録済み製品</label><input id="productMasterSearch" class="product-master-search" type="search" placeholder="整理No・部品名・製品名で検索"><div id="productMasterList" class="product-master-list"></div></section>
+        <section><label for="productMasterSearch">登録済み製品</label><input id="productMasterSearch" class="product-master-search" type="search" placeholder="整理No・製品名で検索"><div id="productMasterList" class="product-master-list"></div></section>
       </div>
     </section>
   </main>
@@ -673,7 +673,7 @@
             <select id="editLineName"></select>
           </div>
           <div class="field">
-            <label for="editSerialNo">整理Noまたは部品名 <span class="required">*</span></label>
+            <label for="editSerialNo">整理No（背番号入力可） <span class="required">*</span></label>
             <input id="editSerialNo" list="editSerialSuggestions" maxlength="60" autocomplete="off" required>
             <datalist id="editSerialSuggestions"></datalist>
             <span id="editProductRegistration"></span>
@@ -857,12 +857,13 @@
 
     function subscribeItems(){
       onSnapshot(collection(db, 'droppedItems'), snap => {
-        state.items = snap.docs.map(doc => ({id:doc.id, ...doc.data()})).sort((a,b)=>parseDate(b)-parseDate(a));
+        state.items = snap.docs.map(doc => ({id:doc.id, ...doc.data(), serialNo:productKey(doc.data().serialNo)})).sort((a,b)=>parseDate(b)-parseDate(a));
         setConnected(true); updateEntrySerialSuggestions(); renderAll();
       }, error => { console.error(error); setConnected(false); showToast('データの受信に失敗しました', true); });
     }
 
     function bindEvents(){
+      ['serialNo','editSerialNo','costSerial','productMasterSerial'].forEach(id=>$(id).addEventListener('change',()=>{normalizeSerialInput($(id));updatePhotoRegistrationLinks();}));
       document.querySelectorAll('input[name="analysisMeasure"]').forEach(input=>input.addEventListener('change',renderAnalysis));
       $('costMasterForm').addEventListener('submit', saveCost);
       $('costSearch').addEventListener('input', renderCosts);
@@ -1006,7 +1007,24 @@
       refreshIcons();
     }
 
-    const productKey = value => String(value || '').trim().normalize('NFC');
+    const BACK_NUMBER_TO_SERIAL = Object.freeze({
+      '630':'6338','50':'6342','49':'6341','51':'6343','48':'6339',
+      '126':'7643','125':'7642','45':'6322','3':'5796','52':'6340',
+      '860':'7556','7550':'7550','115':'7557','119':'7563','117':'7560',
+      '61':'7558','124':'7651','123':'7650','7Y08':'7610','116':'7559',
+      '118':'7562','10':'7561','7631':'7631','570':'7624','127':'7625',
+      '5U40':'6089','4039':'4039','7067':'7067','34':'5874'
+    });
+    function productKey(value){
+      const input=String(value ?? '').trim().normalize('NFC');
+      const key=input.normalize('NFKC').toUpperCase();
+      return Object.hasOwn(BACK_NUMBER_TO_SERIAL,key)?BACK_NUMBER_TO_SERIAL[key]:input;
+    }
+    function normalizeSerialInput(input){
+      const before=input.value.trim(),after=productKey(before);
+      input.value=after;
+      if(before && before!==after)showToast(`背番号 ${before} → 整理No ${after}`);
+    }
     const money = cents => new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',minimumFractionDigits:0,maximumFractionDigits:2}).format(cents/100);
     function lossSummary(rows){
       let cents=0, missing=0;const products=new Set();
@@ -1156,7 +1174,7 @@
     async function saveProductMaster(event){
       event.preventDefault(); if(state.productBusy || state.productPhotoLoading || !state.productMastersReady)return;
       const serial=productKey($('productMasterSerial').value),productName=$('productMasterName').value.trim();
-      if(!serial || serial.length>60 || productName.length>100){showToast('整理No・部品名と製品名の文字数を確認してください',true);return;}
+      if(!serial || serial.length>60 || productName.length>100){showToast('整理Noと製品名の文字数を確認してください',true);return;}
       const existing=state.productEdit;
       if(!existing && productFor(serial)){showToast('登録済みです。一覧の「編集」から変更してください',true);return;}
       if(!state.productFile && !existing?.photo){showToast('製品写真を選んでください',true);return;}
@@ -1296,7 +1314,7 @@
         await addDoc(collection(db,'droppedItems'), {
           department:$('department').value,
           lineName:$('lineName').value,
-          serialNo:$('serialNo').value.trim(),
+          serialNo:productKey($('serialNo').value),
           quantity:qty,
           cause,
           comment:$('comment').value.trim(),
@@ -1399,12 +1417,12 @@
       const occurred = new Date($('editOccurredAt').value);
       const department = $('editDepartment').value;
       const lineName = $('editLineName').value;
-      const serialNo = $('editSerialNo').value.trim();
+      const serialNo = productKey($('editSerialNo').value);
       const quantityValue = Number($('editQuantity').value);
       const cause = $('editCause').value;
       const comment = $('editComment').value.trim();
       if(!original){ showToast('編集するデータが見つかりません', true); return; }
-      if(!department || !serialNo){ showToast('部署と整理Noまたは部品名を入力してください', true); return; }
+      if(!department || !serialNo){ showToast('部署と整理No（背番号入力可）を入力してください', true); return; }
       if(Number.isNaN(occurred.getTime())){ showToast('発生日時を確認してください', true); return; }
       if(!Number.isInteger(quantityValue) || quantityValue < 1 || quantityValue > 9999){ showToast('個数は1～9999で入力してください', true); return; }
       if(!['作業','設備','その他'].includes(cause)){ showToast('原因を選択してください', true); return; }
@@ -1442,7 +1460,7 @@
       if(!item){ showToast('削除するデータが見つかりません', true); return; }
       closeDetail();
       state.deleteItemId = item.id;
-      $('deleteTarget').innerHTML = `<strong>${esc(item.serialNo || '整理No・部品名未設定')}</strong><span>${esc(item.department)} / ${fmtDateTime(item)} / ${quantity(item)}個</span>`;
+      $('deleteTarget').innerHTML = `<strong>${esc(item.serialNo || '整理No未設定')}</strong><span>${esc(item.department)} / ${fmtDateTime(item)} / ${quantity(item)}個</span>`;
       $('deleteModal').classList.add('open');
       $('deleteModal').setAttribute('aria-hidden','false');
       document.body.style.overflow = 'hidden';
@@ -1716,7 +1734,7 @@
       const dept = $('analysisDepartment')?.value || '';
       const current = $('analysisSerial')?.value || '';
       const serials = [...new Set(state.items.filter(row=>!dept||row.department===dept).map(row=>row.serialNo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true}));
-      $('analysisSerial').innerHTML = `<option value="">すべての整理No・部品名</option>${serials.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('')}`;
+      $('analysisSerial').innerHTML = `<option value="">すべての整理No</option>${serials.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('')}`;
       if(serials.includes(current)) $('analysisSerial').value = current;
     }
 
@@ -1778,7 +1796,7 @@
     function openDetail(title,rows){
       closeSerialPreview();
       const sorted=[...rows].sort((a,b)=>parseDate(b)-parseDate(a)); $('detailTitle').textContent=`${title}（${sorted.length}件 / ${sumQty(sorted)}個）`;
-      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No・部品名未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}<div class="product-loss">ロスコスト：${lossLabel([item])}</div>${photoRegistrationLink(item.serialNo)}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
+      $('detailList').innerHTML=sorted.length?sorted.map(item=>`<article class="detail-card"><div class="detail-main"><strong>${esc(item.serialNo||'整理No未設定')}</strong><span>${quantity(item)}個</span></div><div class="detail-meta"><span>${esc(item.department)}</span><span>ライン：${esc(item.lineName || '未記録')}</span><span>${fmtDateTime(item)}</span><span class="cause-tag ${causeClass(item.cause)}">${esc(item.cause)}</span></div>${item.comment?`<div class="detail-comment">${esc(item.comment)}</div>`:''}<div class="product-loss">ロスコスト：${lossLabel([item])}</div>${photoRegistrationLink(item.serialNo)}${mediaHtml(item.media)}<div class="detail-actions"><button class="btn btn-danger" type="button" data-delete-item="${esc(item.id)}"><i data-lucide="trash-2"></i>削除</button><button class="btn btn-secondary" type="button" data-edit-item="${esc(item.id)}"><i data-lucide="pencil"></i>編集</button></div></article>`).join(''):'<div class="empty">該当データがありません</div>';
       document.querySelectorAll('[data-edit-item]').forEach(btn => btn.addEventListener('click', () => openEdit(btn.dataset.editItem)));
       document.querySelectorAll('[data-delete-item]').forEach(btn => btn.addEventListener('click', () => openDelete(btn.dataset.deleteItem)));
       $('detailModal').classList.add('open'); $('detailModal').setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; refreshIcons();
