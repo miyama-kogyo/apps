@@ -2126,6 +2126,15 @@ function getQueryParam(name){
 
 const state = { anomalyId: null };
 
+function clearCurrentAnomalyId(){
+  state.anomalyId = null;
+  try{
+    const url = new URL(location.href);
+    url.searchParams.delete('anomalyId');
+    history.replaceState(null, '', url.toString());
+  }catch(_e){}
+}
+
 /* ===== 異常IDの解決（URLが無くても動く） =====
    優先順:
    1) state.anomalyId（URL等で既に確定）
@@ -4765,13 +4774,23 @@ const base = {
   changePointContent: changePointContent
 };
 
-    // アンドン呼び出し時に draft が作られていればそれを上書き、なければ新規作成
+    // アンドン呼び出しで確保した未使用IDだけを利用する。
+    // URLに残った過去IDがあっても、既存の異常履歴は絶対に上書きしない。
     const draftId = state.anomalyId;
     let docRef;
+    let usedReservedId = false;
+    let avoidedOverwriteId = '';
     if (draftId) {
-      await setDoc(doc(db, 'anomalies', draftId), base);
-      docRef = { id: draftId };
-      state.anomalyId = null; // 使い終わったらリセット
+      const draftRef = doc(db, 'anomalies', draftId);
+      const existingDraft = await getDoc(draftRef);
+      if (existingDraft.exists()) {
+        avoidedOverwriteId = draftId;
+        docRef = await addDoc(collection(db, 'anomalies'), base);
+      } else {
+        await setDoc(draftRef, base);
+        docRef = { id: draftId };
+        usedReservedId = true;
+      }
     } else {
       docRef = await addDoc(collection(db, 'anomalies'), base);
     }
@@ -4821,9 +4840,12 @@ const base = {
 
     await logAudit('anomaly_create', {
       ...summarizeAnomalyForAudit({ _id: docRef.id, ...base }),
-      usedExistingId: !!draftId,
+      usedExistingId: usedReservedId,
+      avoidedOverwriteId,
       mfgPhotoCount: mfgPhotos.length
     });
+
+    clearCurrentAnomalyId();
     
     e.target.reset();
     mfgPhotos = [];
