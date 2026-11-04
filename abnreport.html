@@ -1673,6 +1673,15 @@ const ADMIN_EMAILS = [
   'miyama.firebase@gmail.com'
 ];
 
+function canUseAbnreportWithUser(user){
+  if (!user || user.isAnonymous) return false;
+  const providerIds = (user.providerData || []).map(item => item?.providerId).filter(Boolean);
+  if (providerIds.includes('password')) return true;
+  const email = String(user.email || '').toLowerCase();
+  return providerIds.includes('google.com')
+    && ADMIN_EMAILS.some(adminEmail => adminEmail.toLowerCase() === email);
+}
+
 // 端末ID（ブラウザに固定保存）
 const DEVICE_ID_KEY = 'abn_device_id_v17_1';
 const DEVICE_ID_STATUS = {
@@ -2269,6 +2278,15 @@ document.addEventListener("DOMContentLoaded", () => {
 onAuthStateChanged(auth, async (user)=>{
   if (user){
     try{
+      // 同一ドメインの別アプリが作った匿名セッションでは、閲覧だけできても保存できない。
+      // 異常履歴アプリでは必ずメール/パスワード（または管理者Google）でログインし直す。
+      if (!canUseAbnreportWithUser(user)) {
+        await signOut(auth);
+        const msg = document.getElementById('authMsg');
+        if (msg) msg.textContent = '異常履歴アプリのアカウントでログインしてください。';
+        return;
+      }
+
       // 1) users/{uid} を確実に作成・更新
       const profile = await ensureUserProfile(user);
       if (profile?.isDisabled){
