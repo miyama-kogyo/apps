@@ -2153,10 +2153,10 @@
       }
     });
 
-    function getActorName(askIfMissing = true){
+    function getActorName(askIfMissing = true, promptMessage = '承認履歴に記録する氏名を入力してください'){
       let name = (localStorage.getItem('changepointActorName') || '').trim();
       if (!name && askIfMissing){
-        name = (prompt('承認履歴に記録する氏名を入力してください') || '').trim();
+        name = (prompt(promptMessage) || '').trim();
         if (name) localStorage.setItem('changepointActorName', name);
       }
       return name || `端末利用者-${(auth.currentUser?.uid || 'unknown').slice(0,8)}`;
@@ -3100,7 +3100,7 @@
       if (!planneddepartment || !department){ alert('発信部署と変化点発生部署を選択してください'); return; }
       const distributionDepartments = selectedDistributionDepartments();
       const user = auth.currentUser;
-      const createdBy = getActorName();
+      const createdBy = getActorName(true, '登録者の氏名を入力してください');
       const checklistItems = buildRecordChecklist(category);
       const excludedChecklistItems = Array.from(plannedExcludedChecklist.values()).map(x => ({ masterId:x.masterId, category:x.category, label:x.label, criteria:x.criteria || '', source:x.source || 'master', owner:'both', excludedBy:createdBy, excludedAtLocal:new Date().toISOString() }));
       const issuedDate = ymdLocal(new Date());
