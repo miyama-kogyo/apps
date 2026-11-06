@@ -2606,9 +2606,9 @@
       document.getElementById('boardSummary').innerHTML=
         '<span>今日<strong>'+todayItems.length+'</strong> 件</span><span>今週<strong>'+weekItems.length+'</strong> 件</span><span>継続・未完了<strong>'+carry.length+'</strong> 件</span><span>日程未確定<strong>'+undecided.length+'</strong> 件</span>';
       const groups=new Map();
-      todayItems.forEach(p=>{ const key=JSON.stringify([p.department||'',p.lineName||'']); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(p); });
-      document.getElementById('topicsToday').innerHTML=groups.size?[...groups.values()].sort((a,b)=>String(a[0].lineName||'').localeCompare(String(b[0].lineName||''),'ja')).map(list=>
-        '<div class="board-lane"><h3><small>'+escapeHtml(list[0].department||'部署未設定')+'</small>'+escapeHtml(list[0].lineName||'ライン未設定')+'<span class="board-count">'+list.length+'件</span></h3><div class="board-lane-body">'+list.map(renderTodayCard).join('')+'</div></div>'
+      todayItems.forEach(p=>{ const key=p.department||''; if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(p); });
+      document.getElementById('topicsToday').innerHTML=groups.size?[...groups.values()].sort((a,b)=>String(a[0].department||'').localeCompare(String(b[0].department||''),'ja')).map(list=>
+        '<div class="board-lane"><h3>'+escapeHtml(list[0].department||'部署未設定')+'<span class="board-count">'+list.length+'件</span></h3><div class="board-lane-body">'+list.map(renderTodayCard).join('')+'</div></div>'
       ).join(''):'<div class="board-empty">該当する今日の変化点はありません</div>';
       fillTodayCardQrs();
       document.getElementById('topicsWeek').innerHTML=days.map(d=>{
