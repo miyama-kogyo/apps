@@ -697,6 +697,14 @@
     #mainMenu .board-nav .menu-card { border:0; background:transparent; border-radius:0; color:#64716a; padding:12px 16px; }
     .board-nav-current { border-bottom:3px solid #176349; padding:12px 16px; color:#176349; font-weight:700; font-size:14px; }
     .board-toolbar { flex-wrap:wrap; align-items:flex-end; gap:12px; }
+    .board-date-nav { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:14px 0; }
+    .board-date-nav label { margin:0; font-size:13px; font-weight:600; }
+    .board-date-controls { display:grid; grid-template-columns:40px minmax(0,158px) 40px auto; align-items:center; gap:6px; min-width:0; max-width:100%; }
+    .board-date-controls button { height:40px; padding:0 10px; border:1px solid #bdcac2; border-radius:4px; background:white; color:#30453b; font:inherit; white-space:nowrap; }
+    .board-date-controls button:disabled { opacity:.4; cursor:default!important; }
+    #boardBrowseDate { display:block; -webkit-appearance:none; appearance:none; width:100%; min-width:0; max-width:100%; height:40px; padding:6px; border:1px solid #bdcac2; border-radius:4px; background:white; color:#24332f; font:inherit; font-size:16px; }
+    #boardBrowseDate::-webkit-date-and-time-value { min-width:0; text-align:left; }
+    #boardHistoryStatus { font-size:12px; color:#627369; }
     .board-filter { flex:1 1 140px; min-width:0; }
     .board-filter label { display:block; font-size:12px; font-weight:600; color:#58665e; margin-bottom:6px; }
     .board-filter select,.board-filter input { width:100%; height:40px; padding:8px 10px; border:1px solid #bdcac2; border-radius:4px; background:white; color:#24332f; font:inherit; font-size:14px; }
@@ -1148,18 +1156,28 @@
         <label class="board-open-filter"><input type="checkbox" id="boardOpenOnly">未完了のみ</label>
         <button type="button" id="boardReset" class="board-reset">条件を解除</button>
       </div>
+      <div class="board-date-nav">
+        <label for="boardBrowseDate">表示日</label>
+        <div class="board-date-controls">
+          <button type="button" id="boardPreviousDay" aria-label="前日を表示" title="前日を表示">&#8592;</button>
+          <input type="date" id="boardBrowseDate">
+          <button type="button" id="boardNextDay" aria-label="翌日を表示" title="翌日を表示">&#8594;</button>
+          <button type="button" id="boardReturnToday">今日</button>
+        </div>
+        <span id="boardHistoryStatus" hidden>過去の変化点・状態は現在の情報</span>
+      </div>
       <div class="board-summary" id="boardSummary" aria-live="polite"></div>
       <div class="board-mobile-views" role="group" aria-label="表示期間">
-        <button type="button" data-board-view="today" aria-pressed="true" aria-controls="boardTodayPanel">今日 <span id="boardMobileToday">0</span></button>
-        <button type="button" data-board-view="week" aria-pressed="false" aria-controls="boardWeekPanel">今週 <span id="boardMobileWeek">0</span></button>
+        <button type="button" data-board-view="today" aria-pressed="true" aria-controls="boardTodayPanel"><span id="boardMobileDayLabel">今日</span> <span id="boardMobileToday">0</span></button>
+        <button type="button" data-board-view="week" aria-pressed="false" aria-controls="boardWeekPanel"><span id="boardMobileWeekLabel">今週</span> <span id="boardMobileWeek">0</span></button>
         <button type="button" data-board-view="carry" aria-pressed="false" aria-controls="boardCarryPanel">継続 <span id="boardMobileCarry">0</span></button>
       </div>
       <section id="boardTodayPanel" data-board-panel="today" class="board-section" aria-labelledby="boardTodayTitle">
-        <div class="board-section-heading"><h2 id="boardTodayTitle">今日の変化点 <span id="boardTodayCount" class="board-count">0</span></h2><span id="boardTodayDate"></span></div>
+        <div class="board-section-heading"><h2 id="boardTodayTitle"><span id="boardDayTitleText">今日の変化点</span> <span id="boardTodayCount" class="board-count">0</span></h2><span id="boardTodayDate"></span></div>
         <div id="topicsToday" class="board-today"><div class="board-empty">変化点を読み込んでいます...</div></div>
       </section>
       <section id="boardWeekPanel" data-board-panel="week" class="board-section board-week-section" aria-labelledby="boardWeekTitle">
-        <div class="board-section-heading"><h2 id="boardWeekTitle">今週の変化点 <span id="boardWeekCount" class="board-count">0</span></h2><span id="boardWeekRange"></span></div>
+        <div class="board-section-heading"><h2 id="boardWeekTitle"><span id="boardWeekTitleText">今週の変化点</span> <span id="boardWeekCount" class="board-count">0</span></h2><span id="boardWeekRange"></span></div>
         <div class="board-legend" aria-label="カードの分類色"><span><i style="background:#fb923c"></i>人</span><span><i style="background:#4ade80"></i>設備</span><span><i style="background:#facc15"></i>材料</span><span><i style="background:#f9a8d4"></i>方法</span><span><i style="background:#fff"></i>金型</span></div>
         <div id="topicsWeek" class="board-week"></div>
       </section>
@@ -2499,6 +2517,13 @@
 
 
     const boardLimits = { boardCarry:12, boardFuture:12, topicsUndecided:12 };
+    let boardSelectedDate = '';
+    function setBoardBrowseDate(value){
+      const today=ymdLocal(new Date());
+      const date=new Date(value+'T12:00:00');
+      boardSelectedDate=/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(date.getTime()) && ymdLocal(date)===value && value<today ? value : '';
+      updateTopics();
+    }
     const boardColors = { '人':'#fb923c', '設備':'#4ade80', '材料':'#facc15', '方法':'#f9a8d4', '金型':'#ffffff' };
     function boardCompleted(p){
       return p.approvalStatus === 'approved' || p.switchStatus === 'completed' || p.switchState === 'completed' ||
@@ -2531,6 +2556,15 @@
       const root = document.getElementById('mainMenu');
       if(root.dataset.boardBound) return;
       root.dataset.boardBound='true';
+      document.getElementById('boardBrowseDate').addEventListener('change',e=>setBoardBrowseDate(e.target.value));
+      const stepDay=offset=>{
+        const date=new Date((boardSelectedDate||ymdLocal(new Date()))+'T12:00:00');
+        date.setDate(date.getDate()+offset);
+        setBoardBrowseDate(ymdLocal(date));
+      };
+      document.getElementById('boardPreviousDay').addEventListener('click',()=>stepDay(-1));
+      document.getElementById('boardNextDay').addEventListener('click',()=>stepDay(1));
+      document.getElementById('boardReturnToday').addEventListener('click',()=>setBoardBrowseDate(''));
       const filterToggle = document.getElementById('boardFilterToggle');
       filterToggle.addEventListener('click',()=>{
         const expanded = filterToggle.getAttribute('aria-expanded') !== 'true';
@@ -2575,8 +2609,11 @@
       </button>`;
     }
     function updateTopics(){
-      const now=new Date(), today=ymdLocal(now), mon=new Date(now);
-      mon.setDate(now.getDate()-((now.getDay()+6)%7));
+      const now=new Date(), today=ymdLocal(now), selectedDay=boardSelectedDate||today;
+      const selectedDate=new Date(selectedDay+'T12:00:00'), mon=new Date(selectedDate);
+      mon.setDate(selectedDate.getDate()-((selectedDate.getDay()+6)%7));
+      const currentWeekEnd=new Date(now);
+      currentWeekEnd.setDate(now.getDate()+6-((now.getDay()+6)%7));
       const days=Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
       const weekStart=ymdLocal(days[0]),weekEnd=ymdLocal(days[6]);
       const value=id=>document.getElementById(id).value;
@@ -2587,29 +2624,40 @@
         (!category||p.category===category) && (!type||p.type===type) && (!openOnly||(boardTracked(p)&&!boardCompleted(p))) &&
         (!keyword||[p.serialNo,p.content,p.lineName,p.department].join(' ').normalize('NFKC').toLowerCase().includes(keyword)))
         .sort((a,b)=>changeDisplayDate(a).localeCompare(changeDisplayDate(b))||changeDisplayTime(a).localeCompare(changeDisplayTime(b)));
-      const todayItems=items.filter(p=>changeDisplayDate(p)===today);
+      const todayItems=items.filter(p=>changeDisplayDate(p)===selectedDay);
       const weekItems=items.filter(p=>changeDisplayDate(p)>=weekStart&&changeDisplayDate(p)<=weekEnd);
       const carry=items.filter(p=>boardTracked(p)&&changeDisplayDate(p)&&changeDisplayDate(p)<today&&!boardCompleted(p));
-      const future=items.filter(p=>changeDisplayDate(p)>weekEnd&&!boardCompleted(p));
+      const future=items.filter(p=>changeDisplayDate(p)>ymdLocal(currentWeekEnd)&&!boardCompleted(p));
       const undecided=items.filter(p=>!changeDisplayDate(p)&&!boardCompleted(p));
       const set=(id,text)=>document.getElementById(id).textContent=text;
       const format=d=>d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+      const browsingHistory=selectedDay!==today;
+      const dateInput=document.getElementById('boardBrowseDate');
+      dateInput.max=today;
+      dateInput.value=selectedDay;
+      document.getElementById('boardNextDay').disabled=!browsingHistory;
+      document.getElementById('boardReturnToday').disabled=!browsingHistory;
+      document.getElementById('boardHistoryStatus').hidden=!browsingHistory;
+      set('boardDayTitleText',browsingHistory?'指定日の変化点':'今日の変化点');
+      set('boardWeekTitleText',browsingHistory?'指定日を含む週の変化点':'今週の変化点');
+      set('boardMobileDayLabel',browsingHistory?'指定日':'今日');
+      set('boardMobileWeekLabel',browsingHistory?'指定週':'今週');
       const filterCount=[dept,line,category,type,keyword,openOnly].filter(Boolean).length;
       set('boardFilterCount',filterCount ? filterCount+'条件' : '');
       set('boardMobileToday',todayItems.length);
       set('boardMobileWeek',weekItems.length);
       set('boardMobileCarry',carry.length);
       set('boardDate',now.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'}));
-      set('boardTodayDate',format(now));
+      set('boardTodayDate',selectedDate.toLocaleDateString('ja-JP',{year:'numeric',month:'numeric',day:'numeric',weekday:'short'}));
       set('boardWeekRange',format(days[0])+' ～ '+format(days[6]));
       [['boardTodayCount',todayItems],['boardWeekCount',weekItems],['boardCarryCount',carry],['boardFutureCount',future],['boardUndecidedCount',undecided]].forEach(([id,list])=>set(id,list.length+'件'));
       document.getElementById('boardSummary').innerHTML=
-        '<span>今日<strong>'+todayItems.length+'</strong> 件</span><span>今週<strong>'+weekItems.length+'</strong> 件</span><span>継続・未完了<strong>'+carry.length+'</strong> 件</span><span>日程未確定<strong>'+undecided.length+'</strong> 件</span>';
+        '<span>'+(browsingHistory?'指定日':'今日')+'<strong>'+todayItems.length+'</strong> 件</span><span>'+(browsingHistory?'指定週':'今週')+'<strong>'+weekItems.length+'</strong> 件</span><span>継続・未完了（現在）<strong>'+carry.length+'</strong> 件</span><span>日程未確定<strong>'+undecided.length+'</strong> 件</span>';
       const groups=new Map();
       todayItems.forEach(p=>{ const key=p.department||''; if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(p); });
       document.getElementById('topicsToday').innerHTML=groups.size?[...groups.values()].sort((a,b)=>String(a[0].department||'').localeCompare(String(b[0].department||''),'ja')).map(list=>
         '<div class="board-lane"><h3>'+escapeHtml(list[0].department||'部署未設定')+'<span class="board-count">'+list.length+'件</span></h3><div class="board-lane-body">'+list.map(renderTodayCard).join('')+'</div></div>'
-      ).join(''):'<div class="board-empty">該当する今日の変化点はありません</div>';
+      ).join(''):'<div class="board-empty">該当する'+(browsingHistory?'指定日':'今日')+'の変化点はありません</div>';
       fillTodayCardQrs();
       document.getElementById('topicsWeek').innerHTML=days.map(d=>{
         const date=ymdLocal(d), list=weekItems.filter(p=>changeDisplayDate(p)===date);
