@@ -23,6 +23,17 @@
   .tab.active{background:#fff;color:#667eea;border-bottom:3px solid #667eea}
   .tab[data-tab="notifications"]{position:relative;min-height:66px}
   .tab-new-badge{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);padding:0 5px;border-radius:3px;background:#c63832;color:#fff;font-size:10px;line-height:14px;font-weight:700;letter-spacing:0}
+  #notificationAnnouncement{width:min(520px,calc(100% - 32px));max-height:90dvh;overflow:auto;margin:auto;padding:24px;border:1px solid #d5dbe0;border-radius:8px;color:#27332d;background:#fff;line-height:1.7}
+  #notificationAnnouncement::backdrop{background:rgba(0,0,0,.45)}
+  #notificationAnnouncement h2{font-size:20px;margin:4px 0 16px;line-height:1.5}
+  #notificationAnnouncement h2:focus{outline:none}
+  #notificationAnnouncement p{font-size:14px;margin:12px 0;overflow-wrap:anywhere}
+  #notificationAnnouncement .announcement-label{font-size:12px;color:#596862;margin:0}
+  #notificationAnnouncement .announcement-note{font-size:12px;color:#596862}
+  #notificationAnnouncement footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:22px}
+  #notificationAnnouncement button{font:inherit;font-size:14px;padding:10px 16px;border:1px solid #b9c6bf;border-radius:5px;background:#fff;color:#27332d;cursor:pointer;min-height:44px}
+  #notificationAnnouncement [data-announcement-settings]{background:#176b58;color:#fff;border-color:#176b58}
+  #notificationAnnouncement button:focus-visible{outline:3px solid #d2a530;outline-offset:2px}
   @media(max-width:600px){
     .header{padding-top:56px}
     .header h1{font-size:1.15rem}
@@ -1476,6 +1487,18 @@
   </div>
 
 
+<dialog id="notificationAnnouncement" aria-labelledby="notificationAnnouncementTitle">
+  <p class="announcement-label">機能追加のお知らせ</p>
+  <h2 id="notificationAnnouncementTitle" tabindex="-1" autofocus>異常のPUSH通知が使えるようになりました</h2>
+  <p>部署・ライン・キーワードを指定すると、条件に合う異常が登録されたときにスマホやPCへ通知が届きます。</p>
+  <p>通知には<strong>ライン名・整理No・異常内容</strong>を表示。通知を押すと、このアプリ内で写真や対応内容などの詳細を確認できます。</p>
+  <p>「通知」タブで条件を設定し、<strong>「通知をオンにする」</strong>を押してください。</p>
+  <p class="announcement-note">iPhoneはSafariからこのアプリをホーム画面に追加してご利用ください。</p>
+  <footer>
+    <button type="button" data-announcement-close>閉じる</button>
+    <button type="button" data-announcement-settings>通知を設定する</button>
+  </footer>
+</dialog>
 <script id="notificationNewBadgeScript">
 (() => {
   const badge = document.getElementById('notificationNewBadge');
@@ -1492,6 +1515,7 @@
 })();
 </script>
 <script type="module">
+import {createNotificationAnnouncement} from './assets/abn-notification-announcement.js';
 
 /* =====================================================
     転送プレビュー表示 ＆ 写真URL含むメッセージ生成
@@ -2162,6 +2186,7 @@ function getQueryParam(name){
 
 const state = { anomalyId: null };
 let notificationController = null;
+const notificationAnnouncement=createNotificationAnnouncement({dialog:document.getElementById('notificationAnnouncement'),onSettings:activateNotifications});
 function activateNotifications(){
   document.querySelector('.tab[data-tab="notifications"]').click();
 }
@@ -2177,6 +2202,7 @@ async function startNotifications(){
     const params=new URLSearchParams(location.search);
     if(params.has('notifyAnomalyId')||params.has('notifyNotice'))activateNotifications();
     if(params.get('notifyAnomalyId'))await notificationController.openAnomaly(params.get('notifyAnomalyId'));
+    if(auth.currentUser?.uid===uid&&!params.has('notifyAnomalyId')&&!params.has('notifyNotice'))notificationAnnouncement.show(uid);
   }catch(error){console.error('Notification initialization failed',error);alert('通知を開けませんでした: '+error.message);}
 }
 
@@ -2387,6 +2413,7 @@ onAuthStateChanged(auth, async (user)=>{
   } else {
     appRoot.style.display='none';
     notificationController?.clear();
+    notificationAnnouncement.clear();
     gate.style.display='flex';
     signOutBtn.style.display='none';
   }
