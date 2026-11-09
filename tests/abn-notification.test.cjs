@@ -4,6 +4,26 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const root=path.resolve(__dirname,'..');
+test('New badge expires at the fixed deadline, including on an already-open page',()=>{
+  const html=fs.readFileSync(path.join(root,'abnreport.html'),'utf8');
+  const until=html.match(/id="notificationNewBadge"[^>]*data-until="([^"]+)"/)[1];
+  const source=html.match(/<script id="notificationNewBadgeScript">([\s\S]*?)<\/script>/)[1];
+  const deadline=Date.parse(until);
+  assert.equal(until,'2026-11-16T10:55:00+09:00');
+  function load(now){
+    const badge={dataset:{until},hidden:true},clock={now};let callback,delay,visibility;
+    vm.runInNewContext(source,{document:{getElementById:()=>badge,addEventListener:(name,fn)=>visibility=fn},Date:{parse:Date.parse,now:()=>clock.now},clearTimeout(){},setTimeout:(fn,ms)=>{callback=fn;delay=ms;}});
+    return {badge,clock,callback,delay,visibility};
+  }
+  const open=load(deadline-7*24*60*60*1000);
+  assert.equal(open.badge.hidden,false);
+  assert.equal(open.delay,7*24*60*60*1000);
+  open.clock.now=deadline;open.callback();assert.equal(open.badge.hidden,true);
+  assert.equal(load(deadline-1).badge.hidden,false);
+  assert.equal(load(deadline).badge.hidden,true);
+  assert.equal(load(deadline+1).badge.hidden,true);
+  const resumed=load(deadline-100);resumed.clock.now=deadline+100;resumed.visibility();assert.equal(resumed.badge.hidden,true);
+});
 function worker(){
   const events={},opened=[],shown=[];
   const self={location:{href:'https://miyama-kogyo.github.io/apps/abnreport-push-sw.js'},addEventListener:(name,fn)=>events[name]=fn,registration:{showNotification:async(title,options)=>shown.push({title,options})}};
