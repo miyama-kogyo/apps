@@ -7,6 +7,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>異常履歴入力ツール v19</title>
+<link rel="manifest" href="./abnreport.webmanifest">
+<link rel="apple-touch-icon" href="./assets/abn-notify-icon.png">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;background:#f5f5f5}
@@ -19,6 +21,11 @@
   .tabs{display:flex;background:#fff;margin:15px 0 0;border-radius:8px 8px 0 0;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.1)}
   .tab{flex:1;padding:15px;text-align:center;cursor:pointer;background:#f8f9fa;border:none;font-size:1rem;font-weight:bold;transition:.3s;color:#666}
   .tab.active{background:#fff;color:#667eea;border-bottom:3px solid #667eea}
+  @media(max-width:600px){
+    .header{padding-top:56px}
+    .header h1{font-size:1.15rem}
+    .tab{padding:14px 6px;font-size:.8rem;min-width:0}
+  }
   .tab-content{display:none;background:#fff;padding:20px;border-radius:0 0 8px 8px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
   .tab-content.active{display:block}
   .form-group{margin-bottom:16px}
@@ -807,6 +814,7 @@
       <button class="tab active" data-tab="manufacturing">発信部署入力</button>
       <button class="tab" data-tab="technical">対応部署入力</button>
       <button class="tab" data-tab="history">履歴</button>
+      <button class="tab" data-tab="notifications">通知</button>
       <button class="tab" data-tab="master">⚙️ 管理</button>
     </div>
 
@@ -1287,6 +1295,7 @@
     </div>
 
     <!-- 管理 -->
+    <div id="notifications" class="tab-content"><div id="notificationHost"></div></div>
     <div id="master" class="tab-content">
       <h2 style="margin-bottom:16px;color:#667eea;">⚙️ マスタ管理</h2>
 
@@ -2115,6 +2124,7 @@ document.getElementById('googleLoginBtn')?.addEventListener('click', async ()=>{
 // サインアウト（監査ログ付き）
 signOutBtn.addEventListener('click', async ()=>{
   try{
+    await notificationController?.removeDevice();
     await logAudit('sign_out', {});
   }finally{
     await signOut(auth);
@@ -2134,6 +2144,24 @@ function getQueryParam(name){
 
 
 const state = { anomalyId: null };
+let notificationController = null;
+function activateNotifications(){
+  document.querySelector('.tab[data-tab="notifications"]').click();
+}
+async function startNotifications(){
+  const uid=auth.currentUser?.uid;
+  if(!uid)return;
+  try{
+    if(!notificationController){
+      const {integrateNotifications}=await import('./assets/abn-notification-integration.js');
+      if(auth.currentUser?.uid!==uid)return;
+      notificationController=integrateNotifications({app,auth,container:document.getElementById('notificationHost'),activate:activateNotifications,loadAnomaly:async id=>{const snap=await getDoc(doc(db,'anomalies',id));return snap.exists()?snap.data():null;}});
+    }else await notificationController.reload();
+    const params=new URLSearchParams(location.search);
+    if(params.has('notifyAnomalyId')||params.has('notifyNotice'))activateNotifications();
+    if(params.get('notifyAnomalyId'))await notificationController.openAnomaly(params.get('notifyAnomalyId'));
+  }catch(error){console.error('Notification initialization failed',error);alert('通知を開けませんでした: '+error.message);}
+}
 
 function clearCurrentAnomalyId(){
   state.anomalyId = null;
@@ -2333,6 +2361,7 @@ onAuthStateChanged(auth, async (user)=>{
       await logAudit('sign_in', {});
       bootAfterLogin();
       bindPhotoInputs();
+      startNotifications();
     }catch(e){
       console.error(e);
       alert('ログイン後の初期化に失敗しました: ' + (e.code||e.message));
@@ -2340,6 +2369,7 @@ onAuthStateChanged(auth, async (user)=>{
     }
   } else {
     appRoot.style.display='none';
+    notificationController?.clear();
     gate.style.display='flex';
     signOutBtn.style.display='none';
   }
