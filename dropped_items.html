@@ -414,6 +414,12 @@
     .cost-table{width:100%;border-collapse:collapse;font-size:15px}
     .cost-table td,.cost-table th{text-align:left;padding:12px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
     .cost-table td:last-child{width:54px}
+    #costEditDialog{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:24px;color:var(--ink);background:#fff}
+    #costEditDialog::backdrop{background:rgba(0,0,0,.4)}
+    #costEditForm{display:grid;gap:18px}
+    #costEditForm label{display:grid;gap:8px}
+    #costEditAmount{width:100%;min-width:0;min-height:48px;padding:10px;border:1px solid var(--line);border-radius:6px}
+    #costEditSerial{overflow-wrap:anywhere;font-size:22px}
   </style>
 </head>
 <body>
@@ -641,6 +647,14 @@
     </section>
   </main>
 
+  <dialog id="costEditDialog" aria-labelledby="costEditTitle">
+    <form id="costEditForm">
+      <div class="modal-head"><h3 id="costEditTitle">原価の編集</h3><button type="button" id="closeCostEdit" class="icon-btn" title="閉じる" aria-label="閉じる"><i data-lucide="x"></i></button></div>
+      <strong id="costEditSerial"></strong>
+      <label>1個あたり原価（円）<input id="costEditAmount" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" required></label>
+      <div class="edit-actions"><button type="button" id="cancelCostEdit" class="btn btn-secondary">キャンセル</button><button type="submit" id="saveCostEdit" class="btn btn-primary"><i data-lucide="save"></i>保存</button></div>
+    </form>
+  </dialog>
   <div id="commentTooltip" class="comment-tooltip" role="tooltip" hidden></div>
   <aside id="serialPreview" class="serial-preview" role="dialog" aria-modal="false" aria-labelledby="serialPreviewTitle" hidden>
     <div class="serial-preview-head"><div><h3 id="serialPreviewTitle"></h3><p id="serialPreviewMeta" class="serial-preview-meta"></p></div><button id="closeSerialPreview" type="button" class="icon-btn" aria-label="品番プレビューを閉じる" title="閉じる"><i data-lucide="x"></i></button></div>
@@ -868,7 +882,10 @@
       $('costMasterForm').addEventListener('submit', saveCost);
       $('costSearch').addEventListener('input', renderCosts);
       $('costSerial').addEventListener('change',()=>{const serial=productKey($('costSerial').value),cost=state.costs.get(serial);state.costDraft={serial,revision:cost?.revision || 0};$('costAmount').value=cost ? cost.unitCostSen/100 : '';});
-      document.addEventListener('click',event=>{const link=event.target.closest('[data-cost-product]');if(!link)return;event.preventDefault();closeDetail();showPage('products');$('costSerial').value=link.dataset.costProduct;$('costSerial').dispatchEvent(new Event('change'));$('costAmount').focus();});
+      document.addEventListener('click',event=>{const link=event.target.closest('[data-cost-product]');if(!link)return;event.preventDefault();openCostEditor(link.dataset.costProduct);});
+      $('costEditForm').addEventListener('submit',event=>saveCost(event,true));
+      ['closeCostEdit','cancelCostEdit'].forEach(id=>$(id).addEventListener('click',closeCostEditor));
+      $('costEditDialog').addEventListener('cancel',event=>{event.preventDefault();closeCostEditor();});
       $('serialNo').addEventListener('input', updatePhotoRegistrationLinks);
       $('editSerialNo').addEventListener('input', updatePhotoRegistrationLinks);
       $('commentTooltip').addEventListener('pointerenter',()=>clearTimeout(commentTooltipTimer));
@@ -1051,11 +1068,31 @@
       const search=$('costSearch').value.trim().toLocaleLowerCase('ja');
       $('costList').innerHTML=serials.filter(serial=>serial.toLocaleLowerCase('ja').includes(search)).map(serial=>`<tr><td>${esc(serial)}</td><td>${state.costsReady?(state.costs.has(serial)?money(state.costs.get(serial).unitCostSen):'未登録'):'未取得'}</td><td><button type="button" class="icon-btn" data-cost-product="${esc(serial)}" aria-label="${esc(serial)}の原価を編集" title="原価を編集"><i data-lucide="pencil"></i></button></td></tr>`).join('');refreshIcons();
     }
-    async function saveCost(event){
+    function openCostEditor(value){
+      if(state.costBusy)return;
+      if(!state.costsReady){showToast('原価の読み込み完了後に再度お試しください',true);return;}
+      const serial=productKey(value),cost=state.costs.get(serial);
+      state.costModalDraft={serial,revision:cost?.revision||0,scrollX:window.scrollX,scrollY:window.scrollY};
+      $('costEditSerial').textContent=serial;
+      $('costEditAmount').value=cost?cost.unitCostSen/100:'';
+      $('costEditDialog').showModal();
+      $('costEditAmount').focus({preventScroll:true});$('costEditAmount').select();
+    }
+    function closeCostEditor(){
+      if(state.costBusy)return;
+      const draft=state.costModalDraft;
+      $('costEditDialog').close();
+      if(draft)window.scrollTo({left:draft.scrollX,top:draft.scrollY,behavior:'instant'});
+      state.costModalDraft=null;
+    }
+    async function saveCost(event,modal=false){
       event.preventDefault();if(state.costBusy || !state.costsReady)return;
-      const serial=productKey($('costSerial').value),raw=$('costAmount').value,amount=Number(raw),cents=Math.round(amount*100);
+      const draft=modal?state.costModalDraft:state.costDraft;
+      const serial=modal?draft.serial:productKey($('costSerial').value),raw=$(modal?'costEditAmount':'costAmount').value,amount=Number(raw),cents=Math.round(amount*100);
       if(!serial || serial.length>60 || raw==='' || !Number.isFinite(amount) || amount<0 || amount>1000000 || Math.abs(amount*100-cents)>0.000001){showToast('原価は0～100万円、小数第2位まで入力してください',true);return;}
-      const revision=state.costDraft?.serial===serial?state.costDraft.revision:0;
+      const revision=draft?.serial===serial?draft.revision:0;
+      let saved=false;
+      $('saveCostEdit').disabled=true;$('costEditAmount').disabled=true;
       state.costBusy=true;$('saveCost').disabled=true;
       try{
         const ref=doc(db,'droppedProductCosts',await productDocumentId(serial));
@@ -1064,9 +1101,9 @@
           if((data?.revision || 0)!==revision)throw new Error('別の端末で原価が更新されました。最新の原価を確認して再度保存してください');
           transaction.set(ref,{serialNo:serial,unitCostSen:cents,revision:revision+1,createdAt:data?.createdAt || serverTimestamp(),createdBy:data?.createdBy || auth.currentUser.uid,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
         });
-        state.costDraft={serial,revision:revision+1};showToast('原価を保存しました');
+        if(!modal)state.costDraft={serial,revision:revision+1};saved=true;showToast('原価を保存しました');
       }catch(error){console.error(error);showToast(`原価を保存できませんでした: ${error.message}`,true);}
-      finally{state.costBusy=false;$('saveCost').disabled=!state.costsReady;}
+      finally{state.costBusy=false;$('saveCost').disabled=!state.costsReady;$('saveCostEdit').disabled=false;$('costEditAmount').disabled=false;if(modal && saved)closeCostEditor();}
     }
     function renderLossTrend(rows,dateKey){
       const keys=[];const end=new Date(`${dateKey}T12:00:00`);
