@@ -9,6 +9,7 @@
 <title>異常履歴入力ツール v19</title>
 <link rel="manifest" href="./abnreport.webmanifest">
 <link rel="apple-touch-icon" href="./assets/abn-notify-icon.png">
+<link rel="stylesheet" href="./assets/abn-sorting-results.css">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;background:#f5f5f5}
@@ -1516,6 +1517,7 @@
 </script>
 <script type="module">
 import {createNotificationAnnouncement} from './assets/abn-notification-announcement.js';
+import {createSortingRepository,createSortingController,sortingEntries,sortingSummary} from './assets/abn-sorting-results.js';
 
 /* =====================================================
     転送プレビュー表示 ＆ 写真URL含むメッセージ生成
@@ -1616,7 +1618,7 @@ document.getElementById('shareOpenRepair')?.addEventListener('click', ()=>{
   import {
     getFirestore,
     collection, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, updateDoc,
-    doc, deleteDoc, serverTimestamp, where, limit, startAfter,getDoc
+    doc, deleteDoc, serverTimestamp, where, limit, startAfter,getDoc,runTransaction,FieldPath
   } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
   import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js';
 
@@ -1849,6 +1851,8 @@ function getAuditActionLabel(action){
     anomaly_create: '入力',
     anomaly_update_tech: '対応部署入力',
     anomaly_edit: '編集',
+    anomaly_sorting_add: '選別結果追加',
+    anomaly_sorting_edit: '選別結果修正',
     anomaly_delete: '削除',
     force_complete_stale_pending: '強制完了'
   };
@@ -1865,6 +1869,17 @@ function renderAuditDetail(detail = {}){
   add('部署', detail.department || detail.before?.department || detail.deleted?.department);
   add('発生日', detail.occurrenceDate || detail.before?.occurrenceDate || detail.deleted?.occurrenceDate);
   add('ID', detail.anomalyId);
+  if(detail.resultId){
+    add('選別記録ID',detail.resultId);
+    add('選別日',detail.after?.date);
+    add('担当者',detail.after?.operator);
+    add('対象ロット',detail.after?.lotNo);
+    add('選別数',detail.after?.quantity);
+    add('良品数',detail.after?.goodQuantity);
+    add('不良数',detail.after?.badQuantity);
+    add('結果メモ',detail.after?.notes);
+    if(detail.before)add('修正前',`${detail.before.date} / ${detail.before.operator} / ロット ${detail.before.lotNo||'-'} / 選別 ${detail.before.quantity}・良品 ${detail.before.goodQuantity}・不良 ${detail.before.badQuantity} / ${detail.before.notes||''}`);
+  }
   if (Array.isArray(detail.changedFields) && detail.changedFields.length) {
     add('変更項目', detail.changedFields.join(', '));
   }
@@ -1881,7 +1896,7 @@ async function loadAnomalyAuditLogs(){
     const snap = await getDocs(q);
     const rows = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(row => ['anomaly_create','anomaly_update_tech','anomaly_edit','anomaly_delete','force_complete_stale_pending'].includes(row.action));
+      .filter(row => ['anomaly_create','anomaly_update_tech','anomaly_edit','anomaly_sorting_add','anomaly_sorting_edit','anomaly_delete','force_complete_stale_pending'].includes(row.action));
 
     if (!rows.length) {
       list.innerHTML = '<p style="color:#999;text-align:center;">操作ログはありません</p>';
@@ -2185,6 +2200,12 @@ function getQueryParam(name){
 
 
 const state = { anomalyId: null };
+const sortingRepository=createSortingRepository({db,auth,doc,collection,getDoc,runTransaction,FieldPath,serverTimestamp,deviceId:DEVICE_ID});
+const sortingController=createSortingController({load:id=>sortingRepository.load(id),save:request=>sortingRepository.save(request),getUser:()=>auth.currentUser,onSaved:item=>{updateAnomalyCaches(item._id,{sortingResults:item.sortingResults});renderHistory();}});
+document.addEventListener('click',event=>{
+  const button=event.target.closest('button[data-sorting]');
+  if(button)sortingController.open(button.dataset.sorting).catch(error=>alert(error.message));
+});
 let notificationController = null;
 const notificationAnnouncement=createNotificationAnnouncement({dialog:document.getElementById('notificationAnnouncement'),onSettings:activateNotifications});
 function activateNotifications(){
@@ -2197,7 +2218,7 @@ async function startNotifications(){
     if(!notificationController){
       const {integrateNotifications}=await import('./assets/abn-notification-integration.js');
       if(auth.currentUser?.uid!==uid)return;
-      notificationController=integrateNotifications({app,auth,container:document.getElementById('notificationHost'),activate:activateNotifications,loadAnomaly:async id=>{const snap=await getDoc(doc(db,'anomalies',id));return snap.exists()?snap.data():null;}});
+      notificationController=integrateNotifications({app,auth,container:document.getElementById('notificationHost'),activate:activateNotifications,openSorting:id=>sortingController.open(id),loadAnomaly:async id=>{const snap=await getDoc(doc(db,'anomalies',id));return snap.exists()?snap.data():null;}});
     }else await notificationController.reload();
     const params=new URLSearchParams(location.search);
     if(params.has('notifyAnomalyId')||params.has('notifyNotice'))activateNotifications();
@@ -2414,6 +2435,7 @@ onAuthStateChanged(auth, async (user)=>{
     appRoot.style.display='none';
     notificationController?.clear();
     notificationAnnouncement.clear();
+    sortingController.clear();
     gate.style.display='flex';
     signOutBtn.style.display='none';
   }
@@ -3182,6 +3204,7 @@ ${item.traceback ? `
                 <div class="card-content-text">${item.qualityResponse}</div>
               </div>
             ` : ''}
+            ${sortingEntries(item).length ? `<div class="card-content-section"><div class="card-content-label">選別結果</div><div class="card-content-text">${escapeHtml(sortingSummary(item))}</div></div>` : ''}
             ${item.changePointCategory ? `
               <div class="card-content-section" style="background:#e3f2fd;padding:10px;border-radius:6px;">
                 <div class="card-content-label" style="color:#1565c0;">🔄 変化点情報</div>
@@ -3228,6 +3251,7 @@ ${item.traceback ? `
               <button class="btn-small" onclick="openSharePreview('${item._id}')">📤 転送</button>
               ${item.repairReportId ? `<button class="btn-small" onclick="openRepairFromHistory('${item._id}')">🧾 修理報告書</button>` : ''}
               <button class="btn-small btn-edit" data-edit="${item._id}">✏️ 編集</button>
+              <button class="btn-small" data-sorting="${escapeHtml(item._id)}">選別結果（${sortingEntries(item).length}件）</button>
               <button class="btn-small btn-delete" data-del="${item._id}">🗑️ 削除</button>
             </div>
           </div>
@@ -3339,6 +3363,7 @@ ${item.traceback ? `
                       <button class="btn-small" onclick="openSharePreview('${it._id}')">転送</button>
                       ${it.repairReportId ? `<button class="btn-small" onclick="openRepairFromHistory('${it._id}')">修理報告書</button>` : ''}
                       <button class="btn-small btn-edit" data-edit="${it._id}">編集</button>
+                      <button class="btn-small" data-sorting="${escapeHtml(it._id)}">選別結果（${sortingEntries(it).length}件）</button>
                       <button class="btn-small btn-delete" data-del="${it._id}">削除</button>
                     </td>
                   </tr>
