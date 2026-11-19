@@ -1693,7 +1693,33 @@
       const hasCost=state.costsReady&&state.costs.has(serial);
       $('historySummary').textContent=`${$('historyScope').value==='all'?'全部署':department} / ${monthly?'月別':'日別'}（土日除外） / 合計 ${sumQty(rows).toLocaleString('ja-JP')}個${costMode?' / '+(hasCost?lossLabel(rows):state.costsReady?'原価未登録（集計対象外）':'原価未取得'):''}${!keys.length?' / 対象の平日がありません':''}`;
       const unit=costMode?'円':'個';
-      makeChart('productHistory',$('productHistoryChart'),{type:'bar',data:{labels:keys,datasets:[{label:costMode?'ロスコスト':'落下品数',data:keys.map(key=>costMode?(hasCost?lossSummary(grouped.get(key)).cents/100:null):sumQty(grouped.get(key))),borderColor:costMode?'#a85c65':'#527f98',backgroundColor:costMode?'#a85c65':'#527f98',maxBarThickness:36,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>costMode?money(ctx.parsed.y*100):`${ctx.parsed.y}個`}}},scales:{x:{ticks:{maxTicksLimit:4,maxRotation:0,callback:function(value){const key=this.getLabelForValue(value);return monthly?key.replace('-','/'):key.slice(5).replace('-','/');}}},y:{beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:unit}}},onClick:(_,elements)=>{if(!elements.length)return;const key=keys[elements[0].index];openDetail(`${serial} / ${key} / ${$('historyScope').value==='all'?'全部署':department}`,grouped.get(key));}}});
+      const causes=['設備','作業','その他'],colors=['#527f98','#b18b46','#8b9298'];
+      const causeOf=row=>causes.includes(row.cause)?row.cause:'その他';
+      const datasets=causes.map((cause,index)=>({
+        label:cause,stack:'causes',backgroundColor:colors[index],maxBarThickness:36,
+        data:keys.map(key=>{
+          const causeRows=grouped.get(key).filter(row=>causeOf(row)===cause);
+          return costMode?(hasCost?lossSummary(causeRows).cents/100:null):sumQty(causeRows);
+        })
+      }));
+      makeChart('productHistory',$('productHistoryChart'),{
+        type:'bar',data:{labels:keys,datasets},
+        options:{
+          responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+          plugins:{
+            legend:{display:true,position:'top'},
+            tooltip:{callbacks:{
+              label:ctx=>`${ctx.dataset.label}：${costMode?money(ctx.parsed.y*100):ctx.parsed.y+'個'}`,
+              footer:items=>{const total=items.reduce((sum,item)=>sum+(item.parsed.y||0),0);return `合計：${costMode?money(Math.round(total*100)):total+'個'}`;}
+            }}
+          },
+          scales:{
+            x:{stacked:true,ticks:{maxTicksLimit:4,maxRotation:0,callback:function(value){const key=this.getLabelForValue(value);return monthly?key.replace('-','/'):key.slice(5).replace('-','/');}}},
+            y:{stacked:true,beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:unit}}
+          },
+          onClick:(_,elements)=>{if(!elements.length)return;const key=keys[elements[0].index];openDetail(`${serial} / ${key} / ${$('historyScope').value==='all'?'全部署':department}`,grouped.get(key));}
+        }
+      });
     }
     function closeSerialPreview(restoreFocus=false){
       hideCommentTooltip();
