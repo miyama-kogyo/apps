@@ -420,6 +420,11 @@
     #costEditForm label{display:grid;gap:8px}
     #costEditAmount{width:100%;min-width:0;min-height:48px;padding:10px;border:1px solid var(--line);border-radius:6px}
     #costEditSerial{overflow-wrap:anywhere;font-size:22px}
+    .product-history-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+    .product-history-controls label{display:grid;gap:4px;min-width:0;font-size:13px}
+    .product-history-controls input,.product-history-controls select{width:100%;min-width:0;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}
+    .product-history-chart{position:relative;height:230px;min-width:0}
+    #serialPreview .product-history-heading{display:flex;gap:12px;align-items:center;justify-content:space-between}
   </style>
 </head>
 <body>
@@ -658,6 +663,16 @@
   <div id="commentTooltip" class="comment-tooltip" role="tooltip" hidden></div>
   <aside id="serialPreview" class="serial-preview" role="dialog" aria-modal="false" aria-labelledby="serialPreviewTitle" hidden>
     <div class="serial-preview-head"><div><h3 id="serialPreviewTitle"></h3><p id="serialPreviewMeta" class="serial-preview-meta"></p></div><button id="closeSerialPreview" type="button" class="icon-btn" aria-label="品番プレビューを閉じる" title="閉じる"><i data-lucide="x"></i></button></div>
+    <section aria-label="製品別の過去推移">
+      <div class="product-history-heading"><h4>過去からの推移</h4><button type="button" id="historyAll" class="btn btn-secondary">全期間</button></div>
+      <div class="product-history-controls">
+        <label>開始日<input type="date" id="historyFrom"></label><label>終了日<input type="date" id="historyTo"></label>
+        <label>部署<select id="historyScope"><option value="department">この部署</option><option value="all">全部署</option></select></label>
+        <label>集計指標<select id="historyMeasure"><option value="quantity">個数</option><option value="cost">ロスコスト</option></select></label>
+      </div>
+      <p id="historySummary" class="cost-note" role="status"></p>
+      <div class="product-history-chart"><canvas id="productHistoryChart" role="img" aria-label="製品の落下推移"></canvas></div>
+    </section>
     <h4>製品写真</h4><div id="serialProductPhoto"></div>
     <h4>原因内訳（落下個数）</h4><div class="serial-preview-chart"><canvas id="serialCauseChart" role="img" aria-label="原因別の落下個数"></canvas></div>
     <h4>コメントの内訳（登録件数）</h4><div id="serialCommentBubbles" class="comment-bubbles"></div>
@@ -877,6 +892,14 @@
     }
 
     function bindEvents(){
+      ['historyFrom','historyTo','historyScope','historyMeasure'].forEach(id=>$(id).addEventListener('change',renderProductHistory));
+      $('historyAll').addEventListener('click',()=>{
+        if(!productHistoryContext)return;
+        const rows=productHistoryRows(),keys=rows.map(row=>row.dateKey).filter(key=>/^\d{4}-\d{2}-\d{2}$/.test(key)).sort();
+        $('historyFrom').value=keys[0]||productHistoryContext.dateKey;
+        $('historyTo').value=keys.at(-1)||productHistoryContext.dateKey;
+        renderProductHistory();
+      });
       ['serialNo','editSerialNo','costSerial','productMasterSerial'].forEach(id=>$(id).addEventListener('change',()=>{normalizeSerialInput($(id));updatePhotoRegistrationLinks();}));
       document.querySelectorAll('input[name="analysisMeasure"]').forEach(input=>input.addEventListener('change',renderAnalysis));
       $('costMasterForm').addEventListener('submit', saveCost);
@@ -1642,7 +1665,32 @@
       });
       return [...comments.values()].sort((a,b)=>b[1]-a[1]);
     }
-    let serialPreviewAnchor;
+    let serialPreviewAnchor,productHistoryContext;
+    function productHistoryRows(){
+      if(!productHistoryContext)return [];
+      const {serial,department}=productHistoryContext;
+      return state.items.filter(row=>productKey(row.serialNo)===serial && ($('historyScope').value==='all'||row.department===department));
+    }
+    function renderProductHistory(){
+      if(!productHistoryContext)return;
+      const from=$('historyFrom').value,to=$('historyTo').value,costMode=$('historyMeasure').value==='cost';
+      state.charts.productHistory?.destroy();delete state.charts.productHistory;
+      if(!from||!to||from>to){$('historySummary').textContent='開始日と終了日を確認してください';return;}
+      const rows=productHistoryRows().filter(row=>row.dateKey>=from&&row.dateKey<=to);
+      const monthly=(new Date(to+'T12:00:00')-new Date(from+'T12:00:00'))/86400000>730;
+      const keys=[];
+      if(monthly){
+        const cursor=new Date(from.slice(0,7)+'-01T12:00:00'),end=new Date(to+'T12:00:00');
+        while(cursor<=end){keys.push(localDateKey(cursor).slice(0,7));cursor.setMonth(cursor.getMonth()+1);}
+      }else keys.push(...dateKeys(from,to));
+      const grouped=new Map(keys.map(key=>[key,[]]));
+      rows.forEach(row=>grouped.get(monthly?row.dateKey.slice(0,7):row.dateKey)?.push(row));
+      const {serial,department}=productHistoryContext;
+      const hasCost=state.costsReady&&state.costs.has(serial);
+      $('historySummary').textContent=`${$('historyScope').value==='all'?'全部署':department} / ${monthly?'月別':'日別'} / 合計 ${sumQty(rows).toLocaleString('ja-JP')}個${costMode?' / '+(hasCost?lossLabel(rows):state.costsReady?'原価未登録（集計対象外）':'原価未取得'):''}`;
+      const unit=costMode?'円':'個';
+      makeChart('productHistory',$('productHistoryChart'),{type:'line',data:{labels:keys,datasets:[{label:costMode?'ロスコスト':'落下品数',data:keys.map(key=>costMode?(hasCost?lossSummary(grouped.get(key)).cents/100:null):sumQty(grouped.get(key))),borderColor:costMode?'#a85c65':'#527f98',backgroundColor:'rgba(82,127,152,.1)',fill:true,tension:0,pointRadius:keys.length>60?0:3,pointHitRadius:8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>costMode?money(ctx.parsed.y*100):`${ctx.parsed.y}個`}}},scales:{x:{ticks:{maxTicksLimit:4,maxRotation:0,callback:function(value){const key=this.getLabelForValue(value);return monthly?key.replace('-','/'):key.slice(5).replace('-','/');}}},y:{beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:unit}}},onClick:(_,elements)=>{if(!elements.length)return;const key=keys[elements[0].index];openDetail(`${serial} / ${key} / ${$('historyScope').value==='all'?'全部署':department}`,grouped.get(key));}}});
+    }
     function closeSerialPreview(restoreFocus=false){
       hideCommentTooltip();
       const anchor=serialPreviewAnchor;
@@ -1652,11 +1700,17 @@
       $('serialPreview').hidden=true;
       state.charts.serialPreview?.destroy();
       delete state.charts.serialPreview;
+      state.charts.productHistory?.destroy();delete state.charts.productHistory;productHistoryContext=null;
     }
     function openSerialPreview(anchor,rows,dateKey){
       if(serialPreviewAnchor===anchor && !$('serialPreview').hidden) return;
       closeSerialPreview();
       serialPreviewAnchor=anchor;
+      productHistoryContext={serial:productKey(anchor.dataset.previewSerial),department:anchor.dataset.previewDept,dateKey};
+      const historyStart=new Date(dateKey+'T12:00:00');historyStart.setDate(historyStart.getDate()-89);
+      $('historyFrom').value=localDateKey(historyStart);$('historyTo').value=dateKey;
+      $('historyScope').value='department';$('historyScope').options[0].textContent=anchor.dataset.previewDept;
+      $('historyMeasure').value='quantity';
       anchor.setAttribute('aria-expanded','true');
       const preview=$('serialPreview');
       $('serialPreviewTitle').textContent=anchor.dataset.previewSerial;
@@ -1670,21 +1724,11 @@
       const photos=rows.flatMap(row=>Array.isArray(row.media)?row.media:[]).filter(file=>file.type!=='video' && safeUrl(file.url));
       $('serialPreviewPhotos').innerHTML=photos.length ? photos.map(file=>`<a href="${esc(safeUrl(file.url))}" target="_blank" rel="noopener"><img src="${esc(safeUrl(file.url))}" alt="${esc(anchor.dataset.previewSerial)}の状況写真" loading="lazy"></a>`).join('') : '<p class="serial-preview-empty">写真はありません</p>';
       preview.hidden=false;
+      preview.scrollTop=0;
       preview.style.maxHeight='calc(100dvh - 24px)';
-      const rect=anchor.getBoundingClientRect();
-      const width=preview.offsetWidth;
-      let left=Math.max(12,Math.min(rect.left,innerWidth-width-12));
-      let top=Math.max(12,Math.min(rect.top,innerHeight-preview.offsetHeight-12));
-      if(rect.left>=width+20) left=rect.left-width-8;
-      else if(innerWidth-rect.right>=width+20) left=rect.right+8;
-      else {
-        const below=innerHeight-rect.bottom-20, above=rect.top-20;
-        const useBelow=below>=above;
-        preview.style.maxHeight=`${Math.max(100,useBelow?below:above)}px`;
-        top=useBelow?rect.bottom+8:Math.max(12,rect.top-preview.offsetHeight-8);
-      }
-      preview.style.left=`${left}px`;
-      preview.style.top=`${top}px`;
+      preview.style.left=`${Math.max(12,(innerWidth-preview.offsetWidth)/2)}px`;
+      preview.style.top='12px';
+      renderProductHistory();
       $('serialCauseChart').setAttribute('aria-label',causes.map((cause,i)=>`${cause} ${totals[i]}個`).join('、'));
       makeChart('serialPreview',$('serialCauseChart'),{type:'doughnut',data:{labels:causes.map((cause,i)=>`${cause} ${totals[i]}個`),datasets:[{data:totals,backgroundColor:['#527f98','#b18b46','#8b9298'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'right'},tooltip:{callbacks:{label:context=>`${causes[context.dataIndex]}：${context.parsed}個`}}}}});
     }
