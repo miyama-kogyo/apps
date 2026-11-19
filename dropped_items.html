@@ -1671,25 +1671,29 @@
       const {serial,department}=productHistoryContext;
       return state.items.filter(row=>productKey(row.serialNo)===serial && ($('historyScope').value==='all'||row.department===department));
     }
+    function isHistoryWeekday(key){
+      const day=new Date(`${key}T12:00:00`).getDay();
+      return day>=1 && day<=5;
+    }
     function renderProductHistory(){
       if(!productHistoryContext)return;
       const from=$('historyFrom').value,to=$('historyTo').value,costMode=$('historyMeasure').value==='cost';
       state.charts.productHistory?.destroy();delete state.charts.productHistory;
       if(!from||!to||from>to){$('historySummary').textContent='開始日と終了日を確認してください';return;}
-      const rows=productHistoryRows().filter(row=>row.dateKey>=from&&row.dateKey<=to);
+      const rows=productHistoryRows().filter(row=>row.dateKey>=from&&row.dateKey<=to&&isHistoryWeekday(row.dateKey));
       const monthly=(new Date(to+'T12:00:00')-new Date(from+'T12:00:00'))/86400000>730;
       const keys=[];
       if(monthly){
         const cursor=new Date(from.slice(0,7)+'-01T12:00:00'),end=new Date(to+'T12:00:00');
         while(cursor<=end){keys.push(localDateKey(cursor).slice(0,7));cursor.setMonth(cursor.getMonth()+1);}
-      }else keys.push(...dateKeys(from,to));
+      }else keys.push(...dateKeys(from,to).filter(isHistoryWeekday));
       const grouped=new Map(keys.map(key=>[key,[]]));
       rows.forEach(row=>grouped.get(monthly?row.dateKey.slice(0,7):row.dateKey)?.push(row));
       const {serial,department}=productHistoryContext;
       const hasCost=state.costsReady&&state.costs.has(serial);
-      $('historySummary').textContent=`${$('historyScope').value==='all'?'全部署':department} / ${monthly?'月別':'日別'} / 合計 ${sumQty(rows).toLocaleString('ja-JP')}個${costMode?' / '+(hasCost?lossLabel(rows):state.costsReady?'原価未登録（集計対象外）':'原価未取得'):''}`;
+      $('historySummary').textContent=`${$('historyScope').value==='all'?'全部署':department} / ${monthly?'月別':'日別'}（土日除外） / 合計 ${sumQty(rows).toLocaleString('ja-JP')}個${costMode?' / '+(hasCost?lossLabel(rows):state.costsReady?'原価未登録（集計対象外）':'原価未取得'):''}${!keys.length?' / 対象の平日がありません':''}`;
       const unit=costMode?'円':'個';
-      makeChart('productHistory',$('productHistoryChart'),{type:'line',data:{labels:keys,datasets:[{label:costMode?'ロスコスト':'落下品数',data:keys.map(key=>costMode?(hasCost?lossSummary(grouped.get(key)).cents/100:null):sumQty(grouped.get(key))),borderColor:costMode?'#a85c65':'#527f98',backgroundColor:'rgba(82,127,152,.1)',fill:true,tension:0,pointRadius:keys.length>60?0:3,pointHitRadius:8}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>costMode?money(ctx.parsed.y*100):`${ctx.parsed.y}個`}}},scales:{x:{ticks:{maxTicksLimit:4,maxRotation:0,callback:function(value){const key=this.getLabelForValue(value);return monthly?key.replace('-','/'):key.slice(5).replace('-','/');}}},y:{beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:unit}}},onClick:(_,elements)=>{if(!elements.length)return;const key=keys[elements[0].index];openDetail(`${serial} / ${key} / ${$('historyScope').value==='all'?'全部署':department}`,grouped.get(key));}}});
+      makeChart('productHistory',$('productHistoryChart'),{type:'bar',data:{labels:keys,datasets:[{label:costMode?'ロスコスト':'落下品数',data:keys.map(key=>costMode?(hasCost?lossSummary(grouped.get(key)).cents/100:null):sumQty(grouped.get(key))),borderColor:costMode?'#a85c65':'#527f98',backgroundColor:costMode?'#a85c65':'#527f98',maxBarThickness:36,borderRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>costMode?money(ctx.parsed.y*100):`${ctx.parsed.y}個`}}},scales:{x:{ticks:{maxTicksLimit:4,maxRotation:0,callback:function(value){const key=this.getLabelForValue(value);return monthly?key.replace('-','/'):key.slice(5).replace('-','/');}}},y:{beginAtZero:true,ticks:{precision:costMode?2:0},title:{display:true,text:unit}}},onClick:(_,elements)=>{if(!elements.length)return;const key=keys[elements[0].index];openDetail(`${serial} / ${key} / ${$('historyScope').value==='all'?'全部署':department}`,grouped.get(key));}}});
     }
     function closeSerialPreview(restoreFocus=false){
       hideCommentTooltip();
