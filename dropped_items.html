@@ -425,6 +425,41 @@
     .product-history-controls input,.product-history-controls select{width:100%;min-width:0;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}
     .product-history-chart{position:relative;height:230px;min-width:0}
     #serialPreview .product-history-heading{display:flex;gap:12px;align-items:center;justify-content:space-between}
+    .preview-section{min-width:0;min-height:0}
+    .preview-section-heading{display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .preview-pager{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+    .preview-pager .icon-btn{width:32px;height:32px;min-height:32px}
+    .preview-pager[hidden]{display:none}
+    @media(min-width:1000px){
+      .serial-preview{width:min(1560px,calc(100vw - 32px));height:min(820px,calc(100dvh - 24px));padding:16px;overflow:hidden;display:flex;flex-direction:column}
+      .serial-preview-head{flex:0 0 auto;margin-bottom:10px}
+      .preview-layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) 190px;gap:16px 24px}
+      .preview-history{display:flex;flex-direction:column;min-height:0}
+      .preview-overview{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;min-height:0}
+      .serial-preview h4{margin:0 0 8px;font-size:14px}
+      .product-history-controls{margin:8px 0;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+      .product-history-chart{height:auto;flex:1;min-height:100px}
+      #historySummary{margin:4px 0 8px;font-size:12px}
+      .preview-overview .preview-section{display:flex;flex-direction:column}
+      #serialProductPhoto{min-height:0;flex:1;overflow:auto}
+      .product-reference{margin:0;height:100%;display:flex;flex-direction:column}
+      .product-reference>a{flex:1;min-height:0;display:block}
+      .product-reference img{height:100%;max-height:none}
+      .serial-preview-chart{height:auto;min-height:0;flex:1}
+      .preview-comments,.preview-media{display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:10px}
+      .preview-section-heading{margin-bottom:8px;min-height:32px}
+      .preview-section-heading h4{margin:0}
+      #serialCommentBubbles{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+      #serialCommentBubbles .comment-bubble{width:auto!important;min-height:0!important;max-width:100%;border-radius:8px;font-size:14px;padding:10px;overflow:auto}
+      #serialPreviewPhotos{flex:1;min-height:0;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+      #serialPreviewPhotos a{min-height:0}
+      #serialPreviewPhotos img{height:100%;max-height:130px}
+    }
+    @media(min-width:1000px) and (max-height:760px){
+      .preview-layout{grid-template-rows:minmax(0,1fr) 155px;gap:10px 16px}
+      .product-history-controls input,.product-history-controls select{padding:5px}
+      #serialPreviewPhotos img{max-height:95px}
+    }
   </style>
 </head>
 <body>
@@ -663,7 +698,8 @@
   <div id="commentTooltip" class="comment-tooltip" role="tooltip" hidden></div>
   <aside id="serialPreview" class="serial-preview" role="dialog" aria-modal="false" aria-labelledby="serialPreviewTitle" hidden>
     <div class="serial-preview-head"><div><h3 id="serialPreviewTitle"></h3><p id="serialPreviewMeta" class="serial-preview-meta"></p></div><button id="closeSerialPreview" type="button" class="icon-btn" aria-label="品番プレビューを閉じる" title="閉じる"><i data-lucide="x"></i></button></div>
-    <section aria-label="製品別の過去推移">
+    <div class="preview-layout">
+    <section class="preview-section preview-history" aria-label="製品別の過去推移">
       <div class="product-history-heading"><h4>過去からの推移</h4><button type="button" id="historyAll" class="btn btn-secondary">全期間</button></div>
       <div class="product-history-controls">
         <label>開始日<input type="date" id="historyFrom"></label><label>終了日<input type="date" id="historyTo"></label>
@@ -673,10 +709,13 @@
       <p id="historySummary" class="cost-note" role="status"></p>
       <div class="product-history-chart"><canvas id="productHistoryChart" role="img" aria-label="製品の落下推移"></canvas></div>
     </section>
-    <h4>製品写真</h4><div id="serialProductPhoto"></div>
-    <h4>原因内訳（落下個数）</h4><div class="serial-preview-chart"><canvas id="serialCauseChart" role="img" aria-label="原因別の落下個数"></canvas></div>
-    <h4>コメントの内訳（登録件数）</h4><div id="serialCommentBubbles" class="comment-bubbles"></div>
-    <h4>状況写真</h4><div id="serialPreviewPhotos" class="preview-photos"></div>
+    <div class="preview-overview">
+      <section class="preview-section"><h4>製品写真</h4><div id="serialProductPhoto"></div></section>
+      <section class="preview-section"><h4>原因内訳（落下個数）</h4><div class="serial-preview-chart"><canvas id="serialCauseChart" role="img" aria-label="原因別の落下個数"></canvas></div></section>
+    </div>
+    <section class="preview-section preview-comments"><div class="preview-section-heading"><h4>コメントの内訳（登録件数）</h4><div id="commentPager" class="preview-pager" hidden><button type="button" class="icon-btn" data-preview-page="comments:-1" title="前のコメント" aria-label="前のコメント"><i data-lucide="chevron-left"></i></button><span id="commentPageLabel"></span><button type="button" class="icon-btn" data-preview-page="comments:1" title="次のコメント" aria-label="次のコメント"><i data-lucide="chevron-right"></i></button></div></div><div id="serialCommentBubbles" class="comment-bubbles"></div></section>
+    <section class="preview-section preview-media"><div class="preview-section-heading"><h4>状況写真</h4><div id="photoPager" class="preview-pager" hidden><button type="button" class="icon-btn" data-preview-page="photos:-1" title="前の写真" aria-label="前の写真"><i data-lucide="chevron-left"></i></button><span id="photoPageLabel"></span><button type="button" class="icon-btn" data-preview-page="photos:1" title="次の写真" aria-label="次の写真"><i data-lucide="chevron-right"></i></button></div></div><div id="serialPreviewPhotos" class="preview-photos"></div></section>
+    </div>
   </aside>
   <div class="modal" id="detailModal" aria-hidden="true">
     <div class="modal-card">
@@ -892,6 +931,7 @@
     }
 
     function bindEvents(){
+      document.querySelectorAll('[data-preview-page]').forEach(button=>button.addEventListener('click',()=>{const [kind,step]=button.dataset.previewPage.split(':');if(!previewPages)return;previewPages[kind+'Page']+=Number(step);renderPreviewPages();}));
       ['historyFrom','historyTo','historyScope','historyMeasure'].forEach(id=>$(id).addEventListener('change',renderProductHistory));
       $('historyAll').addEventListener('click',()=>{
         if(!productHistoryContext)return;
@@ -1665,7 +1705,25 @@
       });
       return [...comments.values()].sort((a,b)=>b[1]-a[1]);
     }
-    let serialPreviewAnchor,productHistoryContext;
+    let serialPreviewAnchor,productHistoryContext,previewPages;
+    function renderPreviewPages(){
+      if(!previewPages)return;
+      const {comments,photos,serial}=previewPages,max=comments[0]?.[1]||1;
+      const desktop=innerWidth>=1000;
+      function page(kind,rows,size,pager,label){
+        const pages=Math.max(1,Math.ceil(rows.length/size));
+        const index=previewPages[kind+'Page']=Math.max(0,Math.min(pages-1,previewPages[kind+'Page']));
+        $(pager).hidden=pages<=1;$(label).textContent=`${index+1} / ${pages}`;
+        document.querySelector(`[data-preview-page="${kind}:-1"]`).disabled=index===0;
+        document.querySelector(`[data-preview-page="${kind}:1"]`).disabled=index===pages-1;
+        return rows.slice(index*size,(index+1)*size);
+      }
+      const shownComments=page('comments',comments,desktop?2:Math.max(1,comments.length),'commentPager','commentPageLabel');
+      const shownPhotos=page('photos',photos,desktop?3:Math.max(1,photos.length),'photoPager','photoPageLabel');
+      $('serialCommentBubbles').innerHTML=shownComments.length ? shownComments.map(([comment,count,cause])=>`<div class="comment-bubble ${causeClass(cause)}" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${esc(cause)}・${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
+      $('serialPreviewPhotos').innerHTML=shownPhotos.length ? shownPhotos.map(file=>`<a href="${esc(safeUrl(file.url))}" target="_blank" rel="noopener"><img src="${esc(safeUrl(file.url))}" alt="${esc(serial)}の状況写真" loading="lazy"></a>`).join('') : '<p class="serial-preview-empty">写真はありません</p>';
+      refreshIcons();
+    }
     function productHistoryRows(){
       if(!productHistoryContext)return [];
       const {serial,department}=productHistoryContext;
@@ -1731,6 +1789,7 @@
       state.charts.serialPreview?.destroy();
       delete state.charts.serialPreview;
       state.charts.productHistory?.destroy();delete state.charts.productHistory;productHistoryContext=null;
+      previewPages=null;
     }
     function openSerialPreview(anchor,rows,dateKey){
       if(serialPreviewAnchor===anchor && !$('serialPreview').hidden) return;
@@ -1749,10 +1808,9 @@
       const causes=['設備','作業','その他'];
       const totals=causes.map(cause=>sumQty(rows.filter(row=>(causes.includes(row.cause)?row.cause:'その他')===cause)));
       const comments=commentCounts(rows);
-      const max=comments[0]?.[1]||1;
-      $('serialCommentBubbles').innerHTML=comments.length ? comments.map(([comment,count,cause])=>`<div class="comment-bubble ${causeClass(cause)}" style="width:${140+80*Math.sqrt(count/max)}px;min-height:${76+36*Math.sqrt(count/max)}px"><span>${esc(comment)}</span><strong>${esc(cause)}・${count}件</strong></div>`).join('') : '<p class="serial-preview-empty">コメントはありません</p>';
       const photos=rows.flatMap(row=>Array.isArray(row.media)?row.media:[]).filter(file=>file.type!=='video' && safeUrl(file.url));
-      $('serialPreviewPhotos').innerHTML=photos.length ? photos.map(file=>`<a href="${esc(safeUrl(file.url))}" target="_blank" rel="noopener"><img src="${esc(safeUrl(file.url))}" alt="${esc(anchor.dataset.previewSerial)}の状況写真" loading="lazy"></a>`).join('') : '<p class="serial-preview-empty">写真はありません</p>';
+      previewPages={comments,photos,serial:anchor.dataset.previewSerial,commentsPage:0,photosPage:0};
+      renderPreviewPages();
       preview.hidden=false;
       preview.scrollTop=0;
       preview.style.maxHeight='calc(100dvh - 24px)';
@@ -1760,7 +1818,7 @@
       preview.style.top='12px';
       renderProductHistory();
       $('serialCauseChart').setAttribute('aria-label',causes.map((cause,i)=>`${cause} ${totals[i]}個`).join('、'));
-      makeChart('serialPreview',$('serialCauseChart'),{type:'doughnut',data:{labels:causes.map((cause,i)=>`${cause} ${totals[i]}個`),datasets:[{data:totals,backgroundColor:['#527f98','#b18b46','#8b9298'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'right'},tooltip:{callbacks:{label:context=>`${causes[context.dataIndex]}：${context.parsed}個`}}}}});
+      makeChart('serialPreview',$('serialCauseChart'),{type:'doughnut',data:{labels:causes.map((cause,i)=>`${cause} ${totals[i]}個`),datasets:[{data:totals,backgroundColor:['#527f98','#b18b46','#8b9298'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:innerWidth>=1000?'bottom':'right'},tooltip:{callbacks:{label:context=>`${causes[context.dataIndex]}：${context.parsed}個`}}}}});
     }
 
     function makeChart(key, canvas, config){
