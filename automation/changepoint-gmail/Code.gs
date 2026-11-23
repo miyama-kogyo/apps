@@ -332,7 +332,8 @@ function notificationStreams() {
     {kind:'unplanned_approved',field:'senderApprovedAt',cursor:'CURSOR_UNPLANNED_APPROVED'},
     {kind:'response_approved',field:'responseApprovedAt',cursor:'CURSOR_RESPONSE_APPROVED'},
     {kind:'distribution',field:'distributionRequestedAt',cursor:'CURSOR_DISTRIBUTION'},
-    {kind:'quality_result',field:'qualityEvaluationUpdatedAt',cursor:'CURSOR_QUALITY_RESULT'}
+    {kind:'quality_result',field:'qualityEvaluationUpdatedAt',cursor:'CURSOR_QUALITY_RESULT'},
+    {kind:'content_changed',field:'contentChangedAt',cursor:'CURSOR_CONTENT_CHANGED'}
   ];
 }
 
@@ -425,6 +426,7 @@ function collectOverdueReminders() {
 }
 
 function isResultNotificationCurrent(item, kind) {
+  if (kind === 'content_changed') return Boolean(item && item.contentChangedAt && item.contentChangedBy && item.contentChangeSummary);
   if (!item || !(item.type === 'planned' || item.workflowManaged === true)) return false;
   if (item.switchStatus === 'canceled' || item.switchState === 'canceled') return false;
   if (kind === 'distribution') return Boolean(item.distributionRequestedAt);
@@ -478,6 +480,7 @@ function collectNotificationStream(stream) {
 }
 
 function resolveRecipient(item, departments, kind) {
+  if (kind === 'content_changed') return resolveContentChangeRecipient(item,departments);
   if (kind === 'distribution' || kind === 'quality_result') return resolveDistributionRecipient(item,departments,item.qualityEvaluationRequired === true || item.distributionGroups && item.distributionGroups.length ? readDistributionGroups() : []);
   if (kind === 'overdue_reminder') {
     if (item.type === 'sudden') return resolveRecipient(item,departments,'approval_request');
@@ -659,6 +662,7 @@ function processApprovalJobs() {
         continue;
       }
       const message = kind === 'approval_request' ? approvalMessage(item, recipient)
+        : kind === 'content_changed' ? contentChangeMessage(item,recipient)
         : kind === 'distribution' ? distributionMessage(item,recipient)
         : kind === 'quality_result' ? qualityResultMessage(item,recipient)
         : reminder ? overdueReminderMessage(item,recipient) : resultMessage(item,recipient,kind);

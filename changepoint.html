@@ -4701,15 +4701,33 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       catch (err) { alert('削除に失敗しました: ' + (err.message || err)); return false; }
     };
 
+    let editOriginal = null;
+    const editableChangeLabels = {planneddepartment:'発信部署',category:'分類',department:'発生部署',lineName:'ライン',processName:'工程',serialNo:'整理No',content:'変化点内容',occurrenceDate:'実施予定日・実施日',occurrenceTime:'発生時刻',lot:'対象ロット',document:'関連資料'};
+    function buildContentEdit(latest, original, values, who) {
+      if (!latest || latest.type !== original.type) throw new Error('状態が変更されています。開き直してください。');
+      const fields = {}, changes = [];
+      for (const [key,label] of Object.entries(editableChangeLabels)) {
+        if (String(latest[key] || '') !== String(original[key] || '')) throw new Error('内容が他の利用者によって変更されています。開き直してください。');
+        if (String(values[key] || '') === String(original[key] || '')) continue;
+        fields[key] = key === 'occurrenceDate' ? values[key] || null : values[key];
+        changes.push(label + '\n変更前: ' + (original[key] || '未設定') + '\n変更後: ' + (values[key] || '未設定'));
+      }
+      if (!changes.length) return null;
+      // Only scheduling state follows a changed date; completed/canceled and workflow stamps stay intact.
+      if ('occurrenceDate' in fields && !boardCompleted(latest) && !boardCanceled(latest)) fields.switchStatus = fields.occurrenceDate ? 'scheduled' : 'undecided';
+      return {...fields, contentChangedAt:serverTimestamp(), contentChangedBy:who,
+        contentChangeSummary:changes.join('\n\n'), updatedAt:serverTimestamp(), updatedBy:who};
+    }
     function openEditModal(id) {
       const item = changepointData.find(x => x._id === id);
       if (!item) return;
       if(item.type==='sudden' && !canQualityCheck(item)){alert('完了・中止後の内容は変更できません。');return;}
+      editOriginal = {...item};
       const container = document.getElementById('editFormContainer');
       container.innerHTML = `
         <input type="hidden" id="editId" value="${item._id}">
         <div class="form-row">
-          <div class="form-group"><label>計画区分</label><select id="editType"><option value="planned" ${item.type === 'planned' ? 'selected' : ''}>計画</option><option value="sudden" ${item.type === 'sudden' ? 'selected' : ''}>計画外</option></select></div>
+          <div class="form-group"><label>計画区分</label><select id="editType" disabled><option value="planned" ${item.type === 'planned' ? 'selected' : ''}>計画</option><option value="sudden" ${item.type === 'sudden' ? 'selected' : ''}>計画外</option></select></div>
           <div class="form-group"><label>工程名・作業内容</label><input type="text" id="editProcessName" value="${escapeAttr(item.processName || '')}"></div>
         </div>
         <div class="form-row">
@@ -4736,13 +4754,13 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
       document.getElementById('editModal').classList.add('active');
     }
 
-    document.getElementById('btnEditSave').addEventListener('click', async () => {
+    document.getElementById('btnEditSave').addEventListener('click', async (event) => {
       const id = document.getElementById('editId').value;
       if (!id) return;
-      const original = changepointData.find(x => x._id === id);
+      const original = editOriginal;
+      if (!original || original._id !== id) return;
       const updates = {
         type: document.getElementById('editType').value,
-        workflowManaged: true,
         planneddepartment: document.getElementById('editPlannedDept').value,
         category: document.getElementById('editCategory').value,
         department: document.getElementById('editDepartment').value,
@@ -4753,45 +4771,26 @@ ${data.documentUrl ? `<div class="section"><div class="section-title">📁 添�
         occurrenceDate: document.getElementById('editDate').value,
         occurrenceTime: document.getElementById('editTime').value,
         lot: document.getElementById('editLot').value,
-        document: document.getElementById('editDocument').value,
-        approvalStatus: 'draft',
-        approvalRequestedAt: serverTimestamp(),
-        senderApprovedBy: null,
-        senderApprovedAt: null,
-        receiverConfirmedBy: null,
-        receiverConfirmedAt: null,
-        receiverApprovedBy: null,
-        receiverApprovedAt: null,
-        specialHandlingStatus: '',
-        specialNotes: '',
-        qualityComment: '',
-        engineeringComment: '',
-        continuedManagementRequired: false,
-        managementUntil: '',
-        relatedReviewCompleted: false,
-        checklistItems: getRecordChecklist(original).map(x => ({ ...x, senderChecked:false, receiverChecked:false, senderResult:'', receiverResult:'' }))
+        document: document.getElementById('editDocument').value
       };
-      if (updates.category !== original.category){
-        updates.checklistItems = masterChecklistFor(updates.category);
-        updates.excludedChecklistItems = [];
-      } else {
-        updates.excludedChecklistItems = Array.isArray(original.excludedChecklistItems) ? original.excludedChecklistItems : [];
-      }
-      if (original.type==='sudden'){
-        if(updates.type!=='sudden'){alert('計画外の計画区分は変更できません。');return;}
-        Object.assign(updates,{workflowKind:'unplanned_response_v2',workflowManaged:true,qualityCheckOnly:true,responseDepartment:'品質',approvalStatus:'draft',approvalRequestedAt:serverTimestamp(),checklistItems:original.checklistItems || [],excludedChecklistItems:original.excludedChecklistItems || [],postCheckRevision:(original.postCheckRevision || 0)+1});
-      }
+      if (updates.type !== original.type){alert('計画区分は変更できません。');return;}
       if (!updates.planneddepartment || !updates.department || (!updates.category && updates.type==='planned') || !updates.lineName.trim() || !updates.processName || !updates.content.trim() || (updates.type !== 'planned' && !updates.occurrenceDate)){ alert('発信部署、発生部署、計画の分類、ライン、工程、内容、計画外の実施日は必須です'); return; }
-      if (!updates.occurrenceDate){ updates.occurrenceDate = null; updates.switchStatus = 'undecided'; }
+      if (!Object.keys(editableChangeLabels).some(key=>String(updates[key] || '')!==String(original[key] || ''))){alert('変更はありません。');return;}
+      const who = getActorName(true,'変更者の氏名を入力してください');
+      if (!who || !who.trim()) return;
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      button.disabled = true;
       try {
-        if(original.type==='sudden') await runTransaction(db,async tx=>{
+        await runTransaction(db,async tx=>{
           const ref=doc(db,'changepoints',id),snap=await tx.get(ref),latest=snap.exists()?snap.data():null;
-          if(!canQualityCheck(latest) || unplannedVersion(latest)!==unplannedVersion(original))throw new Error('状態が変更されています。開き直してください。');
-          tx.update(ref,updates);
+          if(original.type==='sudden' && !canQualityCheck(latest))throw new Error('状態が変更されています。開き直してください。');
+          const fields = buildContentEdit(latest,original,updates,who.trim());
+          if(fields) tx.update(ref,fields);
         });
-        else await updateDoc(doc(db, 'changepoints', id), updates);
-        alert('保存しました。内容変更のため確認・承認状態を未完了に戻しました'); document.getElementById('editModal').classList.remove('active'); }
+        alert('保存しました。チェック・承認状態は維持されます。承認先と発信部署の通知先に変更通知を送ります。'); document.getElementById('editModal').classList.remove('active'); }
       catch (err) { alert('保存に失敗しました: ' + (err.message || err)); }
+      finally { button.disabled = false; }
     });
     document.getElementById('btnEditCancel').addEventListener('click', () => { document.getElementById('editModal').classList.remove('active'); });
     document.getElementById('editClose').addEventListener('click', () => { document.getElementById('editModal').classList.remove('active'); });

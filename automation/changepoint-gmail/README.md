@@ -116,3 +116,13 @@ Firebaseの読み取り回数は別途発生し、既存アプリと同じ利用
 - https://developers.google.com/apps-script/guides/triggers/installable?hl=ja
 - https://firebase.google.com/docs/firestore/use-rest-api
 - https://cloud.google.com/firestore/native/docs/security/iam
+# 内容変更通知（2026-11-24）
+
+- 内容編集ではチェック結果・承認スタンプ・進行状況・実際の切替日時を維持する。分類を変更しても既存チェック項目を置き換えない。計画区分は編集時に変更不可。
+- 実際に変更があった保存だけ `contentChangedAt` を更新し、変更者と変更前後を記録する。再承認依頼の日時は更新しない。
+- `ContentChangeNotification.gs` を同じApps Scriptプロジェクトに追加し、`Code.gs` と合わせて保存する。既存の5分トリガー、開始日時、他通知カーソルは変更しない。
+- 発信部署と発生部署の承認先、および発信部署の通知先へ通知する。同一アドレスは重複除外。宛先不備・許可外・枠不足では一部送信せず保留する。
+- 承認済みの案件も変更通知の対象。本文は変更前後と詳細リンクを表示し、再承認依頼ではないことを明示する。
+- 送信前に再編集された場合、古い未送信通知は破棄し、最新の変更通知を送る。5分以内の全編集履歴を逐次配信するものではない。
+- 専用カーソルは `CURSOR_CONTENT_CHANGED`。新規フィールドがない過去案件へ遡って通知しない。
+

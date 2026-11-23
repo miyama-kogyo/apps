@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
-const source = fs.readFileSync(`${__dirname}/Code.gs`, 'utf8');
+const source = fs.readFileSync(`${__dirname}/Code.gs`, 'utf8') + '\n' + fs.readFileSync(`${__dirname}/ContentChangeNotification.gs`, 'utf8');
 const prefix = 'projects/abnreport-fd733/databases/(default)/documents';
 const at = '2026-10-08T01:00:00.123456Z';
 const record = (overrides = {}) => ({_name:`${prefix}/changepoints/test card`,type:'planned',approvalStatus:'draft',approvalRequestedAt:at,planneddepartment:'Sender',department:'Receiver',createdBy:'Creator',content:'Test only',...overrides});
@@ -64,6 +64,39 @@ function setup() {
   vm.createContext(ctx);vm.runInContext(source,ctx);
   const jobs=()=>Object.entries(state).filter(([k])=>k.startsWith('job_')).map(([key,v])=>({key,...JSON.parse(v)}));
   return {ctx,state,sent,requests,triggers,writes,deleted,env,jobs};
+}
+{
+ const u=setup();
+ u.state.ALLOWED_RECIPIENTS+=',origin-notify@example.com';
+ u.env.records=[record({approvalStatus:'approved',switchStatus:'completed',contentChangedAt:at,contentChangedBy:'Editor',contentChangeSummary:'Content: old -> new'})];
+ u.ctx.pollApprovalNotifications();
+ assert.equal(u.sent.length,1);
+ assert.deepEqual(u.sent[0].to.split(',').sort(),['origin-notify@example.com','receiver@example.com','sender@example.com']);
+ assert(u.sent[0].body.includes('再承認の依頼ではありません'));
+ assert(u.sent[0].body.includes('&view=detail'));
+ assert(u.sent[0].body.includes('old -> new'));
+ u.ctx.pollApprovalNotifications();assert.equal(u.sent.length,1);
+ u.env.departments[0].notificationEmail='sender@example.com';
+ u.env.departments[1].approverEmail='sender@example.com';
+ assert.equal(u.ctx.resolveRecipient(u.env.records[0],u.env.departments,'content_changed').emails.length,1);
+ u.env.departments[0].notificationEmail='';
+ assert.throws(()=>u.ctx.resolveRecipient(u.env.records[0],u.env.departments,'content_changed'));
+ for(const state of ['draft','sender_approved','receiver_confirmed','approved']) assert(u.ctx.isResultNotificationCurrent(record({approvalStatus:state,contentChangedAt:at,contentChangedBy:'Editor',contentChangeSummary:'Change'}),'content_changed'));
+ for(const failure of ['stale','deleted','quota','uncertain','missing','readError']) {
+   const x=setup();x.state.ALLOWED_RECIPIENTS+=',origin-notify@example.com';
+   x.env.records=[record({approvalStatus:'approved',contentChangedAt:at,contentChangedBy:'Editor',contentChangeSummary:'Change'})];
+   x.ctx.collectApprovalRequests();
+   if(failure==='stale')x.env.records[0].contentChangedAt='2026-10-08T02:00:00Z';
+   if(failure==='deleted')x.env.records=[];
+   if(failure==='quota')x.env.quota=2;
+   if(failure==='uncertain')x.env.sendError=true;
+   if(failure==='missing')x.env.departments[0].notificationEmail='';
+   if(failure==='readError')x.ctx.firestoreRead=()=>{throw Error('read failed');};
+   try{x.ctx.processApprovalJobs();}catch(e){assert.equal(failure,'readError');}
+   assert.equal(x.sent.length,failure==='uncertain'?1:0);
+   if(failure==='uncertain'){x.ctx.processApprovalJobs();assert.equal(x.sent.length,1);assert.equal(x.jobs()[0].state,'uncertain');}
+ }
+ console.log('PASS content edit notifications: completed/waiting, approvers + origin, dedup, stale/deleted, quota, missing, read failure, uncertain.');
 }
 {
  const u=setup();
