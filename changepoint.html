@@ -2411,10 +2411,25 @@
       return [...masterItems, ...customItems];
     }
 
+    function normalizeChecklistKeys(items){
+      const reserved = new Set(items.map(x=>x.key).filter(key=>typeof key==='string' && key.trim()));
+      const used = new Set();
+      return items.map((item,index)=>{
+        let key = item.key;
+        if(typeof key!=='string' || !key.trim() || used.has(key)){
+          const base = item.masterId ? `master_${item.masterId}` : `legacy_check_${index}`;
+          key = base;
+          let suffix = 1;
+          while(reserved.has(key) || used.has(key)) key = `${base}_${suffix++}`;
+        }
+        used.add(key);
+        return {...item,key};
+      });
+    }
     function getRecordChecklist(item){
       if (item?.type === 'sudden') return [];
       const masterItems = masterChecklistFor(item?.category || '');
-      if (!Array.isArray(item?.checklistItems) || !item.checklistItems.length) return masterItems;
+      if (!Array.isArray(item?.checklistItems) || !item.checklistItems.length) return normalizeChecklistKeys(masterItems);
       const masterById = new Map(masterItems.map(x => [x.masterId, x]));
       const stored = item.checklistItems.map(x => {
         const currentMaster = x.masterId ? masterById.get(x.masterId) : null;
@@ -2426,7 +2441,8 @@
       const excludedMasterIds = new Set(excluded.map(x => x.masterId).filter(Boolean));
       const excludedLabels = new Set(excluded.map(x => String(x.label || '').trim()).filter(Boolean));
       const missing = masterItems.filter(x => !existingMasterIds.has(x.masterId) && !existingLabels.has(String(x.label || '').trim()) && !excludedMasterIds.has(x.masterId) && !excludedLabels.has(String(x.label || '').trim()));
-      return [...stored, ...missing];
+      // Older records can lack a key: the UI and transaction must resolve the same identifier.
+      return normalizeChecklistKeys([...stored, ...missing]);
     }
 
     function renderPlanChecklistPreview(){
